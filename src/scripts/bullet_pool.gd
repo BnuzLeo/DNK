@@ -149,9 +149,9 @@ func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
 		return
 
 	var pos := bullet.global_position
-	var floor_max_x := 5 * 960 + 50
-	var floor_max_y := 5 * 640 + 50
-	if pos.x < -50 or pos.x > floor_max_x or pos.y < -50 or pos.y > floor_max_y:
+	var floor_max_x: float = 5 * 960 + 50
+	var floor_max_y: float = 5 * 640 + 50
+	if pos.x < -50.0 or pos.x > floor_max_x or pos.y < -50.0 or pos.y > floor_max_y:
 		_recycle_bullet(bullet, is_player)
 
 

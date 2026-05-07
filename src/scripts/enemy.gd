@@ -6,10 +6,11 @@ const CONTACT_COOLDOWN := 1.0
 
 var max_hp := 20
 var hp := 20
-var room_origin := Vector2.ZERO  # 敌人所属房间的左上角坐标
+var room_origin := Vector2.ZERO
 var _flash_timer := 0.0
 var _player: CharacterBody2D
 var _contact_cooldown := 0.0
+var _dying := false
 
 # 冰冻/减速
 var _slow_factor := 1.0
@@ -84,7 +85,7 @@ func _physics_process(delta: float) -> void:
 
 func take_damage(amount: int) -> void:
 	if _frozen:
-		amount = int(amount * 1.5)  # 冰冻状态受到 1.5 倍伤害
+		amount = int(amount * 1.5)
 	hp -= amount
 	_flash_timer = 0.1
 	modulate = Color.WHITE * 3.0
@@ -107,6 +108,7 @@ func add_freeze_stack(amount: float) -> void:
 
 
 func _die() -> void:
+	_dying = true
 	queue_free()
 
 
@@ -122,8 +124,7 @@ func _on_area_entered(_area: Area2D) -> void:
 
 func _draw() -> void:
 	var color := Color(0.3, 0.7, 1.0) if _frozen else Color(1.0, 0.0, 1.0)
-	draw_circle(Vector2.ZERO, 12.0, color)
-	draw_arc(Vector2.ZERO, 12.0, 0, TAU, 24, Color.WHITE, 1.5)
-	# 减速指示
+	draw_circle(Vector2.ZERO, 8.0, color)
+	draw_arc(Vector2.ZERO, 8.0, 0, TAU, 24, Color.WHITE, 1.5)
 	if _slow_factor < 1.0 and not _frozen:
-		draw_arc(Vector2.ZERO, 15.0, 0, TAU * _slow_factor, 16, Color(0.3, 0.7, 1.0, 0.5), 2.0)
+		draw_arc(Vector2.ZERO, 11.0, 0, TAU * _slow_factor, 16, Color(0.3, 0.7, 1.0, 0.5), 2.0)

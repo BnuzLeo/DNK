@@ -1,17 +1,15 @@
 extends Node2D
 
-# 房间状态
+## 主场景控制器 - 房间制地牢 + HUD + 小地图
+
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 
 const CELL_SIZE := Vector2(960, 640)
 const WALL_T := 16.0
-const DOOR_W := 64.0
 const DOOR_GAP := 180.0
 const GRID_SIZE := 5
 const CENTER := Vector2i(2, 2)
-const SPAWN_INTERVAL := 0.8
 
-# 房间数据
 class RoomData:
 	var grid_pos: Vector2i
 	var state: int = RoomState.INACTIVE
@@ -20,25 +18,15 @@ class RoomData:
 	var is_start: bool = false
 	var explored: bool = false
 
-var _rooms: Dictionary = {}  # Vector2i → RoomData
+var _rooms: Dictionary = {}
 var _current_room: Vector2i = CENTER
 var _game_over := false
 var _boss_defeated := false
-var _spawn_queue: Array = []
-var _spawn_timer := 0.0
 
-# 房间连接（哪些方向有门）
-var _doors: Dictionary = {}  # Vector2i → {n:bool, s:bool, e:bool, w:bool}
-
-# 门区域
-var _door_n: Area2D
-var _door_s: Area2D
-var _door_e: Area2D
-var _door_w: Area2D
+var _doors: Dictionary = {}
 
 # HUD
 var _fps_label: Label
-var _stats_label: Label
 var _kills_label: Label
 var _weapon_label: Label
 var _hp_bar: ColorRect
@@ -47,8 +35,6 @@ var _mana_bar: ColorRect
 var _mana_bar_bg: ColorRect
 var _room_label: Label
 var _minimap: Control
-
-@onready var cam: Camera2D = $Camera2D
 
 
 func _ready() -> void:
@@ -63,10 +49,8 @@ func _ready() -> void:
 	# 玩家出生在起点房间中心
 	var start_center: Vector2 = Vector2(CENTER) * CELL_SIZE + CELL_SIZE / 2
 	$Player.position = start_center
-	cam.position = start_center
 
 	_enter_room(CENTER)
-	_update_camera_limits()
 
 
 func _generate_floor() -> void:
@@ -74,13 +58,9 @@ func _generate_floor() -> void:
 	_doors.clear()
 	_boss_defeated = false
 
-	# 确定 Boss 房间位置（随机边缘）
 	var boss_pos := _random_edge_room()
-
-	# 从中心到 Boss 生成一条路径
 	var path := _generate_path(CENTER, boss_pos)
 
-	# 路径上的房间都激活
 	for pos in path:
 		_rooms[pos] = RoomData.new()
 		_rooms[pos].grid_pos = pos
@@ -89,7 +69,6 @@ func _generate_floor() -> void:
 		if pos == CENTER:
 			_rooms[pos].is_start = true
 
-	# 路径之外加几个随机房间增加探索感
 	for pos in path:
 		for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 			var adj: Vector2i = pos + dir
@@ -97,7 +76,6 @@ func _generate_floor() -> void:
 				_rooms[adj] = RoomData.new()
 				_rooms[adj].grid_pos = adj
 
-	# 生成门连接
 	for pos in _rooms:
 		_doors[pos] = {"n": false, "s": false, "e": false, "w": false}
 	for pos in _rooms:
@@ -127,7 +105,6 @@ func _generate_path(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
 	while current != to:
 		var dx := signi(to.x - current.x)
 		var dy := signi(to.y - current.y)
-		# 随机选择水平或垂直移动
 		if randf() < 0.5 and dx != 0:
 			current.x += dx
 		elif dy != 0:
@@ -146,7 +123,6 @@ func _in_bounds(pos: Vector2i) -> bool:
 func _enter_room(pos: Vector2i) -> void:
 	_current_room = pos
 	var room: RoomData = _rooms[pos]
-
 	if not room.explored:
 		room.explored = true
 		room.state = RoomState.ACTIVE
@@ -199,17 +175,16 @@ func _spawn_boss(pos: Vector2, room: RoomData, origin: Vector2) -> void:
 
 
 func _on_enemy_died(room: RoomData) -> void:
-	room.enemies = room.enemies.filter(func(e): return is_instance_valid(e))
+	room.enemies = room.enemies.filter(func(e): return is_instance_valid(e) and not e._dying)
 	if room.enemies.is_empty():
 		_room_cleared(room)
 
 
 func _on_boss_died(room: RoomData) -> void:
 	_boss_defeated = true
-	room.enemies = room.enemies.filter(func(e): return is_instance_valid(e))
+	room.enemies = room.enemies.filter(func(e): return is_instance_valid(e) and not e._dying)
 	if room.enemies.is_empty():
 		_room_cleared(room)
-	# 显示传送门提示
 	_show_portal_hint()
 
 
@@ -230,30 +205,9 @@ func _show_portal_hint() -> void:
 	canvas.layer = 30
 	canvas.add_child(label)
 	add_child(canvas)
-	# 3 秒后消失
 	await get_tree().create_timer(3.0).timeout
 	if is_instance_valid(canvas):
 		canvas.queue_free()
-
-
-func _update_camera_limits() -> void:
-	# 摄像机限制为整个已探索楼层区域
-	var min_x := 999999.0
-	var min_y := 999999.0
-	var max_x := -999999.0
-	var max_y := -999999.0
-	for pos in _rooms:
-		var room: RoomData = _rooms[pos]
-		if room.explored:
-			var o: Vector2 = Vector2(pos) * CELL_SIZE
-			min_x = minf(min_x, o.x)
-			min_y = minf(min_y, o.y)
-			max_x = maxf(max_x, o.x + CELL_SIZE.x)
-			max_y = maxf(max_y, o.y + CELL_SIZE.y)
-	cam.limit_left = int(min_x)
-	cam.limit_top = int(min_y)
-	cam.limit_right = int(max_x)
-	cam.limit_bottom = int(max_y)
 
 
 func _physics_process(_delta: float) -> void:
@@ -274,7 +228,6 @@ func _physics_process(_delta: float) -> void:
 			room.explored = true
 			room.state = RoomState.ACTIVE
 			_spawn_enemies(grid_pos)
-			_update_camera_limits()
 			queue_redraw()
 			if _minimap:
 				_minimap.queue_redraw()
@@ -283,7 +236,7 @@ func _physics_process(_delta: float) -> void:
 			if _minimap:
 				_minimap.queue_redraw()
 
-	# 边界碰撞：未清空的房间，敌人存在时不能穿过门
+	# 边界碰撞：未清空房间不能穿过门
 	var origin: Vector2 = Vector2(_current_room) * CELL_SIZE
 	var margin := 16.0
 	var door_zone := DOOR_GAP / 2
@@ -292,40 +245,36 @@ func _physics_process(_delta: float) -> void:
 	var cx := origin.x + CELL_SIZE.x / 2
 	var cy := origin.y + CELL_SIZE.y / 2
 
-	# 上边界
 	if player_pos.y < origin.y + margin:
 		if can_exit and doors.n and absf(player_pos.x - cx) < door_zone:
-			pass  # 可以通过
+			pass
 		else:
 			$Player.position.y = origin.y + margin
-	# 下边界
 	if player_pos.y > origin.y + CELL_SIZE.y - margin:
 		if can_exit and doors.s and absf(player_pos.x - cx) < door_zone:
 			pass
 		else:
 			$Player.position.y = origin.y + CELL_SIZE.y - margin
-	# 左边界
 	if player_pos.x < origin.x + margin:
 		if can_exit and doors.w and absf(player_pos.y - cy) < door_zone:
 			pass
 		else:
 			$Player.position.x = origin.x + margin
-	# 右边界
 	if player_pos.x > origin.x + CELL_SIZE.x - margin:
 		if can_exit and doors.e and absf(player_pos.y - cy) < door_zone:
 			pass
 		else:
 			$Player.position.x = origin.x + CELL_SIZE.x - margin
 
-	# 摄像机跟随玩家
-	cam.position = player_pos
-
-	# 传送门：Boss 已击败，回到起点
+	# 传送门
 	if _boss_defeated and _current_room == CENTER:
 		var room: RoomData = _rooms[CENTER]
 		if room.state == RoomState.CLEARED:
 			GameManager.change_state(GameManager.GameState.GAME_OVER)
 			_show_victory()
+
+
+# ── HUD ──────────────────────────────────────────────
 
 func _create_hud() -> void:
 	var canvas := CanvasLayer.new()
@@ -338,20 +287,14 @@ func _create_hud() -> void:
 	_fps_label.add_theme_color_override("font_color", Color.WHITE)
 	canvas.add_child(_fps_label)
 
-	_stats_label = Label.new()
-	_stats_label.position = Vector2(10, 30)
-	_stats_label.add_theme_font_size_override("font_size", 14)
-	_stats_label.add_theme_color_override("font_color", Color.WHITE)
-	canvas.add_child(_stats_label)
-
 	_kills_label = Label.new()
-	_kills_label.position = Vector2(10, 50)
+	_kills_label.position = Vector2(10, 28)
 	_kills_label.add_theme_font_size_override("font_size", 14)
 	_kills_label.add_theme_color_override("font_color", Color(1.0, 0.53, 0.0))
 	canvas.add_child(_kills_label)
 
 	_weapon_label = Label.new()
-	_weapon_label.position = Vector2(10, 70)
+	_weapon_label.position = Vector2(10, 46)
 	_weapon_label.add_theme_font_size_override("font_size", 14)
 	_weapon_label.add_theme_color_override("font_color", Color(0.0, 1.0, 0.53))
 	canvas.add_child(_weapon_label)
@@ -364,26 +307,26 @@ func _create_hud() -> void:
 
 	# 血条
 	_hp_bar_bg = ColorRect.new()
-	_hp_bar_bg.position = Vector2(10, 94)
+	_hp_bar_bg.position = Vector2(10, 68)
 	_hp_bar_bg.size = Vector2(102, 14)
 	_hp_bar_bg.color = Color(0.2, 0.2, 0.2)
 	canvas.add_child(_hp_bar_bg)
 
 	_hp_bar = ColorRect.new()
-	_hp_bar.position = Vector2(11, 95)
+	_hp_bar.position = Vector2(11, 69)
 	_hp_bar.size = Vector2(100, 12)
 	_hp_bar.color = Color(0.0, 0.8, 0.2)
 	canvas.add_child(_hp_bar)
 
 	# 蓝条
 	_mana_bar_bg = ColorRect.new()
-	_mana_bar_bg.position = Vector2(10, 112)
+	_mana_bar_bg.position = Vector2(10, 86)
 	_mana_bar_bg.size = Vector2(102, 10)
 	_mana_bar_bg.color = Color(0.2, 0.2, 0.2)
 	canvas.add_child(_mana_bar_bg)
 
 	_mana_bar = ColorRect.new()
-	_mana_bar.position = Vector2(11, 113)
+	_mana_bar.position = Vector2(11, 87)
 	_mana_bar.size = Vector2(100, 8)
 	_mana_bar.color = Color(0.2, 0.4, 1.0)
 	canvas.add_child(_mana_bar)
@@ -391,26 +334,15 @@ func _create_hud() -> void:
 
 func _process(_delta: float) -> void:
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
-
-	var pool := $BulletPool
-	if pool:
-		var stats: Dictionary = pool.get_stats()
-		_stats_label.text = "子弹: %d/%d (玩家) %d/%d (敌人)" % [
-			stats.active_player, stats.total_player,
-			stats.active_enemy, stats.total_enemy
-		]
-
 	_kills_label.text = "击杀: %d" % GameManager.total_kills
-	_weapon_label.text = "武器: %s (Q切换) 蓝: %d/%d" % [
+	_weapon_label.text = "武器: %s (Q切换) 蓝: %d" % [
 		$Player.get_weapon_name(),
-		int($Player.mana),
-		int($Player.MAX_MANA)
+		int($Player.mana)
 	]
 
 	var mana_ratio: float = $Player.mana / $Player.MAX_MANA
 	_mana_bar.size.x = 100.0 * mana_ratio
 
-	# 房间信息
 	var room: RoomData = _rooms.get(_current_room)
 	if room:
 		var status := "已清" if room.state == RoomState.CLEARED else "战斗中"
@@ -436,7 +368,7 @@ func _on_player_died() -> void:
 func _show_game_over() -> void:
 	var overlay := ColorRect.new()
 	overlay.color = Color(0, 0, 0, 0.7)
-	overlay.size = CELL_SIZE
+	overlay.size = Vector2(960, 640)
 
 	var canvas := CanvasLayer.new()
 	canvas.layer = 40
@@ -456,7 +388,7 @@ func _show_game_over() -> void:
 func _show_victory() -> void:
 	var overlay := ColorRect.new()
 	overlay.color = Color(0, 0, 0, 0.7)
-	overlay.size = CELL_SIZE
+	overlay.size = Vector2(960, 640)
 
 	var canvas := CanvasLayer.new()
 	canvas.layer = 40
@@ -477,6 +409,8 @@ func _input(event: InputEvent) -> void:
 	if _game_over and event is InputEventKey and event.pressed and event.keycode == KEY_R:
 		GameManager.restart_game()
 
+
+# ── 小地图 ────────────────────────────────────────────
 
 func _create_minimap() -> void:
 	var canvas := CanvasLayer.new()
@@ -504,7 +438,6 @@ func _draw_minimap(ctrl: Control) -> void:
 	var padding := Vector2(8, 8)
 	var total := Vector2(GRID_SIZE, GRID_SIZE) * cell_size + padding * 2
 
-	# 背景
 	ctrl.draw_rect(Rect2(Vector2.ZERO, total), Color(0, 0, 0, 0.7))
 
 	for pos in _rooms:
@@ -512,11 +445,9 @@ func _draw_minimap(ctrl: Control) -> void:
 		var r_pos := padding + Vector2(pos) * cell_size
 
 		if not room.explored:
-			# 未探索：暗灰
-			ctrl.draw_rect(Rect2(r_pos, cell_size), Color(0.2, 0.2, 0.2, 0.5))
+			# 未探索：不绘制
 			continue
 
-		# 已探索房间颜色
 		var color := Color(0.3, 0.3, 0.35)
 		if room.is_boss:
 			color = Color(0.6, 0.15, 0.15)
@@ -527,11 +458,9 @@ func _draw_minimap(ctrl: Control) -> void:
 
 		ctrl.draw_rect(Rect2(r_pos, cell_size), color)
 
-		# 当前房间高亮
 		if pos == _current_room:
 			ctrl.draw_rect(Rect2(r_pos - Vector2(1, 1), cell_size + Vector2(2, 2)), Color(1, 1, 0), false, 1.5)
 
-		# 门连接线
 		var doors: Dictionary = _doors[pos]
 		var door_color := Color(0.0, 0.8, 0.4, 0.6)
 		if doors.n:
@@ -544,13 +473,13 @@ func _draw_minimap(ctrl: Control) -> void:
 			ctrl.draw_rect(Rect2(r_pos + Vector2(-3, cell_size.y / 2 - 2), Vector2(3, 4)), door_color)
 
 
+# ── 房间绘制 ────────────────────────────────────────────
+
 func _draw() -> void:
-	# 绘制所有房间（在世界坐标中）
 	for pos in _rooms:
 		var room: RoomData = _rooms[pos]
 		var origin: Vector2 = Vector2(pos) * CELL_SIZE
 
-		# 未探索的房间不绘制
 		if not room.explored:
 			continue
 
@@ -587,11 +516,11 @@ func _draw() -> void:
 		if doors.w:
 			draw_rect(Rect2(Vector2(origin.x, cy - DOOR_GAP / 2), Vector2(WALL_T, DOOR_GAP)), door_color)
 
-		# Boss 房标记
+		# Boss 标记
 		if room.is_boss and room.state != RoomState.CLEARED:
 			draw_string(ThemeDB.fallback_font, origin + Vector2(CELL_SIZE.x / 2 - 30, 40), "BOSS", HORIZONTAL_ALIGNMENT_CENTER, -1, 20, Color(1.0, 0.0, 0.3))
 
-	# 传送门（Boss 击败后在起点显示）
+	# 传送门
 	if _boss_defeated and CENTER in _rooms:
 		var portal_pos: Vector2 = Vector2(CENTER) * CELL_SIZE + CELL_SIZE / 2
 		draw_circle(portal_pos, 30.0, Color(0.0, 0.898, 1.0, 0.3))
