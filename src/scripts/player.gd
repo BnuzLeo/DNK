@@ -8,6 +8,12 @@ const MAX_HP := 10
 const MAX_MANA := 50.0
 const MANA_REGEN := 3.0
 
+# 闪避技能
+const DASH_SPEED := 500.0
+const DASH_DURATION := 0.25
+const DASH_COOLDOWN := 5.0
+const DASH_INVULN := 0.5
+
 const WEAPONS := {
 	"pistol": {
 		"cooldown": 0.18, "damage": 4, "count": 1, "spread": 0.0,
@@ -42,6 +48,11 @@ var _weapon_keys := ["pistol"]
 var _freeze_firing := false
 var _invuln_timer := 0.0
 
+# 闪避状态
+var _dash_timer := 0.0
+var _dash_cooldown := 0.0
+var _dash_dir := Vector2.ZERO
+
 # Buff 系统
 enum BuffType { MANA_REGEN, SPEED, REVIVE, BULLET }
 const BUFF_INFO := {
@@ -74,8 +85,44 @@ func _physics_process(delta: float) -> void:
 	if _invuln_timer > 0.0:
 		_invuln_timer -= delta
 
+	# 闪避冷却
+	if _dash_cooldown > 0.0:
+		_dash_cooldown -= delta
+
+	# 闪避中 —— 高速移动 + 无敌，不接受其他输入
+	if _dash_timer > 0.0:
+		_dash_timer -= delta
+		velocity = _dash_dir * DASH_SPEED
+		_invuln_timer = max(_invuln_timer, DASH_INVULN)
+		move_and_slide()
+		# 半透明 + 闪烁
+		var blink := sin(_dash_timer * 40.0) * 0.3 + 0.5
+		modulate = Color(1, 1, 1, blink)
+		queue_redraw()
+		return
+
+	# 无敌闪烁（闪避后延续的无敌时间）
+	if _invuln_timer > 0.0:
+		var blink := sin(_invuln_timer * 20.0) * 0.4 + 0.6
+		modulate = Color(1, 1, 1, blink)
+	else:
+		modulate = Color(1, 1, 1, 1)
+
 	# Buff 计时
 	_update_buffs(delta)
+
+	# 闪避输入（Shift）
+	if Input.is_action_just_pressed("dash") and _dash_cooldown <= 0.0:
+		_dash_timer = DASH_DURATION
+		_dash_cooldown = DASH_COOLDOWN
+		# 有移动输入就用移动方向，否则用朝向
+		var dash_input := Vector2(
+			Input.get_axis("move_left", "move_right"),
+			Input.get_axis("move_up", "move_down")
+		)
+		_dash_dir = dash_input.normalized() if dash_input.length() > 0.1 else _facing
+		_freeze_firing = false
+		return
 
 	# 移动 - 8方向
 	var input := Vector2(

@@ -74,6 +74,7 @@ var _hp_bar: ColorRect
 var _hp_bar_bg: ColorRect
 var _mana_bar: ColorRect
 var _mana_bar_bg: ColorRect
+var _dash_icon: Control
 var _room_label: Label
 var _minimap: Control
 var _buff_bar: Control
@@ -749,12 +750,54 @@ func _create_hud() -> void:
 	_mana_bar.color = Color(0.2, 0.4, 1.0)
 	canvas.add_child(_mana_bar)
 
+	# 闪避技能图标
+	_dash_icon = Control.new()
+	_dash_icon.position = Vector2(10, 100)
+	_dash_icon.size = Vector2(36, 36)
+	_dash_icon.draw.connect(_draw_dash_icon)
+	canvas.add_child(_dash_icon)
+
 	# Buff 状态栏
 	_buff_bar = Control.new()
-	_buff_bar.position = Vector2(10, 100)
+	_buff_bar.position = Vector2(52, 108)
 	_buff_bar.size = Vector2(200, 20)
 	_buff_bar.draw.connect(_draw_buff_bar)
 	canvas.add_child(_buff_bar)
+
+
+func _draw_dash_icon() -> void:
+	var size := 36.0
+	var center := Vector2(size / 2, size / 2)
+	var radius := size / 2 - 2
+
+	# 背景
+	_dash_icon.draw_rect(Rect2(0, 0, size, size), Color(0.15, 0.15, 0.18))
+	_dash_icon.draw_rect(Rect2(0, 0, size, size), Color(0.9, 0.6, 0.1), false, 2.0)
+
+	# "K" 文字
+	_dash_icon.draw_string(ThemeDB.fallback_font, Vector2(10, 24), "K",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.8, 0.4))
+
+	# CD 覆盖（扇形遮罩）
+	var dash_cd: float = $Player._dash_cooldown
+	if dash_cd > 0.0:
+		var cd_ratio: float = clampf(dash_cd / $Player.DASH_COOLDOWN, 0.0, 1.0)
+		# 半透明黑色遮罩
+		_dash_icon.draw_rect(Rect2(0, 0, size, size), Color(0, 0, 0, 0.6))
+		# 扇形进度（从顶部顺时针）
+		var points := PackedVector2Array()
+		points.append(center)
+		var segments := 24
+		var sweep: float = TAU * cd_ratio
+		for i in segments + 1:
+			var angle: float = -PI / 2 + sweep * i / segments
+			points.append(center + Vector2(cos(angle), sin(angle)) * radius)
+		if points.size() >= 3:
+			_dash_icon.draw_colored_polygon(points, Color(0, 0, 0, 0.55))
+		# CD 秒数
+		var cd_text := "%.1f" % dash_cd
+		_dash_icon.draw_string(ThemeDB.fallback_font, Vector2(6, 22), cd_text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.9))
 
 
 func _draw_buff_bar() -> void:
@@ -766,18 +809,20 @@ func _draw_buff_bar() -> void:
 		var time_left: float = buffs[type].time
 		var color: Color = info.color
 		var icon: String = info.icon
+		var name_short: String = info.name
+		var panel_w := 72
 		# 背景
-		_buff_bar.draw_rect(Rect2(x, 0, 36, 18), Color(0, 0, 0, 0.5))
-		_buff_bar.draw_rect(Rect2(x, 0, 36, 18), color.darkened(0.3), false, 1.0)
-		# 图标
-		_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 3, 14), icon, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, color)
+		_buff_bar.draw_rect(Rect2(x, 0, panel_w, 20), Color(0, 0, 0, 0.6))
+		_buff_bar.draw_rect(Rect2(x, 0, panel_w, 20), color.darkened(0.3), false, 1.0)
+		# 图标 + 名称
+		_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 3, 13), icon + name_short, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color)
 		# 层数
 		if stacks > 1:
-			_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 18, 14), str(stacks), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+			_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 50, 13), "x%d" % stacks, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color.WHITE)
 		# 时间条
 		var time_ratio := clampf(time_left / 30.0, 0.0, 1.0)
-		_buff_bar.draw_rect(Rect2(x + 1, 16, 34 * time_ratio, 2), color)
-		x += 40
+		_buff_bar.draw_rect(Rect2(x + 1, 18, (panel_w - 2) * time_ratio, 2), color)
+		x += panel_w + 4
 
 
 func _show_boss_hp(boss: Area2D) -> void:
@@ -808,13 +853,17 @@ func _show_boss_hp(boss: Area2D) -> void:
 func _process(delta: float) -> void:
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 	_kills_label.text = "击杀: %d" % GameManager.total_kills
-	_weapon_label.text = "武器: %s (Q切换) 蓝: %d" % [
+	_weapon_label.text = "武器: %s (Q切换) 蓝: %d  [K闪避]" % [
 		$Player.get_weapon_name(),
 		int($Player.mana)
 	]
 
 	var mana_ratio: float = $Player.mana / $Player.MAX_MANA
 	_mana_bar.size.x = 100.0 * mana_ratio
+
+	# 闪避技能图标刷新
+	if _dash_icon:
+		_dash_icon.queue_redraw()
 
 	# Buff 状态栏刷新
 	if _buff_bar:

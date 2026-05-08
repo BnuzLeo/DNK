@@ -55,6 +55,7 @@ func _create_bullet(is_player: bool) -> Area2D:
 	bullet.set_meta("returning", false)
 
 	bullet.area_entered.connect(_on_bullet_hit.bind(bullet))
+	bullet.body_entered.connect(_on_bullet_body_hit.bind(bullet))
 	return bullet
 
 
@@ -167,6 +168,17 @@ func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
 	var floor_max_y: float = 5 * 640 + 50
 	if pos.x < -50.0 or pos.x > floor_max_x or pos.y < -50.0 or pos.y > floor_max_y:
 		_recycle_bullet(bullet, is_player)
+
+
+func _on_bullet_body_hit(body: Node2D, bullet: Area2D) -> void:
+	var is_player_bullet: bool = bullet.get_meta("is_player")
+	if is_player_bullet:
+		return  # 玩家子弹不伤害 body
+	# 敌人子弹击中玩家（CharacterBody2D）
+	if body.has_method("take_damage"):
+		var damage: int = bullet.get_meta("damage")
+		body.take_damage(damage)
+	_recycle_bullet(bullet, false)
 
 
 func _on_bullet_hit(area: Area2D, bullet: Area2D) -> void:

@@ -93,8 +93,13 @@ func _give_reward(player: Node) -> void:
 
 	opened.emit(_reward_type, _reward_key)
 	_spawn_label()
+	# 闪烁 3 次后缩小消失
 	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector2.ZERO, 0.2).set_ease(Tween.EASE_IN)
+	tween.set_parallel(false)
+	for i in 3:
+		tween.tween_property(self, "modulate", Color(1, 1, 1, 0.2), 0.06)
+		tween.tween_property(self, "modulate", Color(1, 1, 1, 1), 0.06)
+	tween.tween_property(self, "scale", Vector2.ZERO, 0.15).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
 
 
