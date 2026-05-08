@@ -57,6 +57,13 @@ var _boss_hp_bar: ColorRect
 var _boss_hp_label: Label
 var _boss_ref: Area2D
 
+# 复活系统
+var _revive_canvas: CanvasLayer
+var _revive_countdown_label: Label
+var _revive_timer := 0.0
+var _desaturate_layer: CanvasLayer
+var _pause_canvas: CanvasLayer
+
 # HUD
 var _fps_label: Label
 var _kills_label: Label
@@ -70,6 +77,7 @@ var _minimap: Control
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameManager.change_state(GameManager.GameState.PLAYING)
 	$Player.hp_changed.connect(_on_player_hp_changed)
 	$Player.player_died.connect(_on_player_died)
@@ -677,6 +685,17 @@ func _process(delta: float) -> void:
 	if _cam_mgr:
 		_cam_mgr.update(delta)
 
+	# 复活倒计时（真实时间，不受暂停影响）
+	if GameManager.state == GameManager.GameState.REVIVING:
+		_revive_timer -= delta
+		if _revive_countdown_label != null:
+			_revive_countdown_label.text = str(ceil(_revive_timer))
+		if _revive_timer <= 0.0:
+			_hide_revive_ui()
+			_game_over = true
+			GameManager.change_state(GameManager.GameState.GAME_OVER)
+			_show_game_over()
+
 	# 怪物预警倒计时
 	if _spawn_warning_timer > 0.0:
 		_spawn_warning_timer -= delta
@@ -706,9 +725,19 @@ func _on_player_hp_changed(current: int, max_hp: int) -> void:
 
 
 func _on_player_died() -> void:
-	_game_over = true
-	GameManager.change_state(GameManager.GameState.GAME_OVER)
-	_show_game_over()
+	GameManager.change_state(GameManager.GameState.DEAD)
+	# 去色
+	_show_desaturation(1.0)
+	if GameManager.revive_coins > 0:
+		# 有复活币 → 进入复活倒计时
+		GameManager.change_state(GameManager.GameState.REVIVING)
+		_revive_timer = 10.0
+		_show_revive_ui()
+	else:
+		# 无复活币 → 直接结束
+		_game_over = true
+		GameManager.change_state(GameManager.GameState.GAME_OVER)
+		_show_game_over()
 
 
 func _show_game_over() -> void:
@@ -751,7 +780,135 @@ func _show_victory() -> void:
 	canvas.add_child(label)
 
 
+# ── 去色效果 ──────────────────────────────────────────
+
+func _show_desaturation(amount: float) -> void:
+	if _desaturate_layer != null:
+		_desaturate_layer.queue_free()
+	_desaturate_layer = CanvasLayer.new()
+	_desaturate_layer.layer = 25
+	add_child(_desaturate_layer)
+
+	var rect := ColorRect.new()
+	rect.size = Vector2(960, 640)
+	var mat := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = """shader_type canvas_item;
+uniform float desaturate_amount : hint_range(0.0, 1.0) = 0.0;
+void fragment() {
+    vec4 c = texture(TEXTURE, UV);
+    float gray = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+    c.rgb = mix(c.rgb, vec3(gray), desaturate_amount);
+    COLOR = c;
+}"""
+	mat.shader = shader
+	mat.set_shader_parameter("desaturate_amount", amount)
+	rect.material = mat
+	_desaturate_layer.add_child(rect)
+
+
+func _hide_desaturation() -> void:
+	if _desaturate_layer != null:
+		_desaturate_layer.queue_free()
+		_desaturate_layer = null
+
+
+# ── 复活系统 ──────────────────────────────────────────
+
+func _show_revive_ui() -> void:
+	if _revive_canvas != null:
+		_revive_canvas.queue_free()
+	_revive_canvas = CanvasLayer.new()
+	_revive_canvas.layer = 28
+	add_child(_revive_canvas)
+
+	# 复活币图标
+	var coin := Label.new()
+	coin.text = "复活币"
+	coin.add_theme_font_size_override("font_size", 20)
+	coin.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
+	coin.position = Vector2(430, 240)
+	coin.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	coin.size = Vector2(100, 30)
+	_revive_canvas.add_child(coin)
+
+	# 倒计时
+	_revive_countdown_label = Label.new()
+	_revive_countdown_label.text = "10"
+	_revive_countdown_label.add_theme_font_size_override("font_size", 48)
+	_revive_countdown_label.add_theme_color_override("font_color", Color(1.0, 0.41, 0.71))
+	_revive_countdown_label.position = Vector2(445, 270)
+	_revive_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_revive_countdown_label.size = Vector2(70, 60)
+	_revive_canvas.add_child(_revive_countdown_label)
+
+	# 提示
+	var hint := Label.new()
+	hint.text = "点击复活 / ESC 退出"
+	hint.add_theme_font_size_override("font_size", 16)
+	hint.add_theme_color_override("font_color", Color.WHITE)
+	hint.position = Vector2(405, 340)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.size = Vector2(150, 24)
+	_revive_canvas.add_child(hint)
+
+
+func _hide_revive_ui() -> void:
+	if _revive_canvas != null:
+		_revive_canvas.queue_free()
+		_revive_canvas = null
+
+
+func _do_revive() -> void:
+	GameManager.revive_coins -= 1
+	_hide_revive_ui()
+	_hide_desaturation()
+	# 清除所有子弹
+	$BulletPool.clear_all()
+	# 恢复玩家
+	$Player.hp = int($Player.MAX_HP * 0.5)
+	$Player.hp_changed.emit($Player.hp, $Player.MAX_HP)
+	$Player._invuln_timer = 1.5
+	# 重新生成当前房间的敌人
+	var room: RoomData = _rooms.get(_current_room)
+	if room and room.state == RoomState.ACTIVE:
+		# 清除残留敌人
+		for e in room.enemies:
+			if is_instance_valid(e):
+				e.queue_free()
+		room.enemies.clear()
+		room.spawned = false
+		room.state = RoomState.INACTIVE
+	GameManager.change_state(GameManager.GameState.PLAYING)
+	_show_hint("已复活！", Color(1.0, 0.84, 0.0))
+
+
 func _input(event: InputEvent) -> void:
+	# 复活状态
+	if GameManager.state == GameManager.GameState.REVIVING:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_do_revive()
+			return
+		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+			# ESC 放弃复活
+			_hide_revive_ui()
+			_game_over = true
+			GameManager.change_state(GameManager.GameState.GAME_OVER)
+			_show_game_over()
+			return
+
+	# 暂停
+	if GameManager.state == GameManager.GameState.PLAYING:
+		if event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_P):
+			GameManager.change_state(GameManager.GameState.PAUSED)
+			_show_pause_menu()
+			return
+	elif GameManager.state == GameManager.GameState.PAUSED:
+		if event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_P):
+			_hide_pause_menu()
+			GameManager.change_state(GameManager.GameState.PLAYING)
+			return
+
 	if _game_over and event is InputEventKey and event.pressed and event.keycode == KEY_R:
 		GameManager.restart_game()
 
@@ -762,6 +919,37 @@ func _input(event: InputEvent) -> void:
 			_game_over = true
 			GameManager.change_state(GameManager.GameState.GAME_OVER)
 			_show_victory()
+
+
+# ── 暂停菜单 ──────────────────────────────────────────
+
+func _show_pause_menu() -> void:
+	if _pause_canvas != null:
+		return
+	_pause_canvas = CanvasLayer.new()
+	_pause_canvas.layer = 35
+	add_child(_pause_canvas)
+
+	var overlay := ColorRect.new()
+	overlay.color = Color(0, 0, 0, 0.6)
+	overlay.size = Vector2(960, 640)
+	_pause_canvas.add_child(overlay)
+
+	var label := Label.new()
+	label.text = "已暂停\n\n按 ESC / P 继续"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	label.position = Vector2(330, 250)
+	label.size = Vector2(300, 100)
+	_pause_canvas.add_child(label)
+
+
+func _hide_pause_menu() -> void:
+	if _pause_canvas != null:
+		_pause_canvas.queue_free()
+		_pause_canvas = null
 
 
 # ── 打击反馈 ──────────────────────────────────────────

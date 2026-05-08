@@ -1,6 +1,6 @@
 extends Node
 
-enum GameState { MAIN_MENU, PLAYING, PAUSED, GAME_OVER }
+enum GameState { MAIN_MENU, PLAYING, PAUSED, DEAD, REVIVING, GAME_OVER }
 
 signal state_changed(old_state: GameState, new_state: GameState)
 
@@ -9,6 +9,7 @@ var state: GameState:
 	get: return _state
 
 var total_kills: int = 0
+var revive_coins: int = 1
 
 
 func change_state(new_state: GameState) -> void:
@@ -22,6 +23,10 @@ func change_state(new_state: GameState) -> void:
 			get_tree().paused = false
 		GameState.PAUSED:
 			get_tree().paused = true
+		GameState.DEAD:
+			get_tree().paused = true
+		GameState.REVIVING:
+			get_tree().paused = true
 		GameState.GAME_OVER:
 			get_tree().paused = true
 	state_changed.emit(old, new_state)
@@ -29,6 +34,7 @@ func change_state(new_state: GameState) -> void:
 
 func restart_game() -> void:
 	total_kills = 0
+	revive_coins = 1
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	get_tree().reload_current_scene()
