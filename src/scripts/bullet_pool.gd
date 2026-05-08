@@ -119,7 +119,19 @@ func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
 	var dir: Vector2 = bullet.get_meta("direction")
 	var speed: float = bullet.get_meta("speed")
 	var move_vec: Vector2 = dir * speed * delta
-	bullet.global_position += move_vec
+	var old_pos: Vector2 = bullet.global_position
+	var new_pos: Vector2 = old_pos + move_vec
+
+	# 子弹撞墙检测（射线查询）
+	var space := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(old_pos, new_pos, 16)
+	query.collide_with_areas = false
+	var result := space.intersect_ray(query)
+	if result:
+		_recycle_bullet(bullet, is_player)
+		return
+
+	bullet.global_position = new_pos
 	bullet.queue_redraw()
 
 	var age: float = bullet.get_meta("age") + delta

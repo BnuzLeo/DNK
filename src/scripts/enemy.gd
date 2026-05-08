@@ -6,7 +6,7 @@ const CONTACT_COOLDOWN := 1.0
 
 var max_hp := 20
 var hp := 20
-var room_origin := Vector2.ZERO
+var room_bounds := Rect2()
 var _flash_timer := 0.0
 var _player: CharacterBody2D
 var _contact_cooldown := 0.0
@@ -62,11 +62,10 @@ func _physics_process(delta: float) -> void:
 	var dir := (_player.global_position - global_position).normalized()
 	global_position += dir * SPEED * _slow_factor * delta
 
-	# 边界限制（相对于房间）
-	var cell := Vector2(960, 640)
-	var margin := 20.0
-	global_position.x = clampf(global_position.x, room_origin.x + margin, room_origin.x + cell.x - margin)
-	global_position.y = clampf(global_position.y, room_origin.y + margin, room_origin.y + cell.y - margin)
+	# 边界限制（房间范围内）
+	if room_bounds.size != Vector2.ZERO:
+		global_position.x = clampf(global_position.x, room_bounds.position.x, room_bounds.end.x)
+		global_position.y = clampf(global_position.y, room_bounds.position.y, room_bounds.end.y)
 
 	# 接触伤害冷却
 	_contact_cooldown -= delta

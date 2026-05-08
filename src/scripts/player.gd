@@ -50,7 +50,7 @@ signal player_died
 
 func _ready() -> void:
 	collision_layer = 1
-	collision_mask = 0
+	collision_mask = 16  # 碰撞墙壁和门（layer 5）
 	add_to_group("player")
 
 
