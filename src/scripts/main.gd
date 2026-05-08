@@ -75,7 +75,8 @@ var _hp_bar_bg: ColorRect
 var _mana_bar: ColorRect
 var _mana_bar_bg: ColorRect
 var _dash_icon: Control
-var _room_label: Label
+var _attack_icon: Control
+var _switch_icon: Control
 var _minimap: Control
 var _buff_bar: Control
 
@@ -804,13 +805,13 @@ func _create_hud() -> void:
 	add_child(canvas)
 
 	_fps_label = Label.new()
-	_fps_label.position = Vector2(10, 10)
+	_fps_label.position = Vector2(830, 10)
 	_fps_label.add_theme_font_size_override("font_size", 14)
 	_fps_label.add_theme_color_override("font_color", Color.WHITE)
 	canvas.add_child(_fps_label)
 
 	_kills_label = Label.new()
-	_kills_label.position = Vector2(10, 28)
+	_kills_label.position = Vector2(830, 28)
 	_kills_label.add_theme_font_size_override("font_size", 14)
 	_kills_label.add_theme_color_override("font_color", Color(1.0, 0.53, 0.0))
 	canvas.add_child(_kills_label)
@@ -820,12 +821,6 @@ func _create_hud() -> void:
 	_weapon_label.add_theme_font_size_override("font_size", 14)
 	_weapon_label.add_theme_color_override("font_color", Color(0.0, 1.0, 0.53))
 	canvas.add_child(_weapon_label)
-
-	_room_label = Label.new()
-	_room_label.position = Vector2(800, 10)
-	_room_label.add_theme_font_size_override("font_size", 16)
-	_room_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.0))
-	canvas.add_child(_room_label)
 
 	_hp_bar_bg = ColorRect.new()
 	_hp_bar_bg.position = Vector2(10, 68)
@@ -851,10 +846,28 @@ func _create_hud() -> void:
 	_mana_bar.color = Color(0.2, 0.4, 1.0)
 	canvas.add_child(_mana_bar)
 
-	# 闪避技能图标
+	# 技能栏（右下角）：J攻击 / Q切换 / K闪避
+	var icon_size := 36.0
+	var icon_gap := 6.0
+	var bar_width := icon_size * 3 + icon_gap * 2
+	var bar_x := 960 - bar_width - 10
+	var bar_y := 640 - icon_size - 10
+
+	_attack_icon = Control.new()
+	_attack_icon.position = Vector2(bar_x, bar_y)
+	_attack_icon.size = Vector2(icon_size, icon_size)
+	_attack_icon.draw.connect(_draw_attack_icon)
+	canvas.add_child(_attack_icon)
+
+	_switch_icon = Control.new()
+	_switch_icon.position = Vector2(bar_x + icon_size + icon_gap, bar_y)
+	_switch_icon.size = Vector2(icon_size, icon_size)
+	_switch_icon.draw.connect(_draw_switch_icon)
+	canvas.add_child(_switch_icon)
+
 	_dash_icon = Control.new()
-	_dash_icon.position = Vector2(10, 100)
-	_dash_icon.size = Vector2(36, 36)
+	_dash_icon.position = Vector2(bar_x + (icon_size + icon_gap) * 2, bar_y)
+	_dash_icon.size = Vector2(icon_size, icon_size)
 	_dash_icon.draw.connect(_draw_dash_icon)
 	canvas.add_child(_dash_icon)
 
@@ -864,6 +877,39 @@ func _create_hud() -> void:
 	_buff_bar.size = Vector2(200, 20)
 	_buff_bar.draw.connect(_draw_buff_bar)
 	canvas.add_child(_buff_bar)
+
+
+func _draw_attack_icon() -> void:
+	var size := 36.0
+	# 背景
+	_attack_icon.draw_rect(Rect2(0, 0, size, size), Color(0.18, 0.12, 0.12))
+	_attack_icon.draw_rect(Rect2(0, 0, size, size), Color(0.9, 0.25, 0.15), false, 2.0)
+	# "J" 文字
+	_attack_icon.draw_string(ThemeDB.fallback_font, Vector2(10, 24), "J",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1.0, 0.6, 0.4))
+	# 十字准星装饰
+	var cx := size / 2
+	var cy := size / 2
+	_attack_icon.draw_line(Vector2(cx - 8, cy), Vector2(cx + 8, cy), Color(0.9, 0.3, 0.2), 1.0)
+	_attack_icon.draw_line(Vector2(cx, cy - 8), Vector2(cx, cy + 8), Color(0.9, 0.3, 0.2), 1.0)
+
+
+func _draw_switch_icon() -> void:
+	var size := 36.0
+	# 背景
+	_switch_icon.draw_rect(Rect2(0, 0, size, size), Color(0.12, 0.15, 0.18))
+	_switch_icon.draw_rect(Rect2(0, 0, size, size), Color(0.2, 0.7, 0.9), false, 2.0)
+	# "Q" 文字
+	_switch_icon.draw_string(ThemeDB.fallback_font, Vector2(10, 24), "Q",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.5, 0.9, 1.0))
+	# 双向箭头装饰
+	var cy := size / 2
+	_switch_icon.draw_line(Vector2(8, cy - 5), Vector2(28, cy - 5), Color(0.3, 0.8, 1.0), 1.5)
+	_switch_icon.draw_line(Vector2(24, cy - 9), Vector2(28, cy - 5), Color(0.3, 0.8, 1.0), 1.5)
+	_switch_icon.draw_line(Vector2(24, cy - 1), Vector2(28, cy - 5), Color(0.3, 0.8, 1.0), 1.5)
+	_switch_icon.draw_line(Vector2(8, cy + 5), Vector2(28, cy + 5), Color(0.3, 0.8, 1.0), 1.5)
+	_switch_icon.draw_line(Vector2(12, cy + 1), Vector2(8, cy + 5), Color(0.3, 0.8, 1.0), 1.5)
+	_switch_icon.draw_line(Vector2(12, cy + 9), Vector2(8, cy + 5), Color(0.3, 0.8, 1.0), 1.5)
 
 
 func _draw_dash_icon() -> void:
@@ -954,7 +1000,7 @@ func _show_boss_hp(boss: Area2D) -> void:
 func _process(delta: float) -> void:
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 	_kills_label.text = "击杀: %d" % GameManager.total_kills
-	_weapon_label.text = "武器: %s (Q切换) 蓝: %d  [K闪避]" % [
+	_weapon_label.text = "武器: %s  蓝: %d" % [
 		$Player.get_weapon_name(),
 		int($Player.mana)
 	]
@@ -962,7 +1008,11 @@ func _process(delta: float) -> void:
 	var mana_ratio: float = $Player.mana / $Player.MAX_MANA
 	_mana_bar.size.x = 100.0 * mana_ratio
 
-	# 闪避技能图标刷新
+	# 技能图标刷新
+	if _attack_icon:
+		_attack_icon.queue_redraw()
+	if _switch_icon:
+		_switch_icon.queue_redraw()
 	if _dash_icon:
 		_dash_icon.queue_redraw()
 
@@ -979,16 +1029,6 @@ func _process(delta: float) -> void:
 		_boss_hp_bar_bg.visible = false
 		_boss_hp_bar.visible = false
 		_boss_hp_label.visible = false
-
-	var room: RoomData = _rooms.get(_current_room)
-	if room:
-		var status := "未触发"
-		if room.state == RoomState.ACTIVE:
-			status = "战斗中"
-		elif room.state == RoomState.CLEARED:
-			status = "已清"
-		var room_type := " [BOSS]" if room.is_boss else ""
-		_room_label.text = "第%d层  %d/%d%s  %s" % [_current_floor, _rooms_cleared, _total_rooms, room_type, status]
 
 	# 命中停顿（使用真实时间，不受 time_scale 影响）
 	if _hit_stop_until > 0 and Time.get_ticks_msec() >= _hit_stop_until:
@@ -1304,11 +1344,11 @@ func _create_minimap() -> void:
 	add_child(canvas)
 
 	var minimap_control := Control.new()
-	minimap_control.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	minimap_control.offset_left = -150
-	minimap_control.offset_top = 10
-	minimap_control.offset_right = -10
-	minimap_control.offset_bottom = 130
+	minimap_control.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	minimap_control.offset_left = 10
+	minimap_control.offset_top = -120
+	minimap_control.offset_right = 150
+	minimap_control.offset_bottom = -10
 	minimap_control.name = "Minimap"
 	minimap_control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	minimap_control.draw.connect(_draw_minimap.bind(minimap_control))
