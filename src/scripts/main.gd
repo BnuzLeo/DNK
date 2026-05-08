@@ -1254,28 +1254,65 @@ func _show_pause_menu() -> void:
 		return
 	_pause_canvas = CanvasLayer.new()
 	_pause_canvas.layer = 35
+	_pause_canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_pause_canvas)
 
 	var overlay := ColorRect.new()
 	overlay.color = Color(0, 0, 0, 0.6)
 	overlay.size = Vector2(960, 640)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	_pause_canvas.add_child(overlay)
 
 	var label := Label.new()
-	label.text = "已暂停\n\n按 ESC / P 继续"
+	label.text = "已暂停"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 32)
 	label.add_theme_color_override("font_color", Color.WHITE)
-	label.position = Vector2(330, 250)
-	label.size = Vector2(300, 100)
+	label.position = Vector2(380, 230)
 	_pause_canvas.add_child(label)
+
+	# 继续按钮
+	var continue_btn := Label.new()
+	continue_btn.text = "[ ESC / P 继续 ]"
+	continue_btn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	continue_btn.add_theme_font_size_override("font_size", 20)
+	continue_btn.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
+	continue_btn.position = Vector2(400, 310)
+	continue_btn.size = Vector2(160, 30)
+	continue_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	continue_btn.gui_input.connect(_on_pause_continue_input)
+	_pause_canvas.add_child(continue_btn)
+
+	# 返回基地按钮
+	var lobby_btn := Label.new()
+	lobby_btn.text = "[ 返回基地 ]"
+	lobby_btn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lobby_btn.add_theme_font_size_override("font_size", 20)
+	lobby_btn.add_theme_color_override("font_color", Color(1.0, 0.7, 0.3))
+	lobby_btn.position = Vector2(400, 360)
+	lobby_btn.size = Vector2(160, 30)
+	lobby_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	lobby_btn.gui_input.connect(_on_pause_lobby_input)
+	_pause_canvas.add_child(lobby_btn)
 
 
 func _hide_pause_menu() -> void:
 	if _pause_canvas != null:
 		_pause_canvas.queue_free()
 		_pause_canvas = null
+
+
+func _on_pause_continue_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_hide_pause_menu()
+		GameManager.change_state(GameManager.GameState.PLAYING)
+
+
+func _on_pause_lobby_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_hide_pause_menu()
+		$Player.save_to_game_manager()
+		GameManager.return_to_lobby()
 
 
 # ── 打击反馈 ──────────────────────────────────────────

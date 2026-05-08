@@ -78,7 +78,13 @@ signal hp_changed(current: int, max_hp: int)
 signal player_died
 signal player_hit
 
-@onready var bullet_pool: Node2D = $"../BulletPool"
+var bullet_pool: Node2D
+
+
+var shield := 0
+var hp_regen_rate := 0.0
+var damage_bonus := 0
+var _talent_dash_cd_reduction := 0.0
 
 
 func _load_from_game_manager() -> void:
@@ -88,10 +94,40 @@ func _load_from_game_manager() -> void:
 	var mana_level: int = data.get("upgrade_mana_level", 0)
 	var regen_level: int = data.get("upgrade_regen_level", 0)
 
-	MAX_HP = BASE_MAX_HP + hp_level * HP_PER_LEVEL
-	SPEED = BASE_SPEED + spd_level * SPEED_PER_LEVEL
-	MAX_MANA = BASE_MAX_MANA + mana_level * MANA_PER_LEVEL
-	MANA_REGEN = BASE_MANA_REGEN + regen_level * REGEN_PER_LEVEL
+	# 天赋等级
+	var t_core: int = data.get("talent_core", 0)
+	var t_hp_max: int = data.get("talent_hp_max", 0)
+	var t_hp_regen: int = data.get("talent_hp_regen", 0)
+	var t_shield: int = data.get("talent_shield", 0)
+	var t_spd_up: int = data.get("talent_spd_up", 0)
+	var t_dash_cd: int = data.get("talent_dash_cd", 0)
+	var t_mana_max: int = data.get("talent_mana_max", 0)
+	var t_mana_regen: int = data.get("talent_mana_regen", 0)
+	var t_dmg_up: int = data.get("talent_dmg_up", 0)
+
+	# 核心天赋：每级全属性+1
+	var core_bonus := t_core
+
+	# 计算属性（升级 + 天赋）
+	MAX_HP = BASE_MAX_HP + hp_level * HP_PER_LEVEL + t_hp_max * 3 + core_bonus
+	SPEED = BASE_SPEED + spd_level * SPEED_PER_LEVEL + t_spd_up * 8 + core_bonus
+	MAX_MANA = BASE_MAX_MANA + mana_level * MANA_PER_LEVEL + t_mana_max * 10 + core_bonus
+	MANA_REGEN = BASE_MANA_REGEN + regen_level * REGEN_PER_LEVEL + t_mana_regen * 0.5 + core_bonus * 0.1
+
+	# 天赋：生命回复
+	var hp_regen_vals := [0.0, 0.5, 1.0, 2.0]
+	hp_regen_rate = hp_regen_vals[t_hp_regen] if t_hp_regen < hp_regen_vals.size() else 0.0
+
+	# 天赋：护盾
+	var shield_vals := [0, 2, 5, 10]
+	shield = shield_vals[t_shield] if t_shield < shield_vals.size() else 0
+
+	# 天赋：闪避冷却
+	_talent_dash_cd_reduction = t_dash_cd * 0.5
+
+	# 天赋：伤害加成
+	var dmg_vals := [0, 1, 2, 4]
+	damage_bonus = dmg_vals[t_dmg_up] if t_dmg_up < dmg_vals.size() else 0
 
 	_weapon_keys = data.get("weapon_keys", ["pistol"]).duplicate()
 	_weapon_index = data.get("weapon_index", 0)
@@ -111,6 +147,7 @@ func _ready() -> void:
 	collision_layer = 1
 	collision_mask = 48  # 碰撞墙壁(layer 4) + 拾取(layer 5)
 	add_to_group("player")
+	bullet_pool = get_node_or_null("../BulletPool")
 	_load_from_game_manager()
 
 
@@ -152,7 +189,7 @@ func _physics_process(delta: float) -> void:
 	# 闪避输入（Shift）
 	if Input.is_action_just_pressed("dash") and _dash_cooldown <= 0.0:
 		_dash_timer = DASH_DURATION
-		_dash_cooldown = DASH_COOLDOWN
+		_dash_cooldown = DASH_COOLDOWN - _talent_dash_cd_reduction
 		# 有移动输入就用移动方向，否则用朝向
 		var dash_input := Vector2(
 			Input.get_axis("move_left", "move_right"),
@@ -185,6 +222,10 @@ func _physics_process(delta: float) -> void:
 	# 蓝量恢复
 	var regen: float = MANA_REGEN * (1.0 + get_buff_stacks(BuffType.MANA_REGEN) * 0.5)
 	mana = min(mana + regen * delta, MAX_MANA)
+
+	# 生命回复（天赋）
+	if hp_regen_rate > 0.0 and hp < MAX_HP:
+		hp = mini(hp + int(hp_regen_rate * delta * 10), MAX_HP)
 
 	# 射击
 	_fire_cooldown -= delta
@@ -230,7 +271,7 @@ func _shoot(weapon: Dictionary) -> void:
 			global_position + dir * 14.0,
 			dir,
 			weapon.speed,
-			weapon.damage,
+			weapon.damage + damage_bonus,
 			true,
 			false
 		)
@@ -243,7 +284,7 @@ func _shoot_dart(weapon: Dictionary) -> void:
 		global_position + _facing * 14.0,
 		_facing,
 		weapon.speed,
-		weapon.damage,
+		weapon.damage + damage_bonus,
 		true,
 		true,
 		weapon.max_distance
@@ -264,7 +305,7 @@ func _spray_freeze(weapon: Dictionary, delta: float) -> void:
 		var angle_diff: float = absf(_facing.angle_to(to_enemy.normalized()))
 		if angle_diff < spray_angle:
 			if enemy.has_method("take_damage"):
-				enemy.take_damage(weapon.damage * delta * 10)
+				enemy.take_damage((weapon.damage + damage_bonus) * delta * 10)
 			if enemy.has_method("apply_slow"):
 				enemy.apply_slow(0.5, 2.0)
 				if enemy.has_method("add_freeze_stack"):

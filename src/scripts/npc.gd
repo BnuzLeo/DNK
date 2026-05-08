@@ -48,10 +48,10 @@ func _open_panel() -> void:
 	_panel_open = true
 	GameManager.change_state(GameManager.GameState.PAUSED)
 	match npc_type:
-		"broker":
-			_panel_node = load("res://scripts/upgrade_panel.gd").new()
 		"smith":
 			_panel_node = load("res://scripts/shop_panel.gd").new()
+		"broker":
+			_panel_node = load("res://scripts/talent_tree_panel.gd").new()
 	if _panel_node:
 		_panel_node.tree_exiting.connect(_on_panel_closed)
 		get_tree().current_scene.add_child(_panel_node)
@@ -73,31 +73,93 @@ func _on_panel_closed() -> void:
 
 
 func _draw() -> void:
-	# NPC 身体
-	var body_size := Vector2(32, 40)
-	draw_rect(Rect2(-body_size.x / 2, -body_size.y / 2, body_size.x, body_size.y),
-		npc_color.darkened(0.3))
-	draw_rect(Rect2(-body_size.x / 2, -body_size.y / 2, body_size.x, body_size.y),
-		npc_color, false, 2.0)
+	# ── 人形角色绘制 ──
+	# 肤色
+	var skin := Color(0.9, 0.75, 0.6)
+	# 衣服颜色
+	var shirt := npc_color.darkened(0.2)
+	var pants := Color(0.25, 0.2, 0.15)
+	# 头发
+	var hair := Color(0.15, 0.1, 0.05)
 
-	# NPC 头部（圆形）
-	draw_circle(Vector2(0, -body_size.y / 2 - 8), 12.0, npc_color.lightened(0.2))
-	draw_arc(Vector2(0, -body_size.y / 2 - 8), 12.0, 0, TAU, 20,
-		npc_color.darkened(0.1), 2.0)
+	# 头部
+	draw_circle(Vector2(0, -28), 10.0, skin)
+	draw_arc(Vector2(0, -28), 10.0, 0, TAU, 20, skin.darkened(0.2), 1.5)
+	# 头发（半圆顶部）
+	var hair_pts := PackedVector2Array()
+	for i in 13:
+		var a := PI + i * PI / 12.0
+		hair_pts.append(Vector2(cos(a), sin(a)) * 10.5)
+	hair_pts.append(Vector2(10.5, -28))
+	hair_pts.append(Vector2(-10.5, -28))
+	draw_colored_polygon(hair_pts, hair)
 
-	# NPC 职业图标
-	match npc_type:
-		"broker":
-			# 星形（经纪人）
-			_draw_star(Vector2(0, -2), 8.0, Color(1, 1, 0.6))
-		"smith":
-			# 锤子（铁匠）
-			_draw_hammer(Vector2(0, -2), Color(0.8, 0.85, 1.0))
+	# 眼睛
+	draw_circle(Vector2(-4, -29), 1.5, Color(0.1, 0.05, 0.0))
+	draw_circle(Vector2(4, -29), 1.5, Color(0.1, 0.05, 0.0))
+
+	# 身体（躯干）
+	draw_rect(Rect2(-10, -18, 20, 22), shirt)
+	# 围裙（铁匠专属）
+	if npc_type == "smith":
+		var apron := Color(0.45, 0.3, 0.15)
+		draw_rect(Rect2(-8, -10, 16, 18), apron)
+		draw_rect(Rect2(-8, -10, 16, 18), apron.darkened(0.3), false, 1.0)
+		# 围裙带子
+		draw_line(Vector2(-8, -8), Vector2(-14, -12), apron, 2.0)
+		draw_line(Vector2(8, -8), Vector2(14, -12), apron, 2.0)
+
+	# 手臂
+	draw_line(Vector2(-10, -14), Vector2(-16, 0), skin, 3.0)
+	draw_line(Vector2(10, -14), Vector2(16, 0), skin, 3.0)
+	# 手
+	draw_circle(Vector2(-16, 0), 3.0, skin)
+	draw_circle(Vector2(16, 0), 3.0, skin)
+
+	# 腿
+	draw_line(Vector2(-5, 4), Vector2(-6, 18), pants, 4.0)
+	draw_line(Vector2(5, 4), Vector2(6, 18), pants, 4.0)
+	# 鞋子
+	draw_rect(Rect2(-9, 16, 7, 5), Color(0.2, 0.15, 0.1))
+	draw_rect(Rect2(3, 16, 7, 5), Color(0.2, 0.15, 0.1))
+
+	# 铁匠锤子（右手持锤）
+	if npc_type == "smith":
+		var hammer_color := Color(0.5, 0.5, 0.55)
+		var handle_color := Color(0.55, 0.35, 0.15)
+		# 锤柄
+		draw_line(Vector2(16, 0), Vector2(22, -12), handle_color, 3.0)
+		# 锤头
+		draw_rect(Rect2(18, -18, 10, 8), hammer_color)
+		draw_rect(Rect2(18, -18, 10, 8), hammer_color.darkened(0.3), false, 1.0)
+
+	# 经纪人特征：领带 + 剪贴板
+	if npc_type == "broker":
+		# 领带
+		var tie := Color(0.8, 0.2, 0.2)
+		var tie_pts := PackedVector2Array()
+		tie_pts.append(Vector2(-2, -18))
+		tie_pts.append(Vector2(2, -18))
+		tie_pts.append(Vector2(4, -4))
+		tie_pts.append(Vector2(0, 0))
+		tie_pts.append(Vector2(-4, -4))
+		draw_colored_polygon(tie_pts, tie)
+		# 剪贴板（左手持）
+		var board := Color(0.55, 0.45, 0.25)
+		draw_rect(Rect2(-24, -10, 12, 16), board)
+		draw_rect(Rect2(-24, -10, 12, 16), board.darkened(0.3), false, 1.0)
+		# 纸张
+		draw_rect(Rect2(-22, -8, 8, 11), Color(0.95, 0.95, 0.9))
+		# 文字线条
+		for line_i in 3:
+			draw_line(Vector2(-21, -5 + line_i * 3), Vector2(-16, -5 + line_i * 3), Color(0.3, 0.3, 0.3), 1.0)
+		# 夹子
+		draw_rect(Rect2(-20, -12, 4, 3), Color(0.7, 0.7, 0.7))
 
 	# 名字
 	var name_size := ThemeDB.fallback_font.get_string_size(display_name,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
-	draw_string(ThemeDB.fallback_font, Vector2(-name_size.x / 2, body_size.y / 2 + 16),
+	draw_string(ThemeDB.fallback_font, Vector2(-name_size.x / 2, 36),
 		display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, npc_color.lightened(0.4))
 
 	# 交互提示
@@ -106,22 +168,5 @@ func _draw() -> void:
 		var p_size := ThemeDB.fallback_font.get_string_size(prompt_text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
 		var c := Color(1, 1, 0.6, _prompt_alpha)
-		draw_string(ThemeDB.fallback_font, Vector2(-p_size.x / 2, body_size.y / 2 + 36),
+		draw_string(ThemeDB.fallback_font, Vector2(-p_size.x / 2, 56),
 			prompt_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, c)
-
-
-func _draw_star(center: Vector2, radius: float, color: Color) -> void:
-	var points := PackedVector2Array()
-	for i in 5:
-		var outer_angle := -PI / 2 + i * TAU / 5
-		var inner_angle := outer_angle + TAU / 10
-		points.append(center + Vector2(cos(outer_angle), sin(outer_angle)) * radius)
-		points.append(center + Vector2(cos(inner_angle), sin(inner_angle)) * radius * 0.4)
-	draw_colored_polygon(points, color)
-
-
-func _draw_hammer(center: Vector2, color: Color) -> void:
-	# 锤柄
-	draw_line(center + Vector2(0, 6), center + Vector2(0, -2), color.darkened(0.3), 3.0)
-	# 锤头
-	draw_rect(Rect2(center.x - 6, center.y - 8, 12, 6), color)

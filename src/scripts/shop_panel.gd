@@ -10,6 +10,7 @@ const SHOP_WEAPONS := ["shotgun", "gatling", "freeze", "dart"]
 
 func show_panel(player: Node) -> void:
 	_player = player
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_canvas = CanvasLayer.new()
 	_canvas.layer = 29
 	add_child(_canvas)
