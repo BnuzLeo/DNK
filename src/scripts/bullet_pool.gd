@@ -9,6 +9,8 @@ var _enemy_bullets: Array[Area2D] = []
 var _active_player := 0
 var _active_enemy := 0
 
+signal hit_occurred(pos: Vector2, damage: int, is_kill: bool, is_boss: bool)
+
 
 func _ready() -> void:
 	for i in POOL_SIZE_PLAYER:
@@ -174,8 +176,13 @@ func _on_bullet_hit(area: Area2D, bullet: Area2D) -> void:
 
 	if is_player:
 		if area.has_method("take_damage"):
+			var was_dying: bool = "_dying" in area and area._dying
 			area.take_damage(damage)
-			GameManager.add_kill()
+			var is_kill: bool = not was_dying and area.hp <= 0
+			var is_boss: bool = area.max_hp > 50
+			hit_occurred.emit(bullet.global_position, damage, is_kill, is_boss)
+			if is_kill:
+				GameManager.add_kill()
 		# 飞镖命中后不回收，继续返回
 		if not is_dart:
 			_recycle_bullet(bullet, true)

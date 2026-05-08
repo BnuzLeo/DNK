@@ -45,6 +45,12 @@ var _spawn_warning_positions: Array[Vector2] = []
 var _spawn_warning_timer := 0.0
 var _spawn_warning_room: Vector2i = CENTER
 
+# 摄像机 + 打击反馈
+var _cam_mgr: CameraManager
+var _hit_stop_until := 0
+var _damage_numbers: Array[Dictionary] = []
+const MAX_DAMAGE_NUMBERS := 20
+
 # HUD
 var _fps_label: Label
 var _kills_label: Label
@@ -61,11 +67,19 @@ func _ready() -> void:
 	GameManager.change_state(GameManager.GameState.PLAYING)
 	$Player.hp_changed.connect(_on_player_hp_changed)
 	$Player.player_died.connect(_on_player_died)
+	$Player.player_hit.connect(_on_player_hit)
 
 	_generate_floor()
 	_create_dungeon()
 	_create_hud()
 	_create_minimap()
+
+	# 摄像机系统
+	_cam_mgr = CameraManager.new()
+	_cam_mgr.setup($Player/Camera2D)
+
+	# 打击反馈信号
+	$BulletPool.hit_occurred.connect(_on_bullet_hit_feedback)
 
 	var start_center := Vector2(CENTER.x * CELL_W + CELL_W / 2, CENTER.y * CELL_H + CELL_H / 2)
 	$Player.position = start_center
@@ -74,6 +88,9 @@ func _ready() -> void:
 	var room: RoomData = _rooms[CENTER]
 	room.explored = true
 	_mark_adjacent_explored(CENTER)
+
+	# 初始摄像机边界
+	_update_camera_bounds(CENTER)
 
 
 # ── 地牢生成 ──────────────────────────────────────────
@@ -346,6 +363,11 @@ func _close_doors(pos: Vector2i) -> void:
 	if locked_any:
 		_show_hint("房门已锁，清理怪物后开启", Color(1.0, 0.8, 0.0))
 
+func _update_camera_bounds(pos: Vector2i) -> void:
+	var rx: float = pos.x * CELL_W + ROOM_PAD_X
+	var ry: float = pos.y * CELL_H + ROOM_PAD_Y
+	_cam_mgr.set_room_bounds(Rect2(rx, ry, ROOM_W, ROOM_H))
+
 
 func _start_spawn_warning(pos: Vector2i) -> void:
 	var room: RoomData = _rooms[pos]
@@ -496,7 +518,7 @@ func _physics_process(_delta: float) -> void:
 	var gy := int(floor(player_pos.y / CELL_H))
 	var grid_pos := Vector2i(gx, gy)
 
-	# 切换房间：更新探索状态
+	# 切换房间：更新探索状态 + 摄像机边界
 	if grid_pos != _current_room and grid_pos in _rooms:
 		_current_room = grid_pos
 		var room: RoomData = _rooms[grid_pos]
@@ -504,6 +526,7 @@ func _physics_process(_delta: float) -> void:
 			room.explored = true
 			queue_redraw()
 		_mark_adjacent_explored(grid_pos)
+		_update_camera_bounds(grid_pos)
 
 	# 检测玩家是否真正进入房间内部（触发锁门+出怪）
 	if _current_room in _rooms:
@@ -593,6 +616,15 @@ func _process(delta: float) -> void:
 		var room_type := " [BOSS]" if room.is_boss else ""
 		_room_label.text = "%d,%d%s %s" % [_current_room.x, _current_room.y, room_type, status]
 
+	# 命中停顿（使用真实时间，不受 time_scale 影响）
+	if _hit_stop_until > 0 and Time.get_ticks_msec() >= _hit_stop_until:
+		_hit_stop_until = 0
+		Engine.time_scale = 1.0
+
+	# 摄像机震动
+	if _cam_mgr:
+		_cam_mgr.update(delta)
+
 	# 怪物预警倒计时
 	if _spawn_warning_timer > 0.0:
 		_spawn_warning_timer -= delta
@@ -602,6 +634,14 @@ func _process(delta: float) -> void:
 				_spawn_enemies_with_positions(_spawn_warning_room)
 			_spawn_warning_positions.clear()
 			queue_redraw()
+
+	# 伤害飘字更新
+	_update_damage_numbers(delta)
+
+
+func _on_player_hit() -> void:
+	if _cam_mgr:
+		_cam_mgr.shake(4.0, 0.15)
 
 
 func _on_player_hp_changed(current: int, max_hp: int) -> void:
@@ -670,6 +710,69 @@ func _input(event: InputEvent) -> void:
 			_game_over = true
 			GameManager.change_state(GameManager.GameState.GAME_OVER)
 			_show_victory()
+
+
+# ── 打击反馈 ──────────────────────────────────────────
+
+func _on_bullet_hit_feedback(pos: Vector2, damage: int, is_kill: bool, is_boss: bool) -> void:
+	if is_kill:
+		trigger_hit_stop(3, 1.0, 0.05)
+		spawn_damage_number(pos, damage, Color(1.0, 0.53, 0.0), 16)
+	elif is_boss:
+		trigger_hit_stop(2, 5.0, 0.2)
+		spawn_damage_number(pos, damage, Color(1.0, 0.41, 0.71), 14)
+	else:
+		trigger_hit_stop(1, 2.0, 0.1)
+		spawn_damage_number(pos, damage)
+
+
+func trigger_hit_stop(frames: int, shake_intensity: float = 0.0, shake_duration: float = 0.0) -> void:
+	var duration_ms: int = int(frames * (1000.0 / 60.0))
+	var until: int = Time.get_ticks_msec() + duration_ms
+	if until > _hit_stop_until:
+		_hit_stop_until = until
+		Engine.time_scale = 0.05
+	if shake_intensity > 0.0 and _cam_mgr:
+		_cam_mgr.shake(shake_intensity, shake_duration)
+
+
+func spawn_damage_number(pos: Vector2, amount: int, color: Color = Color.WHITE, font_size: int = 12) -> void:
+	if _damage_numbers.size() >= MAX_DAMAGE_NUMBERS:
+		var oldest: Dictionary = _damage_numbers[0]
+		if is_instance_valid(oldest.node):
+			oldest.node.queue_free()
+		_damage_numbers.remove_at(0)
+
+	var label := Label.new()
+	label.text = str(amount)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.position = pos + Vector2(randf_range(-10.0, 10.0), -16.0)
+	label.z_index = 100
+	add_child(label)
+	_damage_numbers.append({"node": label, "alpha": 1.0, "base_color": color})
+
+
+func _update_damage_numbers(delta: float) -> void:
+	var i := _damage_numbers.size() - 1
+	while i >= 0:
+		var entry: Dictionary = _damage_numbers[i]
+		var label: Label = entry.node
+		if not is_instance_valid(label):
+			_damage_numbers.remove_at(i)
+			i -= 1
+			continue
+		label.position.y -= 30.0 * delta
+		entry.alpha -= 2.0 * delta
+		if entry.alpha <= 0.0:
+			label.queue_free()
+			_damage_numbers.remove_at(i)
+		else:
+			var c: Color = entry.base_color
+			c.a = entry.alpha
+			label.add_theme_color_override("font_color", c)
+		i -= 1
+		i -= 1
 
 
 # ── 小地图 ────────────────────────────────────────────

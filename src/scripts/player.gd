@@ -44,6 +44,7 @@ var _invuln_timer := 0.0
 
 signal hp_changed(current: int, max_hp: int)
 signal player_died
+signal player_hit
 
 @onready var bullet_pool: Node2D = $"../BulletPool"
 
@@ -174,6 +175,7 @@ func take_damage(amount: int) -> void:
 		return
 	hp -= amount
 	hp_changed.emit(hp, MAX_HP)
+	player_hit.emit()
 	_invuln_timer = 0.5
 	if hp <= 0:
 		player_died.emit()

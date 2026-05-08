@@ -83,6 +83,8 @@ func _physics_process(delta: float) -> void:
 
 
 func take_damage(amount: int) -> void:
+	if _dying:
+		return
 	if _frozen:
 		amount = int(amount * 1.5)
 	hp -= amount
@@ -108,7 +110,14 @@ func add_freeze_stack(amount: float) -> void:
 
 func _die() -> void:
 	_dying = true
-	queue_free()
+	# 闪烁 3 次 + 缩小消失
+	var tween := create_tween()
+	tween.set_parallel(false)
+	for i in 3:
+		tween.tween_property(self, "modulate", Color.WHITE * 3.0, 0.033)
+		tween.tween_property(self, "modulate", Color(1.0, 0.0, 1.0), 0.033)
+	tween.tween_property(self, "scale", Vector2.ZERO, 0.2).set_ease(Tween.EASE_IN)
+	tween.tween_callback(queue_free)
 
 
 func _on_body_entered(body: Node2D) -> void:
