@@ -51,6 +51,12 @@ var _hit_stop_until := 0
 var _damage_numbers: Array[Dictionary] = []
 const MAX_DAMAGE_NUMBERS := 20
 
+# Boss 血条
+var _boss_hp_bar_bg: ColorRect
+var _boss_hp_bar: ColorRect
+var _boss_hp_label: Label
+var _boss_ref: Area2D
+
 # HUD
 var _fps_label: Label
 var _kills_label: Label
@@ -428,32 +434,43 @@ func _spawn_enemies_with_positions(room_pos: Vector2i) -> void:
 		_spawn_boss(_spawn_warning_positions[0], room, bounds)
 	else:
 		for pos in _spawn_warning_positions:
-			_spawn_enemy(pos, room, bounds)
+			_spawn_enemy(pos, room, bounds, _random_enemy_type())
 
 
-func _spawn_enemy(pos: Vector2, room: RoomData, bounds: Rect2) -> void:
+func _spawn_enemy(pos: Vector2, room: RoomData, bounds: Rect2, type: int = 0) -> void:
 	var enemy_scene: PackedScene = preload("res://scenes/Enemy.tscn")
 	var enemy: Area2D = enemy_scene.instantiate()
 	enemy.global_position = pos
-	enemy.setup($Player)
+	enemy.setup($Player, type, $BulletPool)
 	enemy.room_bounds = bounds
 	add_child(enemy)
 	room.enemies.append(enemy)
 	enemy.tree_exiting.connect(_on_enemy_died.bind(room))
 
 
+func _random_enemy_type() -> int:
+	var roll := randf()
+	if roll < 0.45:
+		return 0  # CHASER
+	elif roll < 0.70:
+		return 1  # SHOOTER
+	elif roll < 0.85:
+		return 2  # TANK
+	else:
+		return 3  # SWARM
+
+
 func _spawn_boss(pos: Vector2, room: RoomData, bounds: Rect2) -> void:
-	var enemy_scene: PackedScene = preload("res://scenes/Enemy.tscn")
-	var boss: Area2D = enemy_scene.instantiate()
+	var boss_scene: PackedScene = preload("res://scenes/Boss.tscn")
+	var boss: Area2D = boss_scene.instantiate()
 	boss.global_position = pos
-	boss.setup($Player)
-	boss.max_hp = 100
-	boss.hp = 100
-	boss.scale = Vector2(2, 2)
+	boss.setup($Player, $BulletPool)
 	boss.room_bounds = bounds
 	add_child(boss)
 	room.enemies.append(boss)
 	boss.tree_exiting.connect(_on_boss_died.bind(room))
+	# 显示 Boss 血条
+	_show_boss_hp(boss)
 
 
 func _on_enemy_died(room: RoomData) -> void:
@@ -595,6 +612,31 @@ func _create_hud() -> void:
 	canvas.add_child(_mana_bar)
 
 
+func _show_boss_hp(boss: Area2D) -> void:
+	_boss_ref = boss
+	var canvas := CanvasLayer.new()
+	canvas.layer = 15
+	add_child(canvas)
+
+	_boss_hp_bar_bg = ColorRect.new()
+	_boss_hp_bar_bg.position = Vector2(230, 590)
+	_boss_hp_bar_bg.size = Vector2(500, 16)
+	_boss_hp_bar_bg.color = Color(0.15, 0.15, 0.15)
+	canvas.add_child(_boss_hp_bar_bg)
+
+	_boss_hp_bar = ColorRect.new()
+	_boss_hp_bar.position = Vector2(231, 591)
+	_boss_hp_bar.size = Vector2(498, 14)
+	_boss_hp_bar.color = Color(1.0, 0.0, 0.3)
+	canvas.add_child(_boss_hp_bar)
+
+	_boss_hp_label = Label.new()
+	_boss_hp_label.position = Vector2(430, 592)
+	_boss_hp_label.add_theme_font_size_override("font_size", 12)
+	_boss_hp_label.add_theme_color_override("font_color", Color.WHITE)
+	canvas.add_child(_boss_hp_label)
+
+
 func _process(delta: float) -> void:
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 	_kills_label.text = "击杀: %d" % GameManager.total_kills
@@ -605,6 +647,16 @@ func _process(delta: float) -> void:
 
 	var mana_ratio: float = $Player.mana / $Player.MAX_MANA
 	_mana_bar.size.x = 100.0 * mana_ratio
+
+	# Boss 血条更新
+	if _boss_ref != null and is_instance_valid(_boss_ref) and _boss_hp_bar != null:
+		var boss_ratio: float = float(_boss_ref.hp) / float(_boss_ref.max_hp)
+		_boss_hp_bar.size.x = 498.0 * clampf(boss_ratio, 0.0, 1.0)
+		_boss_hp_label.text = "BOSS  %d / %d" % [_boss_ref.hp, _boss_ref.max_hp]
+	elif _boss_hp_bar_bg != null and (_boss_ref == null or not is_instance_valid(_boss_ref)):
+		_boss_hp_bar_bg.visible = false
+		_boss_hp_bar.visible = false
+		_boss_hp_label.visible = false
 
 	var room: RoomData = _rooms.get(_current_room)
 	if room:
