@@ -2,6 +2,8 @@ extends Area2D
 
 ## 敌人 AI — 支持 CHASER / SHOOTER / TANK / SWARM 四种类型
 
+signal died
+
 enum EnemyType { CHASER, SHOOTER, TANK, SWARM }
 
 const TYPE_STATS := {
@@ -209,6 +211,7 @@ func add_freeze_stack(amount: float) -> void:
 
 func _die() -> void:
 	_dying = true
+	died.emit()
 	# 闪烁 3 次 + 缩小消失
 	var base_col := _get_base_color()
 	var tween := create_tween()

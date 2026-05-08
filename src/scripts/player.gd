@@ -38,9 +38,20 @@ var mana := MAX_MANA
 var _fire_cooldown := 0.0
 var _facing := Vector2.RIGHT
 var _weapon_index := 0
-var _weapon_keys := ["pistol", "shotgun", "gatling", "freeze", "dart"]
+var _weapon_keys := ["pistol"]
 var _freeze_firing := false
 var _invuln_timer := 0.0
+
+# Buff 系统
+enum BuffType { MANA_REGEN, SPEED, REVIVE, BULLET }
+const BUFF_INFO := {
+	BuffType.MANA_REGEN: {"name": "回蓝", "color": Color(0.2, 0.4, 1.0), "icon": "◆"},
+	BuffType.SPEED:      {"name": "移速", "color": Color(0.0, 0.9, 0.4), "icon": "»"},
+	BuffType.REVIVE:     {"name": "复活", "color": Color(1.0, 0.84, 0.0), "icon": "★"},
+	BuffType.BULLET:     {"name": "弹道", "color": Color(1.0, 0.4, 0.7), "icon": "†"},
+}
+# {BuffType: {"time": float, "stacks": int}}
+var _active_buffs: Dictionary = {}
 
 signal hp_changed(current: int, max_hp: int)
 signal player_died
@@ -51,7 +62,7 @@ signal player_hit
 
 func _ready() -> void:
 	collision_layer = 1
-	collision_mask = 16  # 碰撞墙壁和门（layer 5）
+	collision_mask = 48  # 碰撞墙壁(layer 4) + 拾取(layer 5)
 	add_to_group("player")
 
 
@@ -63,6 +74,9 @@ func _physics_process(delta: float) -> void:
 	if _invuln_timer > 0.0:
 		_invuln_timer -= delta
 
+	# Buff 计时
+	_update_buffs(delta)
+
 	# 移动 - 8方向
 	var input := Vector2(
 		Input.get_axis("move_left", "move_right"),
@@ -70,7 +84,8 @@ func _physics_process(delta: float) -> void:
 	)
 	if input.length() > 1.0:
 		input = input.normalized()
-	velocity = input * SPEED
+	var move_speed: float = SPEED * (1.0 + get_buff_stacks(BuffType.SPEED) * 0.2)
+	velocity = input * move_speed
 	move_and_slide()
 
 	# 面朝方向 = 最后移动方向
@@ -83,7 +98,8 @@ func _physics_process(delta: float) -> void:
 		_freeze_firing = false
 
 	# 蓝量恢复
-	mana = min(mana + MANA_REGEN * delta, MAX_MANA)
+	var regen: float = MANA_REGEN * (1.0 + get_buff_stacks(BuffType.MANA_REGEN) * 0.5)
+	mana = min(mana + regen * delta, MAX_MANA)
 
 	# 射击
 	_fire_cooldown -= delta
@@ -118,7 +134,7 @@ func _physics_process(delta: float) -> void:
 func _shoot(weapon: Dictionary) -> void:
 	if bullet_pool == null:
 		return
-	var count: int = weapon.count
+	var count: int = weapon.count + get_buff_stacks(BuffType.BULLET)
 	var spread: float = weapon.spread
 	for i in count:
 		var angle_offset := 0.0
@@ -213,3 +229,51 @@ func _draw() -> void:
 			var a := angle - spray_angle + (spray_angle * 2.0 * i / segments)
 			cone.append(Vector2(cos(a), sin(a)) * spray_range)
 		draw_colored_polygon(cone, Color(0.3, 0.7, 1.0, 0.2))
+
+
+# ── 武器管理 ──────────────────────────────────────────
+
+func add_weapon(key: String) -> bool:
+	## 添加武器到循环列表，返回是否成功（已有则失败）
+	if key not in WEAPONS or key in _weapon_keys:
+		return false
+	_weapon_keys.append(key)
+	return true
+
+
+func has_weapon(key: String) -> bool:
+	return key in _weapon_keys
+
+
+func get_all_weapon_keys() -> Array:
+	return WEAPONS.keys()
+
+
+# ── Buff 系统 ──────────────────────────────────────────
+
+func add_buff(type: int, duration: float) -> void:
+	if type in _active_buffs:
+		_active_buffs[type].time += duration
+		_active_buffs[type].stacks += 1
+	else:
+		_active_buffs[type] = {"time": duration, "stacks": 1}
+
+
+func get_buff_stacks(type: int) -> int:
+	if type in _active_buffs:
+		return _active_buffs[type].stacks
+	return 0
+
+
+func get_active_buffs() -> Dictionary:
+	return _active_buffs
+
+
+func _update_buffs(delta: float) -> void:
+	var expired: Array = []
+	for type in _active_buffs:
+		_active_buffs[type].time -= delta
+		if _active_buffs[type].time <= 0.0:
+			expired.append(type)
+	for type in expired:
+		_active_buffs.erase(type)

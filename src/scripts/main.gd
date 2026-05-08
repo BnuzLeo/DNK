@@ -76,6 +76,7 @@ var _mana_bar: ColorRect
 var _mana_bar_bg: ColorRect
 var _room_label: Label
 var _minimap: Control
+var _buff_bar: Control
 
 
 func _ready() -> void:
@@ -360,9 +361,20 @@ func _on_player_entered_room(pos: Vector2i) -> void:
 	if room.spawned or room.state == RoomState.CLEARED:
 		return
 	room.spawned = true
-	room.state = RoomState.ACTIVE
 	# 0) 清除上一个房间残留的子弹
 	$BulletPool.clear_all()
+
+	# 起始房间：不刷怪，直接放武器选择宝箱
+	if room.is_start:
+		room.state = RoomState.CLEARED
+		_rooms_cleared += 1
+		_spawn_weapon_chest(pos)
+		queue_redraw()
+		if _minimap:
+			_minimap.queue_redraw()
+		return
+
+	room.state = RoomState.ACTIVE
 	# 1) 关门
 	_close_doors(pos)
 	# 2) 预警 + 出怪
@@ -473,7 +485,7 @@ func _spawn_enemy(pos: Vector2, room: RoomData, bounds: Rect2, type: int = 0) ->
 	enemy.room_bounds = bounds
 	add_child(enemy)
 	room.enemies.append(enemy)
-	enemy.tree_exiting.connect(_on_enemy_died.bind(room))
+	enemy.died.connect(_on_enemy_died.bind(enemy, room))
 
 
 func _random_enemy_type() -> int:
@@ -505,7 +517,12 @@ func _spawn_boss(pos: Vector2, room: RoomData, bounds: Rect2) -> void:
 	_show_boss_hp(boss)
 
 
-func _on_enemy_died(room: RoomData) -> void:
+func _on_enemy_died(enemy: Area2D, room: RoomData) -> void:
+	# 先在敌人位置尝试掉落宝箱（25% 概率）
+	if randf() < 0.25:
+		var ep: Vector2 = enemy.global_position
+		_spawn_chest(ep + Vector2(randf_range(-30, 30), randf_range(-30, 30)))
+
 	room.enemies = room.enemies.filter(func(e): return is_instance_valid(e) and not e._dying)
 	if room.enemies.is_empty():
 		_room_cleared(room)
@@ -540,6 +557,23 @@ func _room_cleared(room: RoomData) -> void:
 	queue_redraw()
 	if _minimap:
 		_minimap.queue_redraw()
+
+
+func _spawn_chest(pos: Vector2) -> void:
+	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
+	var chest: Area2D = chest_scene.instantiate()
+	chest.position = pos
+	add_child(chest)
+
+
+func _spawn_weapon_chest(room_pos: Vector2i) -> void:
+	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
+	var chest: Area2D = chest_scene.instantiate()
+	var cx: float = room_pos.x * CELL_W + CELL_W / 2.0
+	var cy: float = room_pos.y * CELL_H + CELL_H / 2.0
+	chest.position = Vector2(cx, cy)
+	chest.is_weapon_choice = true
+	add_child(chest)
 
 
 func _next_floor() -> void:
@@ -715,6 +749,36 @@ func _create_hud() -> void:
 	_mana_bar.color = Color(0.2, 0.4, 1.0)
 	canvas.add_child(_mana_bar)
 
+	# Buff 状态栏
+	_buff_bar = Control.new()
+	_buff_bar.position = Vector2(10, 100)
+	_buff_bar.size = Vector2(200, 20)
+	_buff_bar.draw.connect(_draw_buff_bar)
+	canvas.add_child(_buff_bar)
+
+
+func _draw_buff_bar() -> void:
+	var buffs: Dictionary = $Player.get_active_buffs()
+	var x := 0
+	for type in buffs:
+		var info: Dictionary = $Player.BUFF_INFO[type]
+		var stacks: int = buffs[type].stacks
+		var time_left: float = buffs[type].time
+		var color: Color = info.color
+		var icon: String = info.icon
+		# 背景
+		_buff_bar.draw_rect(Rect2(x, 0, 36, 18), Color(0, 0, 0, 0.5))
+		_buff_bar.draw_rect(Rect2(x, 0, 36, 18), color.darkened(0.3), false, 1.0)
+		# 图标
+		_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 3, 14), icon, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, color)
+		# 层数
+		if stacks > 1:
+			_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 18, 14), str(stacks), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+		# 时间条
+		var time_ratio := clampf(time_left / 30.0, 0.0, 1.0)
+		_buff_bar.draw_rect(Rect2(x + 1, 16, 34 * time_ratio, 2), color)
+		x += 40
+
 
 func _show_boss_hp(boss: Area2D) -> void:
 	_boss_ref = boss
@@ -751,6 +815,10 @@ func _process(delta: float) -> void:
 
 	var mana_ratio: float = $Player.mana / $Player.MAX_MANA
 	_mana_bar.size.x = 100.0 * mana_ratio
+
+	# Buff 状态栏刷新
+	if _buff_bar:
+		_buff_bar.queue_redraw()
 
 	# Boss 血条更新
 	if _boss_ref != null and is_instance_valid(_boss_ref) and _boss_hp_bar != null:
