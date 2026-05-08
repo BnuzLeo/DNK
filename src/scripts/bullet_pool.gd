@@ -131,6 +131,10 @@ func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
 	query.collide_with_areas = false
 	var result := space.intersect_ray(query)
 	if result:
+		var collider: Object = result.get("collider")
+		if collider and collider.has_method("take_damage"):
+			var damage: int = bullet.get_meta("damage")
+			collider.take_damage(damage)
 		_recycle_bullet(bullet, is_player)
 		return
 
@@ -172,11 +176,17 @@ func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
 
 func _on_bullet_body_hit(body: Node2D, bullet: Area2D) -> void:
 	var is_player_bullet: bool = bullet.get_meta("is_player")
+	var damage: int = bullet.get_meta("damage")
+
 	if is_player_bullet:
-		return  # 玩家子弹不伤害 body
-	# 敌人子弹击中玩家（CharacterBody2D）
+		# 玩家子弹击中可破坏障碍物
+		if body.has_method("take_damage") and body.has_method("setup"):
+			body.take_damage(damage)
+			_recycle_bullet(bullet, true)
+		return
+
+	# 敌人子弹击中玩家或障碍物
 	if body.has_method("take_damage"):
-		var damage: int = bullet.get_meta("damage")
 		body.take_damage(damage)
 	_recycle_bullet(bullet, false)
 

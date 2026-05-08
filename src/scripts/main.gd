@@ -79,6 +79,9 @@ var _room_label: Label
 var _minimap: Control
 var _buff_bar: Control
 
+# 提示消息系统
+var _active_hints: Array[CanvasLayer] = []
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -378,7 +381,9 @@ func _on_player_entered_room(pos: Vector2i) -> void:
 	room.state = RoomState.ACTIVE
 	# 1) 关门
 	_close_doors(pos)
-	# 2) 预警 + 出怪
+	# 2) 放置障碍物和陷阱
+	_spawn_room_objects(pos)
+	# 3) 预警 + 出怪
 	_start_spawn_warning(pos)
 	queue_redraw()
 	if _minimap:
@@ -518,12 +523,7 @@ func _spawn_boss(pos: Vector2, room: RoomData, bounds: Rect2) -> void:
 	_show_boss_hp(boss)
 
 
-func _on_enemy_died(enemy: Area2D, room: RoomData) -> void:
-	# 先在敌人位置尝试掉落宝箱（25% 概率）
-	if randf() < 0.25:
-		var ep: Vector2 = enemy.global_position
-		_spawn_chest(ep + Vector2(randf_range(-30, 30), randf_range(-30, 30)))
-
+func _on_enemy_died(_enemy: Area2D, room: RoomData) -> void:
 	room.enemies = room.enemies.filter(func(e): return is_instance_valid(e) and not e._dying)
 	if room.enemies.is_empty():
 		_room_cleared(room)
@@ -577,6 +577,75 @@ func _spawn_weapon_chest(room_pos: Vector2i) -> void:
 	add_child(chest)
 
 
+# ── 房间物件生成 ──────────────────────────────────────────
+
+var _room_objects: Dictionary = {}  # {Vector2i: Array[Node]}
+
+func _spawn_room_objects(grid_pos: Vector2i) -> void:
+	# 起始房间和 Boss 房不放物件
+	var room: RoomData = _rooms[grid_pos]
+	if room.is_start or room.is_boss:
+		return
+
+	var occupied: Array[Vector2] = []
+	var rx: float = grid_pos.x * CELL_W + ROOM_PAD_X + WALL_T + 20
+	var ry: float = grid_pos.y * CELL_H + ROOM_PAD_Y + WALL_T + 20
+	var rw: float = ROOM_W - WALL_T * 2 - 40
+	var rh: float = ROOM_H - WALL_T * 2 - 40
+	var center := Vector2(grid_pos.x * CELL_W + CELL_W / 2.0, grid_pos.y * CELL_H + CELL_H / 2.0)
+
+	var objects: Array[Node] = []
+
+	# 木箱 2-5 个（可破坏掩体，30% 掉宝箱）
+	var crate_count := 2 + randi() % 4
+	for i in crate_count:
+		var pos := _random_room_pos(rx, ry, rw, rh, center, 80.0, occupied, 40.0)
+		if pos == Vector2.ZERO:
+			continue
+		var crate: StaticBody2D = load("res://scripts/obstacle.gd").new()
+		crate.position = pos
+		crate.setup(self)
+		add_child(crate)
+		objects.append(crate)
+		occupied.append(pos)
+
+	_room_objects[grid_pos] = objects
+
+
+func _random_room_pos(rx: float, ry: float, rw: float, rh: float,
+		center: Vector2, avoid_radius: float,
+		occupied: Array[Vector2], min_dist: float) -> Vector2:
+	for _attempt in 20:
+		var pos := Vector2(
+			randf_range(rx, rx + rw),
+			randf_range(ry, ry + rh)
+		)
+		# 避开房间中心
+		if pos.distance_to(center) < avoid_radius:
+			continue
+		# 避开门口区域（墙的缺口）
+		var door_center_x := rx + rw / 2.0
+		var door_center_y := ry + rh / 2.0
+		if absf(pos.x - door_center_x) < 50 and pos.y < ry + 30:
+			continue
+		if absf(pos.x - door_center_x) < 50 and pos.y > ry + rh - 30:
+			continue
+		if absf(pos.y - door_center_y) < 50 and pos.x < rx + 30:
+			continue
+		if absf(pos.y - door_center_y) < 50 and pos.x > rx + rw - 30:
+			continue
+		# 避开已有物体
+		var too_close := false
+		for op in occupied:
+			if pos.distance_to(op) < min_dist:
+				too_close = true
+				break
+		if too_close:
+			continue
+		return pos
+	return Vector2.ZERO
+
+
 func _next_floor() -> void:
 	# 清除所有子弹
 	$BulletPool.clear_all()
@@ -598,6 +667,12 @@ func _next_floor() -> void:
 			if is_instance_valid(door):
 				door.queue_free()
 	_doors.clear()
+	# 清除房间物件
+	for pos_key in _room_objects:
+		for obj in _room_objects[pos_key]:
+			if is_instance_valid(obj):
+				obj.queue_free()
+	_room_objects.clear()
 	# 隐藏 Boss 血条
 	if _boss_hp_bar_bg != null and is_instance_valid(_boss_hp_bar_bg):
 		_boss_hp_bar_bg.queue_free()
@@ -649,16 +724,42 @@ func _get_floor_hp_multiplier() -> float:
 func _show_hint(text: String, color: Color = Color.WHITE) -> void:
 	var label := Label.new()
 	label.text = text
-	label.position = Vector2(380, 60)
 	label.add_theme_font_size_override("font_size", 22)
 	label.add_theme_color_override("font_color", color)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.size = Vector2(200, 30)
+
 	var canvas := CanvasLayer.new()
 	canvas.layer = 30
 	canvas.add_child(label)
 	add_child(canvas)
-	await get_tree().create_timer(2.0).timeout
+
+	_active_hints.append(canvas)
+	_reposition_hints()
+
+	# 淡出后移除
+	await get_tree().create_timer(1.8).timeout
+	if not is_instance_valid(canvas):
+		return
+	var tween := create_tween()
+	tween.tween_property(label, "modulate:a", 0.0, 0.3)
+	await tween.finished
+	_active_hints.erase(canvas)
 	if is_instance_valid(canvas):
 		canvas.queue_free()
+	_reposition_hints()
+
+
+func _reposition_hints() -> void:
+	var base_y := 55
+	for i in _active_hints.size():
+		var canvas: CanvasLayer = _active_hints[i]
+		if not is_instance_valid(canvas):
+			continue
+		for child in canvas.get_children():
+			if child is Label:
+				var target_y := base_y + i * 32
+				child.position = Vector2(380, target_y)
 
 
 # ── 物理更新 ──────────────────────────────────────────
