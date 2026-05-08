@@ -1,6 +1,6 @@
 extends Node
 
-enum GameState { MAIN_MENU, PLAYING, PAUSED, DEAD, REVIVING, GAME_OVER }
+enum GameState { MAIN_MENU, LOBBY, PLAYING, PAUSED, DEAD, REVIVING, GAME_OVER }
 
 signal state_changed(old_state: GameState, new_state: GameState)
 
@@ -11,6 +11,36 @@ var state: GameState:
 var total_kills: int = 0
 var revive_coins: int = 1
 
+# ── 经济系统 ──
+var practice_time: int = 0
+var kun_coins: int = 0
+
+# ── 持久化玩家数据（跨场景保持）──
+var player_data: Dictionary = {
+	"weapon_keys": ["pistol"],
+	"weapon_index": 0,
+	"upgrade_hp_level": 0,
+	"upgrade_speed_level": 0,
+	"upgrade_mana_level": 0,
+	"upgrade_regen_level": 0,
+}
+
+# ── 升级费用（练习时长）──
+const UPGRADE_COSTS := {
+	"hp":    [10, 25, 50, 100, 200],
+	"speed": [10, 25, 50, 100, 200],
+	"mana":  [10, 25, 50, 100, 200],
+	"regen": [15, 30, 60, 120, 250],
+}
+
+# ── 武器价格（坤币）──
+const WEAPON_COSTS := {
+	"shotgun": 1,
+	"gatling": 2,
+	"freeze":  2,
+	"dart":    1,
+}
+
 
 func change_state(new_state: GameState) -> void:
 	if new_state == _state:
@@ -18,6 +48,9 @@ func change_state(new_state: GameState) -> void:
 	var old := _state
 	_state = new_state
 	match new_state:
+		GameState.LOBBY:
+			get_tree().paused = false
+			Engine.time_scale = 1.0
 		GameState.PLAYING:
 			Engine.time_scale = 1.0
 			get_tree().paused = false
@@ -35,11 +68,67 @@ func change_state(new_state: GameState) -> void:
 func restart_game() -> void:
 	total_kills = 0
 	revive_coins = 1
+	practice_time = 0
+	kun_coins = 0
+	player_data = {
+		"weapon_keys": ["pistol"],
+		"weapon_index": 0,
+		"upgrade_hp_level": 0,
+		"upgrade_speed_level": 0,
+		"upgrade_mana_level": 0,
+		"upgrade_regen_level": 0,
+	}
+	return_to_lobby()
+
+
+func return_to_lobby() -> void:
 	get_tree().paused = false
 	Engine.time_scale = 1.0
-	get_tree().reload_current_scene()
-	change_state(GameState.PLAYING)
+	change_state(GameState.LOBBY)
+	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
 
 
 func add_kill() -> void:
 	total_kills += 1
+	practice_time += 1
+
+
+func add_dungeon_clear() -> void:
+	kun_coins += 1
+
+
+# ── 升级系统 ──
+
+func get_upgrade_cost(stat: String) -> int:
+	var level: int = player_data.get("upgrade_%s_level" % stat, 0)
+	var costs: Array = UPGRADE_COSTS[stat]
+	if level >= costs.size():
+		return -1
+	return costs[level]
+
+
+func can_afford_upgrade(stat: String) -> bool:
+	var cost := get_upgrade_cost(stat)
+	return cost > 0 and practice_time >= cost
+
+
+func purchase_upgrade(stat: String) -> bool:
+	if not can_afford_upgrade(stat):
+		return false
+	practice_time -= get_upgrade_cost(stat)
+	player_data["upgrade_%s_level" % stat] += 1
+	return true
+
+
+# ── 武器商店 ──
+
+func purchase_weapon(key: String) -> bool:
+	if key not in WEAPON_COSTS:
+		return false
+	if key in player_data.weapon_keys:
+		return false
+	if kun_coins < WEAPON_COSTS[key]:
+		return false
+	kun_coins -= WEAPON_COSTS[key]
+	player_data.weapon_keys.append(key)
+	return true

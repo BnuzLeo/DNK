@@ -3,10 +3,20 @@ extends CharacterBody2D
 ## 玩家控制器 - 元气骑士风格
 ## WASD 移动 + J 键射击，射击方向为面朝方向
 
-const SPEED := 180.0
-const MAX_HP := 10
-const MAX_MANA := 50.0
-const MANA_REGEN := 3.0
+var SPEED := 180.0
+var MAX_HP := 10
+var MAX_MANA := 50.0
+var MANA_REGEN := 3.0
+
+# 基础值（升级计算用）
+const BASE_SPEED := 180.0
+const BASE_MAX_HP := 10
+const BASE_MAX_MANA := 50.0
+const BASE_MANA_REGEN := 3.0
+const HP_PER_LEVEL := 2
+const SPEED_PER_LEVEL := 10.0
+const MANA_PER_LEVEL := 10.0
+const REGEN_PER_LEVEL := 0.5
 
 # 闪避技能
 const DASH_SPEED := 500.0
@@ -71,14 +81,42 @@ signal player_hit
 @onready var bullet_pool: Node2D = $"../BulletPool"
 
 
+func _load_from_game_manager() -> void:
+	var data: Dictionary = GameManager.player_data
+	var hp_level: int = data.get("upgrade_hp_level", 0)
+	var spd_level: int = data.get("upgrade_speed_level", 0)
+	var mana_level: int = data.get("upgrade_mana_level", 0)
+	var regen_level: int = data.get("upgrade_regen_level", 0)
+
+	MAX_HP = BASE_MAX_HP + hp_level * HP_PER_LEVEL
+	SPEED = BASE_SPEED + spd_level * SPEED_PER_LEVEL
+	MAX_MANA = BASE_MAX_MANA + mana_level * MANA_PER_LEVEL
+	MANA_REGEN = BASE_MANA_REGEN + regen_level * REGEN_PER_LEVEL
+
+	_weapon_keys = data.get("weapon_keys", ["pistol"]).duplicate()
+	_weapon_index = data.get("weapon_index", 0)
+	if _weapon_index >= _weapon_keys.size():
+		_weapon_index = 0
+
+	hp = MAX_HP
+	mana = MAX_MANA
+
+
+func save_to_game_manager() -> void:
+	GameManager.player_data.weapon_keys = _weapon_keys.duplicate()
+	GameManager.player_data.weapon_index = _weapon_index
+
+
 func _ready() -> void:
 	collision_layer = 1
 	collision_mask = 48  # 碰撞墙壁(layer 4) + 拾取(layer 5)
 	add_to_group("player")
+	_load_from_game_manager()
 
 
 func _physics_process(delta: float) -> void:
-	if GameManager.state != GameManager.GameState.PLAYING:
+	var s := GameManager.state
+	if s != GameManager.GameState.PLAYING and s != GameManager.GameState.LOBBY:
 		return
 
 	# 无敌时间

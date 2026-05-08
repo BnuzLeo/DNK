@@ -539,7 +539,7 @@ func _on_boss_died(room: RoomData) -> void:
 	_portal_active = true
 	_portal_pos = Vector2(_boss_pos.x * CELL_W + CELL_W / 2, _boss_pos.y * CELL_H + CELL_H / 2)
 	queue_redraw()
-	_show_hint("Boss 已击败！按 E 进入传送门", Color(0.0, 0.898, 1.0))
+	_show_hint("Boss 已击败！按 E 返回基地", Color(0.0, 0.898, 1.0))
 
 
 func _room_cleared(room: RoomData) -> void:
@@ -1084,6 +1084,7 @@ func _on_player_died() -> void:
 		_revive_timer = 10.0
 		_show_revive_ui()
 	else:
+		$Player.save_to_game_manager()
 		_game_over = true
 		GameManager.change_state(GameManager.GameState.GAME_OVER)
 		_show_game_over()
@@ -1100,7 +1101,7 @@ func _show_game_over() -> void:
 	canvas.add_child(overlay)
 
 	var label := Label.new()
-	label.text = "游戏结束\n击杀: %d\n\n按 R 重新开始" % GameManager.total_kills
+	label.text = "游戏结束\n击杀: %d\n\n按 R 返回基地" % GameManager.total_kills
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 32)
@@ -1120,7 +1121,7 @@ func _show_victory() -> void:
 	canvas.add_child(overlay)
 
 	var label := Label.new()
-	label.text = "通关！\n击杀: %d\n\n按 R 再来一局" % GameManager.total_kills
+	label.text = "通关！\n击杀: %d\n\n按 R 返回基地" % GameManager.total_kills
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 32)
@@ -1234,13 +1235,16 @@ func _input(event: InputEvent) -> void:
 			return
 
 	if _game_over and event is InputEventKey and event.pressed and event.keycode == KEY_R:
-		GameManager.restart_game()
+		$Player.save_to_game_manager()
+		GameManager.return_to_lobby()
 
-	# E 键进入传送门
+	# E 键进入传送门（通关）
 	if _portal_active and event is InputEventKey and event.pressed and event.keycode == KEY_E:
 		if $Player.global_position.distance_to(_portal_pos) < 40.0:
 			_portal_active = false
-			_next_floor()
+			$Player.save_to_game_manager()
+			GameManager.add_dungeon_clear()
+			GameManager.return_to_lobby()
 
 
 # ── 暂停菜单 ──────────────────────────────────────────
