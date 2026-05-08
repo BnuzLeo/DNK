@@ -61,7 +61,6 @@ var _boss_ref: Area2D
 var _revive_canvas: CanvasLayer
 var _revive_countdown_label: Label
 var _revive_timer := 0.0
-var _desaturate_layer: CanvasLayer
 var _pause_canvas: CanvasLayer
 
 # HUD
@@ -725,16 +724,11 @@ func _on_player_hp_changed(current: int, max_hp: int) -> void:
 
 
 func _on_player_died() -> void:
-	GameManager.change_state(GameManager.GameState.DEAD)
-	# 去色
-	_show_desaturation(1.0)
 	if GameManager.revive_coins > 0:
-		# 有复活币 → 进入复活倒计时
 		GameManager.change_state(GameManager.GameState.REVIVING)
 		_revive_timer = 10.0
 		_show_revive_ui()
 	else:
-		# 无复活币 → 直接结束
 		_game_over = true
 		GameManager.change_state(GameManager.GameState.GAME_OVER)
 		_show_game_over()
@@ -782,37 +776,6 @@ func _show_victory() -> void:
 
 # ── 去色效果 ──────────────────────────────────────────
 
-func _show_desaturation(amount: float) -> void:
-	if _desaturate_layer != null:
-		_desaturate_layer.queue_free()
-	_desaturate_layer = CanvasLayer.new()
-	_desaturate_layer.layer = 25
-	add_child(_desaturate_layer)
-
-	var rect := ColorRect.new()
-	rect.size = Vector2(960, 640)
-	var mat := ShaderMaterial.new()
-	var shader := Shader.new()
-	shader.code = """shader_type canvas_item;
-uniform float desaturate_amount : hint_range(0.0, 1.0) = 0.0;
-void fragment() {
-    vec4 c = texture(TEXTURE, UV);
-    float gray = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-    c.rgb = mix(c.rgb, vec3(gray), desaturate_amount);
-    COLOR = c;
-}"""
-	mat.shader = shader
-	mat.set_shader_parameter("desaturate_amount", amount)
-	rect.material = mat
-	_desaturate_layer.add_child(rect)
-
-
-func _hide_desaturation() -> void:
-	if _desaturate_layer != null:
-		_desaturate_layer.queue_free()
-		_desaturate_layer = null
-
-
 # ── 复活系统 ──────────────────────────────────────────
 
 func _show_revive_ui() -> void:
@@ -822,34 +785,41 @@ func _show_revive_ui() -> void:
 	_revive_canvas.layer = 28
 	add_child(_revive_canvas)
 
-	# 复活币图标
-	var coin := Label.new()
-	coin.text = "复活币"
-	coin.add_theme_font_size_override("font_size", 20)
-	coin.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
-	coin.position = Vector2(430, 240)
-	coin.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	coin.size = Vector2(100, 30)
-	_revive_canvas.add_child(coin)
+	# 半透明背景
+	var bg := ColorRect.new()
+	bg.color = Color(0, 0, 0, 0.6)
+	bg.size = Vector2(960, 640)
+	_revive_canvas.add_child(bg)
+
+	# 弹框面板
+	var panel := ColorRect.new()
+	panel.color = Color(0.12, 0.12, 0.15)
+	panel.position = Vector2(330, 220)
+	panel.size = Vector2(300, 200)
+	_revive_canvas.add_child(panel)
+
+	# 标题
+	var title := Label.new()
+	title.text = "是否复活？"
+	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
+	title.position = Vector2(380, 235)
+	_revive_canvas.add_child(title)
 
 	# 倒计时
 	_revive_countdown_label = Label.new()
 	_revive_countdown_label.text = "10"
 	_revive_countdown_label.add_theme_font_size_override("font_size", 48)
 	_revive_countdown_label.add_theme_color_override("font_color", Color(1.0, 0.41, 0.71))
-	_revive_countdown_label.position = Vector2(445, 270)
-	_revive_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_revive_countdown_label.size = Vector2(70, 60)
+	_revive_countdown_label.position = Vector2(455, 280)
 	_revive_canvas.add_child(_revive_countdown_label)
 
 	# 提示
 	var hint := Label.new()
-	hint.text = "点击复活 / ESC 退出"
+	hint.text = "点击复活 / ESC 放弃"
 	hint.add_theme_font_size_override("font_size", 16)
-	hint.add_theme_color_override("font_color", Color.WHITE)
-	hint.position = Vector2(405, 340)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.size = Vector2(150, 24)
+	hint.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	hint.position = Vector2(385, 360)
 	_revive_canvas.add_child(hint)
 
 
@@ -862,7 +832,6 @@ func _hide_revive_ui() -> void:
 func _do_revive() -> void:
 	GameManager.revive_coins -= 1
 	_hide_revive_ui()
-	_hide_desaturation()
 	# 清除所有子弹
 	$BulletPool.clear_all()
 	# 恢复玩家
