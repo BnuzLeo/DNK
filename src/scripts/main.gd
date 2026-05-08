@@ -35,6 +35,9 @@ var _rooms: Dictionary = {}
 var _current_room: Vector2i = CENTER
 var _game_over := false
 var _boss_defeated := false
+var _current_floor := 1
+var _rooms_cleared := 0
+var _total_rooms := 0
 var _boss_pos: Vector2i = CENTER
 var _boss_entry_pos: Vector2i = CENTER
 var _portal_active := false
@@ -138,6 +141,9 @@ func _generate_floor() -> void:
 			if _can_add_branch_room(adj, boss_pos) and randf() < 0.4:
 				_rooms[adj] = RoomData.new()
 				_rooms[adj].grid_pos = adj
+
+	_rooms_cleared = 0
+	_total_rooms = _rooms.size()
 
 
 func _random_edge_room() -> Vector2i:
@@ -355,6 +361,8 @@ func _on_player_entered_room(pos: Vector2i) -> void:
 		return
 	room.spawned = true
 	room.state = RoomState.ACTIVE
+	# 0) 清除上一个房间残留的子弹
+	$BulletPool.clear_all()
 	# 1) 关门
 	_close_doors(pos)
 	# 2) 预警 + 出怪
@@ -442,6 +450,15 @@ func _spawn_enemies_with_positions(room_pos: Vector2i) -> void:
 	else:
 		for pos in _spawn_warning_positions:
 			_spawn_enemy(pos, room, bounds, _random_enemy_type())
+		# 楼层额外敌人
+		var bonus := _get_floor_enemy_bonus()
+		var center := Vector2(room_pos.x * CELL_W + CELL_W / 2, room_pos.y * CELL_H + CELL_H / 2)
+		for i in bonus:
+			var offset := Vector2(randf_range(-200, 200), randf_range(-120, 120))
+			var extra_pos := center + offset
+			if extra_pos.distance_to(center) < 80:
+				extra_pos = center + offset.normalized() * 120
+			_spawn_enemy(extra_pos, room, bounds, _random_enemy_type())
 
 
 func _spawn_enemy(pos: Vector2, room: RoomData, bounds: Rect2, type: int = 0) -> void:
@@ -449,6 +466,10 @@ func _spawn_enemy(pos: Vector2, room: RoomData, bounds: Rect2, type: int = 0) ->
 	var enemy: Area2D = enemy_scene.instantiate()
 	enemy.global_position = pos
 	enemy.setup($Player, type, $BulletPool)
+	# 楼层血量倍率
+	var hp_mult := _get_floor_hp_multiplier()
+	enemy.max_hp = int(enemy.max_hp * hp_mult)
+	enemy.hp = int(enemy.hp * hp_mult)
 	enemy.room_bounds = bounds
 	add_child(enemy)
 	room.enemies.append(enemy)
@@ -472,6 +493,10 @@ func _spawn_boss(pos: Vector2, room: RoomData, bounds: Rect2) -> void:
 	var boss: Area2D = boss_scene.instantiate()
 	boss.global_position = pos
 	boss.setup($Player, $BulletPool)
+	# 楼层血量倍率
+	var hp_mult := _get_floor_hp_multiplier()
+	boss.max_hp = int(boss.max_hp * hp_mult)
+	boss.hp = int(boss.hp * hp_mult)
 	boss.room_bounds = bounds
 	add_child(boss)
 	room.enemies.append(boss)
@@ -500,7 +525,10 @@ func _on_boss_died(room: RoomData) -> void:
 
 func _room_cleared(room: RoomData) -> void:
 	room.state = RoomState.CLEARED
-	# 移除该房间的所有门
+	_rooms_cleared += 1
+	_show_hint("房间已清理！", Color(0.0, 1.0, 0.53))
+	# 延迟 0.5 秒后开门
+	await get_tree().create_timer(0.5).timeout
 	if room.grid_pos in _doors:
 		for key in _doors[room.grid_pos]:
 			var door: StaticBody2D = _doors[room.grid_pos][key]
@@ -512,6 +540,75 @@ func _room_cleared(room: RoomData) -> void:
 	queue_redraw()
 	if _minimap:
 		_minimap.queue_redraw()
+
+
+func _next_floor() -> void:
+	# 清除所有子弹
+	$BulletPool.clear_all()
+	# 清除残留敌人
+	for pos_key in _rooms:
+		var rdata: RoomData = _rooms[pos_key]
+		for e in rdata.enemies:
+			if is_instance_valid(e):
+				e.queue_free()
+	# 清除墙壁
+	for wb in _wall_bodies:
+		if is_instance_valid(wb):
+			wb.queue_free()
+	_wall_bodies.clear()
+	# 清除门
+	for pos_key in _doors:
+		for key in _doors[pos_key]:
+			var door: StaticBody2D = _doors[pos_key][key]
+			if is_instance_valid(door):
+				door.queue_free()
+	_doors.clear()
+	# 隐藏 Boss 血条
+	if _boss_hp_bar_bg != null and is_instance_valid(_boss_hp_bar_bg):
+		_boss_hp_bar_bg.queue_free()
+		_boss_hp_bar_bg = null
+	if _boss_hp_bar != null and is_instance_valid(_boss_hp_bar):
+		_boss_hp_bar.queue_free()
+		_boss_hp_bar = null
+	if _boss_hp_label != null and is_instance_valid(_boss_hp_label):
+		_boss_hp_label.queue_free()
+		_boss_hp_label = null
+	_boss_ref = null
+
+	# 下一层
+	_current_floor += 1
+	_game_over = false
+	_generate_floor()
+	_create_dungeon()
+
+	# 玩家回到起始房间
+	var start_center := Vector2(CENTER.x * CELL_W + CELL_W / 2, CENTER.y * CELL_H + CELL_H / 2)
+	$Player.position = start_center
+	_current_room = CENTER
+	var room: RoomData = _rooms[CENTER]
+	room.explored = true
+	_mark_adjacent_explored(CENTER)
+	_update_camera_bounds(CENTER)
+
+	# 恢复部分生命
+	var heal := int($Player.MAX_HP * 0.3)
+	$Player.hp = mini($Player.hp + heal, $Player.MAX_HP)
+	$Player.hp_changed.emit($Player.hp, $Player.MAX_HP)
+
+	_show_hint("第 %d 层" % _current_floor, Color(1.0, 0.84, 0.0))
+	queue_redraw()
+	if _minimap:
+		_minimap.queue_redraw()
+
+
+func _get_floor_enemy_bonus() -> int:
+	## 根据当前楼层返回额外敌人数量
+	return int((_current_floor - 1) * 0.5)
+
+
+func _get_floor_hp_multiplier() -> float:
+	## 根据当前楼层返回敌人血量倍率
+	return 1.0 + (_current_floor - 1) * 0.2
 
 
 func _show_hint(text: String, color: Color = Color.WHITE) -> void:
@@ -673,7 +770,7 @@ func _process(delta: float) -> void:
 		elif room.state == RoomState.CLEARED:
 			status = "已清"
 		var room_type := " [BOSS]" if room.is_boss else ""
-		_room_label.text = "%d,%d%s %s" % [_current_room.x, _current_room.y, room_type, status]
+		_room_label.text = "第%d层  %d/%d%s  %s" % [_current_floor, _rooms_cleared, _total_rooms, room_type, status]
 
 	# 命中停顿（使用真实时间，不受 time_scale 影响）
 	if _hit_stop_until > 0 and Time.get_ticks_msec() >= _hit_stop_until:
@@ -885,9 +982,7 @@ func _input(event: InputEvent) -> void:
 	if _portal_active and event is InputEventKey and event.pressed and event.keycode == KEY_E:
 		if $Player.global_position.distance_to(_portal_pos) < 40.0:
 			_portal_active = false
-			_game_over = true
-			GameManager.change_state(GameManager.GameState.GAME_OVER)
-			_show_victory()
+			_next_floor()
 
 
 # ── 暂停菜单 ──────────────────────────────────────────
@@ -980,7 +1075,6 @@ func _update_damage_numbers(delta: float) -> void:
 			var c: Color = entry.base_color
 			c.a = entry.alpha
 			label.add_theme_color_override("font_color", c)
-		i -= 1
 		i -= 1
 
 

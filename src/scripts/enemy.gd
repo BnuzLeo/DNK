@@ -29,6 +29,7 @@ var _flash_timer := 0.0
 var _player: CharacterBody2D
 var _contact_cooldown := 0.0
 var _dying := false
+var _spawn_invuln_timer := 0.0
 
 # 射击
 var _shoot_timer := 0.0
@@ -50,6 +51,7 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
 
+	_spawn_invuln_timer = 0.5
 	_shoot_timer = randf_range(SHOOT_COOLDOWN_MIN, SHOOT_COOLDOWN_MAX)
 
 
@@ -67,6 +69,10 @@ func _physics_process(delta: float) -> void:
 		return
 	if _player == null:
 		return
+
+	# 生成无敌
+	if _spawn_invuln_timer > 0.0:
+		_spawn_invuln_timer -= delta
 
 	# 减速计时
 	if _slow_timer > 0.0:
@@ -176,7 +182,7 @@ func _get_base_color() -> Color:
 
 
 func take_damage(amount: int) -> void:
-	if _dying:
+	if _dying or _spawn_invuln_timer > 0.0:
 		return
 	if _frozen:
 		amount = int(amount * 1.5)
@@ -215,7 +221,7 @@ func _die() -> void:
 
 
 func _on_body_entered(body: Node2D) -> void:
-	if body.has_method("take_damage") and _contact_cooldown <= 0.0:
+	if body.has_method("take_damage") and _contact_cooldown <= 0.0 and _spawn_invuln_timer <= 0.0:
 		var stats: Dictionary = TYPE_STATS[enemy_type]
 		body.take_damage(stats.damage)
 		_contact_cooldown = CONTACT_COOLDOWN
@@ -228,6 +234,10 @@ func _on_area_entered(_area: Area2D) -> void:
 func _draw() -> void:
 	var radius := 6.0 if enemy_type == EnemyType.SWARM else 8.0
 	var color := Color(0.3, 0.7, 1.0) if _frozen else _get_base_color()
+	# 生成无敌闪烁
+	if _spawn_invuln_timer > 0.0:
+		var flash := sin(_spawn_invuln_timer * 20.0) * 0.3 + 0.5
+		color.a = flash
 	draw_circle(Vector2.ZERO, radius, color)
 	draw_arc(Vector2.ZERO, radius, 0, TAU, 24, Color.WHITE, 1.5)
 	if _slow_factor < 1.0 and not _frozen:
