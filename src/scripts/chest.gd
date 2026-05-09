@@ -189,7 +189,7 @@ func _create_weapon_panel(canvas: CanvasLayer, weapon: Dictionary, key: String, 
 
 	# 武器类型
 	var type_label := Label.new()
-	type_label.text = weapon.type
+	type_label.text = _get_weapon_type_text(weapon)
 	type_label.add_theme_font_size_override("font_size", 14)
 	type_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -197,20 +197,7 @@ func _create_weapon_panel(canvas: CanvasLayer, weapon: Dictionary, key: String, 
 
 	# 属性
 	var stats := []
-	stats.append("伤害: %d" % weapon.damage)
-	if weapon.type == "bullet":
-		stats.append("弹数: %d" % weapon.count)
-		stats.append("射速: %.2fs" % weapon.cooldown)
-	elif weapon.type == "spray":
-		stats.append("范围: %.0f" % weapon.get("range", 0))
-	elif weapon.type == "dart":
-		stats.append("射速: %.2fs" % weapon.cooldown)
-	if weapon.get("mana", 0) > 0:
-		stats.append("蓝耗: %d" % weapon.mana)
-	elif weapon.has("mana_per_sec"):
-		stats.append("蓝耗: %d/s" % weapon.mana_per_sec)
-	else:
-		stats.append("蓝耗: 0")
+	stats.append_array(_get_weapon_stats(weapon))
 
 	for stat in stats:
 		var stat_label := Label.new()
@@ -260,6 +247,43 @@ func _on_weapon_panel_input(event: InputEvent, key: String, player: Node, canvas
 		var tween := create_tween()
 		tween.tween_property(self, "scale", Vector2.ZERO, 0.2).set_ease(Tween.EASE_IN)
 		tween.tween_callback(queue_free)
+
+
+func _get_weapon_type_text(weapon: Dictionary) -> String:
+	match weapon.type:
+		"basketball":
+			return "投射"
+		"room_blast":
+			return "全屏"
+		"rooster":
+			return "追击"
+	return "武器"
+
+
+func _get_weapon_stats(weapon: Dictionary) -> Array[String]:
+	match weapon.type:
+		"basketball":
+			return [
+				"伤害: %d" % weapon.damage,
+				"普通: 单发 %.2fs" % weapon.cooldown,
+				"狂暴: 连射 %.2fs" % weapon.berserk_cooldown,
+				"蓝耗: 0",
+			]
+		"room_blast":
+			return [
+				"伤害: %d / 全房间" % weapon.damage,
+				"普通: %.1fs" % weapon.cooldown,
+				"狂暴: 3次 间隔%.1fs" % weapon.berserk_interval,
+				"蓝耗: 0",
+			]
+		"rooster":
+			return [
+				"伤害: %d" % weapon.damage,
+				"普通: 1只 CD%.1fs" % weapon.cooldown,
+				"狂暴: %d只 CD%.1fs" % [weapon.berserk_count, weapon.berserk_cooldown],
+				"蓝耗: 0",
+			]
+	return ["伤害: %d" % weapon.damage]
 
 
 func _show_pick_label(text: String, color: Color) -> void:

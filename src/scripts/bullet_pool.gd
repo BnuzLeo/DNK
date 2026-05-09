@@ -50,6 +50,7 @@ func _create_bullet(is_player: bool) -> Area2D:
 	bullet.set_meta("age", 0.0)
 	bullet.set_meta("active", false)
 	bullet.set_meta("is_dart", false)
+	bullet.set_meta("projectile_type", "")
 	bullet.set_meta("max_distance", 0.0)
 	bullet.set_meta("traveled", 0.0)
 	bullet.set_meta("returning", false)
@@ -60,7 +61,8 @@ func _create_bullet(is_player: bool) -> Area2D:
 
 
 func spawn(pos: Vector2, dir: Vector2, speed: float, damage: int,
-		is_player: bool, is_dart: bool = false, max_distance: float = 0.0) -> void:
+		is_player: bool, is_dart: bool = false, max_distance: float = 0.0,
+		projectile_type: String = "") -> void:
 	var pool := _player_bullets if is_player else _enemy_bullets
 	var count := _active_player if is_player else _active_enemy
 
@@ -69,7 +71,7 @@ func spawn(pos: Vector2, dir: Vector2, speed: float, damage: int,
 
 	for bullet in pool:
 		if not bullet.get_meta("active", false):
-			_activate_bullet(bullet, pos, dir, speed, damage, is_player, is_dart, max_distance)
+			_activate_bullet(bullet, pos, dir, speed, damage, is_player, is_dart, max_distance, projectile_type)
 			if is_player:
 				_active_player += 1
 			else:
@@ -78,7 +80,8 @@ func spawn(pos: Vector2, dir: Vector2, speed: float, damage: int,
 
 
 func _activate_bullet(bullet: Area2D, pos: Vector2, dir: Vector2, speed: float,
-		damage: int, is_player: bool, is_dart: bool, max_distance: float) -> void:
+		damage: int, is_player: bool, is_dart: bool, max_distance: float,
+		projectile_type: String) -> void:
 	bullet.global_position = pos
 	bullet.set_meta("direction", dir)
 	bullet.set_meta("speed", speed)
@@ -87,6 +90,7 @@ func _activate_bullet(bullet: Area2D, pos: Vector2, dir: Vector2, speed: float,
 	bullet.set_meta("age", 0.0)
 	bullet.set_meta("active", true)
 	bullet.set_meta("is_dart", is_dart)
+	bullet.set_meta("projectile_type", projectile_type)
 	bullet.set_meta("max_distance", max_distance)
 	bullet.set_meta("traveled", 0.0)
 	bullet.set_meta("returning", false)

@@ -17,11 +17,11 @@ var kun_coins: int = 100
 
 # ── 持久化玩家数据（跨场景保持）──
 var player_data: Dictionary = {
-	"owned_weapons": ["pistol"],
-	"equipped_weapons": ["pistol"],
+	"owned_weapons": ["basketball"],
+	"equipped_weapons": ["basketball"],
 	"weapon_index": 0,
 	"max_weapon_slots": 3,
-	"_lobby_equipped": ["pistol"],
+	"_lobby_equipped": ["basketball"],
 	"upgrade_hp_level": 0,
 	"upgrade_speed_level": 0,
 	"upgrade_mana_level": 0,
@@ -38,10 +38,8 @@ const UPGRADE_COSTS := {
 
 # ── 武器价格（坤币）──
 const WEAPON_COSTS := {
-	"shotgun": 1,
-	"gatling": 2,
-	"freeze":  2,
-	"dart":    1,
+	"jntm": 2,
+	"chicken_foot": 2,
 }
 
 # ── 装备槽位解锁费用（坤币）──
@@ -80,11 +78,11 @@ func restart_game() -> void:
 	practice_time = 0
 	kun_coins = 0
 	player_data = {
-		"owned_weapons": ["pistol"],
-		"equipped_weapons": ["pistol"],
+		"owned_weapons": ["basketball"],
+		"equipped_weapons": ["basketball"],
 		"weapon_index": 0,
 		"max_weapon_slots": 3,
-		"_lobby_equipped": ["pistol"],
+		"_lobby_equipped": ["basketball"],
 		"upgrade_hp_level": 0,
 		"upgrade_speed_level": 0,
 		"upgrade_mana_level": 0,
@@ -163,11 +161,11 @@ func unlock_weapon_slot() -> bool:
 
 func save_lobby_weapons() -> void:
 	if player_data.equipped_weapons.is_empty():
-		player_data.equipped_weapons = ["pistol"]
+		player_data.equipped_weapons = ["basketball"]
 	player_data._lobby_equipped = player_data.equipped_weapons.duplicate()
 
 
 func restore_lobby_weapons() -> void:
-	var lobby_equipped: Array = player_data.get("_lobby_equipped", ["pistol"])
-	player_data.equipped_weapons = lobby_equipped.duplicate() if not lobby_equipped.is_empty() else ["pistol"]
+	var lobby_equipped: Array = player_data.get("_lobby_equipped", ["basketball"])
+	player_data.equipped_weapons = lobby_equipped.duplicate() if not lobby_equipped.is_empty() else ["basketball"]
 	player_data.weapon_index = 0

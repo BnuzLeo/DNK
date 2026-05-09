@@ -14,6 +14,15 @@ const DASH_DAMAGE := 20
 
 const FAN_BULLET_SPEED := 250.0
 const RING_BULLET_SPEED := 200.0
+const BOSS_ANIMATIONS := {
+	"frame_size": 128,
+	"animations": {
+		"idle": {"path": "res://assets/export/bosses/main/boss_main_body_idle_strip6.png", "frames": 6, "fps": 5.0, "loop": true},
+		"tell": {"path": "res://assets/export/bosses/main/boss_main_body_tell_strip4.png", "frames": 4, "fps": 10.0, "loop": true},
+		"dash": {"path": "res://assets/export/bosses/main/boss_main_body_dash_strip6.png", "frames": 6, "fps": 12.0, "loop": true},
+		"dead": {"path": "res://assets/export/bosses/main/boss_main_body_dead_strip8.png", "frames": 8, "fps": 8.0, "loop": false},
+	},
+}
 
 const PHASE_CONFIGS := {
 	Phase.P1: {
@@ -61,6 +70,8 @@ var _dash_traveled := 0.0
 # 视觉
 var _flash_timer := 0.0
 var _base_color := Color(1.0, 0.0, 0.3)
+var _sprite: AnimatedSprite2D = null
+var _current_animation := ""
 
 
 func _ready() -> void:
@@ -72,6 +83,7 @@ func _ready() -> void:
 	_fan_timer = PHASE_CONFIGS[Phase.P1].fan_interval
 	_ring_timer = PHASE_CONFIGS[Phase.P2].ring_interval
 	_dash_timer = PHASE_CONFIGS[Phase.P1].dash_interval
+	_setup_sprite()
 
 
 func setup(player: CharacterBody2D, pool: Node2D) -> void:
@@ -94,14 +106,15 @@ func _physics_process(delta: float) -> void:
 	if _flash_timer > 0.0:
 		_flash_timer -= delta
 		if _flash_timer <= 0.0:
-			modulate = _base_color
+			_apply_idle_modulate()
 
 	# 攻击 "告诉"
 	if _attacking:
+		_set_animation("tell")
 		_tell_timer -= delta
 		# "告诉" 视觉
 		var flash := sin(_tell_timer * 30.0) * 0.5 + 0.5
-		modulate = _base_color.lerp(Color.WHITE * 3.0, flash)
+		modulate = _get_base_modulate().lerp(Color.WHITE * 3.0, flash)
 		if _tell_timer <= 0.0:
 			_execute_attack()
 			_attacking = false
@@ -110,7 +123,9 @@ func _physics_process(delta: float) -> void:
 
 	# 冲刺中
 	if _dashing:
+		_set_animation("dash")
 		_dash_dir = (_player.global_position - global_position).normalized()
+		_face_direction(_dash_dir)
 		var move := _dash_dir * DASH_SPEED * delta
 		global_position += move
 		_dash_traveled += move.length()
@@ -118,11 +133,15 @@ func _physics_process(delta: float) -> void:
 			_dashing = false
 		# 边界
 		_clamp_bounds()
+		if _flash_timer <= 0.0:
+			modulate = Color(0.3, 0.7, 1.0) if _sprite != null else _base_color
 		queue_redraw()
 		return
 
 	# 缓慢追踪
+	_set_animation("idle")
 	var dir := (_player.global_position - global_position).normalized()
+	_face_direction(dir)
 	global_position += dir * MOVE_SPEED * delta
 	_clamp_bounds()
 
@@ -144,6 +163,8 @@ func _physics_process(delta: float) -> void:
 			_start_attack(AttackType.DASH)
 			_dash_timer = cfg.dash_interval
 
+	if _flash_timer <= 0.0:
+		_apply_idle_modulate()
 	queue_redraw()
 
 
@@ -226,14 +247,115 @@ func take_damage(amount: int) -> void:
 
 func _die() -> void:
 	_dying = true
+	if _has_animation("dead"):
+		modulate = _get_base_modulate()
+		_set_animation("dead", true)
+		var tween := create_tween()
+		tween.tween_interval(_get_animation_duration("dead"))
+		tween.tween_property(self, "scale", Vector2.ZERO, 0.18).set_ease(Tween.EASE_IN)
+		tween.tween_callback(queue_free)
+		return
 	# 爆炸 + 缩小
+	var base_col := _get_base_modulate()
 	var tween := create_tween()
 	tween.set_parallel(false)
 	for i in 5:
 		tween.tween_property(self, "modulate", Color.WHITE * 3.0, 0.05)
-		tween.tween_property(self, "modulate", _base_color, 0.05)
+		tween.tween_property(self, "modulate", base_col, 0.05)
 	tween.tween_property(self, "scale", Vector2.ZERO, 0.3).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
+
+
+func _get_base_modulate() -> Color:
+	return Color.WHITE if _sprite != null else _base_color
+
+
+func _apply_idle_modulate() -> void:
+	modulate = _get_base_modulate()
+
+
+func _setup_sprite() -> void:
+	var frames := _build_sprite_frames(BOSS_ANIMATIONS)
+	if frames == null:
+		return
+	if _sprite == null:
+		_sprite = AnimatedSprite2D.new()
+		_sprite.centered = true
+		_sprite.z_index = 2
+		add_child(_sprite)
+	_sprite.sprite_frames = frames
+	_current_animation = ""
+	var frame_size := float(BOSS_ANIMATIONS.get("frame_size", 128))
+	if frame_size > 0.0:
+		var scale_factor: float = VS.BOSS_DISPLAY_SIZE / frame_size
+		_sprite.scale = Vector2(scale_factor, scale_factor)
+	_set_animation("idle", true)
+	_apply_idle_modulate()
+
+
+func _build_sprite_frames(config: Dictionary) -> SpriteFrames:
+	var sprite_frames := SpriteFrames.new()
+	sprite_frames.remove_animation("default")
+	var frame_size := int(config.get("frame_size", 128))
+	var animations: Dictionary = config.get("animations", {})
+	for animation_name in animations.keys():
+		var animation: Dictionary = animations[animation_name]
+		var texture := _load_texture(animation.get("path", ""))
+		if texture == null:
+			continue
+		sprite_frames.add_animation(animation_name)
+		sprite_frames.set_animation_speed(animation_name, float(animation.get("fps", 8.0)))
+		sprite_frames.set_animation_loop(animation_name, bool(animation.get("loop", true)))
+		var frame_count := int(animation.get("frames", 1))
+		for frame_index in frame_count:
+			var atlas := AtlasTexture.new()
+			atlas.atlas = texture
+			atlas.region = Rect2(frame_index * frame_size, 0, frame_size, frame_size)
+			sprite_frames.add_frame(animation_name, atlas)
+	if not sprite_frames.has_animation("idle"):
+		return null
+	return sprite_frames
+
+
+func _load_texture(path: String) -> Texture2D:
+	var texture := load(path) as Texture2D
+	if texture != null:
+		return texture
+	var image := Image.new()
+	if image.load(path) != OK:
+		return null
+	return ImageTexture.create_from_image(image)
+
+
+func _face_direction(dir: Vector2) -> void:
+	if _sprite != null and dir.length_squared() > 0.001:
+		_sprite.rotation = dir.angle()
+
+
+func _has_animation(animation_name: String) -> bool:
+	return _sprite != null and _sprite.sprite_frames != null and _sprite.sprite_frames.has_animation(animation_name)
+
+
+func _set_animation(animation_name: String, restart: bool = false) -> void:
+	if _sprite == null or _sprite.sprite_frames == null:
+		return
+	var next_animation := animation_name
+	if not _sprite.sprite_frames.has_animation(next_animation):
+		next_animation = "idle"
+	if _current_animation == next_animation and not restart:
+		return
+	_current_animation = next_animation
+	_sprite.play(next_animation)
+
+
+func _get_animation_duration(animation_name: String) -> float:
+	if not _has_animation(animation_name):
+		return 0.3
+	var frame_count := _sprite.sprite_frames.get_frame_count(animation_name)
+	var fps := _sprite.sprite_frames.get_animation_speed(animation_name)
+	if fps <= 0.0:
+		return 0.3
+	return frame_count / fps
 
 
 func _on_body_entered(body: Node2D) -> void:
@@ -244,14 +366,15 @@ func _on_body_entered(body: Node2D) -> void:
 func _draw() -> void:
 	# Boss 身体
 	var radius := VS.BOSS_DISPLAY_SIZE * 0.5
-	var col := Color(0.3, 0.7, 1.0) if _dashing else _base_color
-	draw_circle(Vector2.ZERO, radius, col)
-	draw_arc(Vector2.ZERO, radius, 0, TAU, 32, Color.WHITE, 2.0)
+	if _sprite == null:
+		var col := Color(0.3, 0.7, 1.0) if _dashing else _base_color
+		draw_circle(Vector2.ZERO, radius, col)
+		draw_arc(Vector2.ZERO, radius, 0, TAU, 32, Color.WHITE, 2.0)
 
-	# 眼睛
-	var eye_offset := radius * 0.42
-	draw_circle(Vector2(-eye_offset, -radius * 0.25), 5.0, Color.WHITE)
-	draw_circle(Vector2(eye_offset, -radius * 0.25), 5.0, Color.WHITE)
+		# 眼睛
+		var eye_offset := radius * 0.42
+		draw_circle(Vector2(-eye_offset, -radius * 0.25), 5.0, Color.WHITE)
+		draw_circle(Vector2(eye_offset, -radius * 0.25), 5.0, Color.WHITE)
 
 	# 阶段指示器
 	var hp_ratio := float(hp) / float(max_hp)

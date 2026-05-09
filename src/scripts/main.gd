@@ -77,6 +77,7 @@ var _hp_bar_bg: ColorRect
 var _mana_bar: ColorRect
 var _mana_bar_bg: ColorRect
 var _dash_icon: Control
+var _berserk_icon: Control
 var _attack_icon: Control
 var _switch_icon: Control
 var _minimap: Control
@@ -848,10 +849,10 @@ func _create_hud() -> void:
 	_mana_bar.color = Color(0.2, 0.4, 1.0)
 	canvas.add_child(_mana_bar)
 
-	# 技能栏（右下角）：J攻击 / Q切换 / K闪避
+	# 技能栏（右下角）：J攻击 / Q切换 / K闪避 / U狂暴
 	var icon_size := VS.ACTION_ICON_SIZE
 	var icon_gap := 6.0
-	var bar_width := icon_size * 3 + icon_gap * 2
+	var bar_width := icon_size * 4 + icon_gap * 3
 	var bar_x := VS.VIEWPORT_SIZE.x - bar_width - 10
 	var bar_y := VS.VIEWPORT_SIZE.y - icon_size - 10
 
@@ -872,6 +873,12 @@ func _create_hud() -> void:
 	_dash_icon.size = Vector2(icon_size, icon_size)
 	_dash_icon.draw.connect(_draw_dash_icon)
 	canvas.add_child(_dash_icon)
+
+	_berserk_icon = Control.new()
+	_berserk_icon.position = Vector2(bar_x + (icon_size + icon_gap) * 3, bar_y)
+	_berserk_icon.size = Vector2(icon_size, icon_size)
+	_berserk_icon.draw.connect(_draw_berserk_icon)
+	canvas.add_child(_berserk_icon)
 
 	# Buff 状态栏
 	_buff_bar = Control.new()
@@ -949,6 +956,25 @@ func _draw_dash_icon() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.9))
 
 
+func _draw_berserk_icon() -> void:
+	var size := VS.ACTION_ICON_SIZE
+	var active: bool = $Player.has_method("is_berserk_active") and $Player.is_berserk_active()
+	var bg := Color(0.24, 0.08, 0.04) if active else Color(0.16, 0.12, 0.10)
+	var border := Color(1.0, 0.25, 0.08) if active else Color(0.65, 0.35, 0.18)
+	_berserk_icon.draw_rect(Rect2(0, 0, size, size), bg)
+	_berserk_icon.draw_rect(Rect2(0, 0, size, size), border, false, 2.0)
+	_berserk_icon.draw_string(ThemeDB.fallback_font, Vector2(9, 24), "U",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1.0, 0.75, 0.45))
+	var center := Vector2(size / 2, size / 2)
+	var flame := PackedVector2Array([
+		center + Vector2(0, -9),
+		center + Vector2(7, 3),
+		center + Vector2(1, 9),
+		center + Vector2(-7, 3),
+	])
+	_berserk_icon.draw_colored_polygon(flame, Color(1.0, 0.28, 0.05, 0.75 if active else 0.35))
+
+
 func _draw_buff_bar() -> void:
 	var buffs: Dictionary = $Player.get_active_buffs()
 	var x := 0
@@ -1004,7 +1030,7 @@ func _process(delta: float) -> void:
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 	_kills_label.text = "击杀: %d" % GameManager.total_kills
 	_weapon_label.text = "武器: %s  蓝: %d" % [
-		$Player.get_weapon_name(),
+		$Player.get_weapon_name() + (" [狂暴]" if $Player.has_method("is_berserk_active") and $Player.is_berserk_active() else ""),
 		int($Player.mana)
 	]
 
@@ -1018,6 +1044,8 @@ func _process(delta: float) -> void:
 		_switch_icon.queue_redraw()
 	if _dash_icon:
 		_dash_icon.queue_redraw()
+	if _berserk_icon:
+		_berserk_icon.queue_redraw()
 
 	# Buff 状态栏刷新
 	if _buff_bar:

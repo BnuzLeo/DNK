@@ -2,6 +2,13 @@ extends Area2D
 
 ## NPC交互区域 — 靠近后显示"按E交互"，按E打开面板
 
+const VS := preload("res://scripts/visual_spec.gd")
+
+const NPC_TEXTURES := {
+	"broker": "res://assets/export/characters/npc_broker/npc_broker_body_idle_128.png",
+	"smith": "res://assets/export/characters/npc_smith/npc_smith_body_idle_128.png",
+}
+
 var npc_type: String = ""
 var display_name: String = ""
 var npc_color := Color.WHITE
@@ -9,6 +16,8 @@ var _player_in_range := false
 var _panel_open := false
 var _prompt_alpha := 0.0
 var _panel_node: Node = null
+var _sprite: Sprite2D = null
+var _sprite_type := ""
 
 
 func _ready() -> void:
@@ -16,6 +25,7 @@ func _ready() -> void:
 	collision_mask = 1
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
+	_setup_sprite()
 
 
 func _on_body_entered(body: Node2D) -> void:
@@ -29,6 +39,8 @@ func _on_body_exited(body: Node2D) -> void:
 
 
 func _process(delta: float) -> void:
+	if _sprite_type != npc_type:
+		_setup_sprite()
 	var target := 1.0 if _player_in_range else 0.0
 	_prompt_alpha = lerpf(_prompt_alpha, target, delta * 8.0)
 	queue_redraw()
@@ -72,7 +84,39 @@ func _on_panel_closed() -> void:
 		GameManager.change_state(GameManager.GameState.LOBBY)
 
 
-func _draw() -> void:
+func _setup_sprite() -> void:
+	var path: String = NPC_TEXTURES.get(npc_type, "")
+	if path.is_empty():
+		return
+	var texture := _load_texture(path)
+	if texture == null:
+		return
+	if _sprite == null:
+		_sprite = Sprite2D.new()
+		_sprite.centered = true
+		_sprite.z_index = 1
+		add_child(_sprite)
+	_sprite_type = npc_type
+	_sprite.texture = texture
+	var texture_size := texture.get_size()
+	if texture_size.y > 0.0:
+		var scale_factor: float = VS.NPC_DISPLAY_HEIGHT / texture_size.y
+		_sprite.scale = Vector2(scale_factor, scale_factor)
+		# Keep the existing interaction text positions below the NPC feet.
+		_sprite.position = Vector2(0.0, -18.0)
+
+
+func _load_texture(path: String) -> Texture2D:
+	var texture := load(path) as Texture2D
+	if texture != null:
+		return texture
+	var image := Image.new()
+	if image.load(path) != OK:
+		return null
+	return ImageTexture.create_from_image(image)
+
+
+func _draw_fallback_body() -> void:
 	# ── 人形角色绘制 ──
 	# 肤色
 	var skin := Color(0.9, 0.75, 0.6)
@@ -155,6 +199,11 @@ func _draw() -> void:
 			draw_line(Vector2(-21, -5 + line_i * 3), Vector2(-16, -5 + line_i * 3), Color(0.3, 0.3, 0.3), 1.0)
 		# 夹子
 		draw_rect(Rect2(-20, -12, 4, 3), Color(0.7, 0.7, 0.7))
+
+
+func _draw() -> void:
+	if _sprite == null:
+		_draw_fallback_body()
 
 	# 名字
 	var name_size := ThemeDB.fallback_font.get_string_size(display_name,

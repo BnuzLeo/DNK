@@ -4,6 +4,13 @@ extends CharacterBody2D
 ## WASD 移动 + J 键射击，射击方向为面朝方向
 
 const VS := preload("res://scripts/visual_spec.gd")
+const ROOSTER_PROJECTILE := preload("res://scripts/rooster_projectile.gd")
+const PLAYER_SPRITE_PATH := "res://assets/export/characters/sprite.webp"
+const PLAYER_SPRITE_FRAME_SIZE := Vector2i(192, 208)
+const PLAYER_SPRITE_FRAME_COUNTS := [6, 8, 8, 4, 5, 8, 6, 6, 6]
+const PLAYER_SPRITE_DISPLAY_HEIGHT := 88.0
+
+enum PlayerSpriteAnim { IDLE, RUN_RIGHT, RUN_LEFT, WAVE, JUMP, FAIL, WAIT, DANCE, INSPECT }
 
 var SPEED := 180.0
 var MAX_HP := 10
@@ -25,29 +32,25 @@ const DASH_SPEED := 500.0
 const DASH_DURATION := 0.25
 const DASH_COOLDOWN := 5.0
 const DASH_INVULN := 0.5
+const BERSERK_COLOR := Color(1.0, 0.25, 0.08)
 
 const WEAPONS := {
-	"pistol": {
+	"basketball": {
 		"cooldown": 0.18, "damage": 4, "count": 1, "spread": 0.0,
-		"speed": 600.0, "mana": 0, "name": "小手枪", "type": "bullet"
+		"speed": 620.0, "mana": 0, "name": "篮球", "type": "basketball",
+		"berserk_cooldown": 0.05, "berserk_damage": 2, "berserk_spread": 0.08,
+		"berserk_speed": 760.0
 	},
-	"shotgun": {
-		"cooldown": 0.75, "damage": 5, "count": 6, "spread": 0.5,
-		"speed": 500.0, "mana": 2, "name": "散弹枪", "type": "bullet"
+	"jntm": {
+		"cooldown": 3.0, "damage": 18, "mana": 0, "name": "鸡你太美",
+		"type": "room_blast", "berserk_hits": 3, "berserk_interval": 3.0,
+		"berserk_cooldown": 9.0
 	},
-	"gatling": {
-		"cooldown": 0.05, "damage": 2, "count": 1, "spread": 0.0,
-		"speed": 700.0, "mana": 1, "name": "加特林", "type": "bullet"
-	},
-	"freeze": {
-		"cooldown": 0.0, "damage": 1, "count": 0, "spread": 0.0,
-		"speed": 0.0, "mana_per_sec": 4, "name": "冰冻喷射器", "type": "spray",
-		"range": 100.0, "angle": 0.6
-	},
-	"dart": {
-		"cooldown": 0.45, "damage": 8, "count": 1, "spread": 0.0,
-		"speed": 400.0, "mana": 0, "name": "飞镖", "type": "dart",
-		"max_distance": 300.0
+	"chicken_foot": {
+		"cooldown": 1.0, "damage": 8, "count": 1, "mana": 0,
+		"name": "漏出鸡脚", "type": "rooster", "speed": 320.0, "lifetime": 6.0,
+		"monitor_range": 180.0,
+		"berserk_count": 10, "berserk_cooldown": 3.0
 	},
 }
 
@@ -56,9 +59,21 @@ var mana := MAX_MANA
 var _fire_cooldown := 0.0
 var _facing := Vector2.RIGHT
 var _weapon_index := 0
-var _weapon_keys := ["pistol"]
-var _freeze_firing := false
+var _weapon_keys := ["basketball"]
 var _invuln_timer := 0.0
+var _berserk_active := false
+var _berserk_flash_timer := 0.0
+var _room_blast_pending := 0
+var _room_blast_timer := 0.0
+var _room_blast_interval := 0.0
+var _room_blast_damage := 0
+var _sprite: Sprite2D = null
+var _sprite_anim := PlayerSpriteAnim.IDLE
+var _sprite_frame := 0
+var _sprite_timer := 0.0
+var _sprite_idle_timer := 0.0
+var _sprite_action_timer := 0.0
+var _last_move_input := Vector2.ZERO
 
 # 闪避状态
 var _dash_timer := 0.0
@@ -132,11 +147,11 @@ func _load_from_game_manager() -> void:
 	damage_bonus = dmg_vals[t_dmg_up] if t_dmg_up < dmg_vals.size() else 0
 
 	_weapon_keys.clear()
-	for key in data.get("equipped_weapons", ["pistol"]):
+	for key in data.get("equipped_weapons", ["basketball"]):
 		if key in WEAPONS:
 			_weapon_keys.append(key)
 	if _weapon_keys.is_empty():
-		_weapon_keys.append("pistol")
+		_weapon_keys.append("basketball")
 	_weapon_index = data.get("weapon_index", 0)
 	if _weapon_index < 0 or _weapon_index >= _weapon_keys.size():
 		_weapon_index = 0
@@ -155,6 +170,7 @@ func _ready() -> void:
 	add_to_group("player")
 	bullet_pool = get_node_or_null("../BulletPool")
 	_load_from_game_manager()
+	_setup_sprite()
 
 
 func _physics_process(delta: float) -> void:
@@ -176,6 +192,8 @@ func _physics_process(delta: float) -> void:
 		velocity = _dash_dir * DASH_SPEED
 		_invuln_timer = max(_invuln_timer, DASH_INVULN)
 		move_and_slide()
+		_last_move_input = _dash_dir
+		_update_sprite_animation(delta)
 		# 半透明 + 闪烁
 		var blink := sin(_dash_timer * 40.0) * 0.3 + 0.5
 		modulate = Color(1, 1, 1, blink)
@@ -191,6 +209,11 @@ func _physics_process(delta: float) -> void:
 
 	# Buff 计时
 	_update_buffs(delta)
+	_update_room_blast_combo(delta)
+
+	if s == GameManager.GameState.PLAYING and Input.is_action_just_pressed("berserk"):
+		_berserk_active = not _berserk_active
+		_berserk_flash_timer = 0.25
 
 	# 闪避输入（Shift）
 	if Input.is_action_just_pressed("dash") and _dash_cooldown <= 0.0:
@@ -202,7 +225,8 @@ func _physics_process(delta: float) -> void:
 			Input.get_axis("move_up", "move_down")
 		)
 		_dash_dir = dash_input.normalized() if dash_input.length() > 0.1 else _facing
-		_freeze_firing = false
+		_last_move_input = _dash_dir
+		_update_sprite_animation(delta)
 		return
 
 	# 移动 - 8方向
@@ -215,6 +239,7 @@ func _physics_process(delta: float) -> void:
 	var move_speed: float = SPEED * (1.0 + get_buff_stacks(BuffType.SPEED) * 0.2)
 	velocity = input * move_speed
 	move_and_slide()
+	_last_move_input = input
 
 	# 面朝方向 = 最后移动方向
 	if input.length() > 0.1:
@@ -223,7 +248,7 @@ func _physics_process(delta: float) -> void:
 	# 武器切换
 	if Input.is_action_just_pressed("switch_weapon"):
 		_weapon_index = (_weapon_index + 1) % _weapon_keys.size()
-		_freeze_firing = false
+		GameManager.player_data.weapon_index = _weapon_index
 
 	# 蓝量恢复
 	var regen: float = MANA_REGEN * (1.0 + get_buff_stacks(BuffType.MANA_REGEN) * 0.5)
@@ -237,37 +262,47 @@ func _physics_process(delta: float) -> void:
 	_fire_cooldown -= delta
 	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
 
-	if weapon.type == "spray":
-		# 冰冻喷射器：持续按住J键
-		_freeze_firing = Input.is_action_pressed("shoot") and mana > 0
-		if _freeze_firing:
-			var cost: float = weapon.mana_per_sec * delta
-			mana -= cost
-			if mana <= 0:
-				mana = 0
-				_freeze_firing = false
-			_spray_freeze(weapon, delta)
-		queue_redraw()
-		return
-
 	if Input.is_action_pressed("shoot") and _fire_cooldown <= 0.0:
-		var mana_cost: float = weapon.mana
+		var mana_cost: float = weapon.get("mana", 0)
 		if mana >= mana_cost:
 			mana -= mana_cost
-			_fire_cooldown = weapon.cooldown
-			if weapon.type == "dart":
-				_shoot_dart(weapon)
-			else:
-				_shoot(weapon)
+			_fire_cooldown = _get_weapon_cooldown(weapon)
+			_activate_weapon(weapon)
+			_sprite_action_timer = 0.22
 
+	if _berserk_flash_timer > 0.0:
+		_berserk_flash_timer -= delta
+	_update_sprite_animation(delta)
 	queue_redraw()
 
 
-func _shoot(weapon: Dictionary) -> void:
+func _get_weapon_cooldown(weapon: Dictionary) -> float:
+	if _berserk_active:
+		return weapon.get("berserk_cooldown", weapon.cooldown)
+	return weapon.cooldown
+
+
+func _activate_weapon(weapon: Dictionary) -> void:
+	match weapon.type:
+		"basketball":
+			_shoot_basketball(weapon)
+		"room_blast":
+			_start_room_blast(weapon)
+		"rooster":
+			_spawn_roosters(weapon)
+
+
+func _shoot_basketball(weapon: Dictionary) -> void:
 	if bullet_pool == null:
 		return
-	var count: int = weapon.count + get_buff_stacks(BuffType.BULLET)
-	var spread: float = weapon.spread
+	var count: int = weapon.get("count", 1) + get_buff_stacks(BuffType.BULLET)
+	var spread: float = weapon.get("spread", 0.0)
+	var speed: float = weapon.get("speed", 620.0)
+	var damage: int = weapon.damage + damage_bonus
+	if _berserk_active:
+		spread = weapon.get("berserk_spread", spread)
+		speed = weapon.get("berserk_speed", speed)
+		damage = weapon.get("berserk_damage", weapon.damage) + damage_bonus
 	for i in count:
 		var angle_offset := 0.0
 		if count > 1:
@@ -276,46 +311,128 @@ func _shoot(weapon: Dictionary) -> void:
 		bullet_pool.spawn(
 			global_position + dir * (VS.PLAYER_DISPLAY_SIZE * 0.5),
 			dir,
-			weapon.speed,
-			weapon.damage + damage_bonus,
+			speed,
+			damage,
 			true,
-			false
+			false,
+			0.0,
+			"basketball"
 		)
 
 
-func _shoot_dart(weapon: Dictionary) -> void:
-	if bullet_pool == null:
+func _start_room_blast(weapon: Dictionary) -> void:
+	var hits: int = weapon.get("berserk_hits", 1) if _berserk_active else 1
+	_room_blast_damage = weapon.damage + damage_bonus
+	_room_blast_interval = weapon.get("berserk_interval", weapon.cooldown)
+	_room_blast_pending = maxi(hits - 1, 0)
+	_room_blast_timer = _room_blast_interval
+	_deal_room_blast(_room_blast_damage)
+
+
+func _update_room_blast_combo(delta: float) -> void:
+	if _room_blast_pending <= 0:
 		return
-	bullet_pool.spawn(
-		global_position + _facing * (VS.PLAYER_DISPLAY_SIZE * 0.5),
-		_facing,
-		weapon.speed,
-		weapon.damage + damage_bonus,
-		true,
-		true,
-		weapon.max_distance
+	if GameManager.state != GameManager.GameState.PLAYING:
+		return
+	_room_blast_timer -= delta
+	if _room_blast_timer > 0.0:
+		return
+	_deal_room_blast(_room_blast_damage)
+	_room_blast_pending -= 1
+	if _room_blast_pending > 0:
+		_room_blast_timer += _room_blast_interval
+
+
+func _deal_room_blast(amount: int) -> void:
+	var targets := _get_current_room_enemies()
+	for enemy in targets:
+		_deal_damage_to_enemy(enemy, amount)
+	_show_room_blast_fx(amount, targets.size())
+
+
+func _get_current_room_enemies() -> Array:
+	var enemies_in_room: Array = []
+	var player_cell := Vector2i(
+		int(floor(global_position.x / VS.CELL_SIZE.x)),
+		int(floor(global_position.y / VS.CELL_SIZE.y))
 	)
-
-
-func _spray_freeze(weapon: Dictionary, delta: float) -> void:
-	var spray_range: float = weapon.range
-	var spray_angle: float = weapon.angle
 	var enemies := get_tree().get_nodes_in_group("enemy")
 	for enemy in enemies:
-		if not is_instance_valid(enemy):
+		if not is_instance_valid(enemy) or not enemy.has_method("take_damage"):
 			continue
-		var to_enemy: Vector2 = enemy.global_position - global_position
-		var dist: float = to_enemy.length()
-		if dist > spray_range:
+		if "_dying" in enemy and enemy._dying:
 			continue
-		var angle_diff: float = absf(_facing.angle_to(to_enemy.normalized()))
-		if angle_diff < spray_angle:
-			if enemy.has_method("take_damage"):
-				enemy.take_damage((weapon.damage + damage_bonus) * delta * 10)
-			if enemy.has_method("apply_slow"):
-				enemy.apply_slow(0.5, 2.0)
-				if enemy.has_method("add_freeze_stack"):
-					enemy.add_freeze_stack(delta * 5)
+		var enemy_cell := Vector2i(
+			int(floor(enemy.global_position.x / VS.CELL_SIZE.x)),
+			int(floor(enemy.global_position.y / VS.CELL_SIZE.y))
+		)
+		if enemy_cell == player_cell:
+			enemies_in_room.append(enemy)
+	return enemies_in_room
+
+
+func _deal_damage_to_enemy(enemy: Node, amount: int) -> void:
+	var was_dying: bool = "_dying" in enemy and enemy._dying
+	enemy.take_damage(amount)
+	if not was_dying and "hp" in enemy and enemy.hp <= 0:
+		GameManager.add_kill()
+	var scene := get_tree().current_scene
+	if scene != null and scene.has_method("spawn_damage_number"):
+		var color := BERSERK_COLOR if _berserk_active else Color(1.0, 0.84, 0.0)
+		scene.spawn_damage_number(enemy.global_position, amount, color, 16)
+
+
+func _show_room_blast_fx(amount: int, target_count: int) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var canvas := CanvasLayer.new()
+	canvas.layer = 31
+	scene.add_child(canvas)
+
+	var flash := ColorRect.new()
+	flash.color = Color(1.0, 0.35, 0.08, 0.16) if _berserk_active else Color(1.0, 0.84, 0.0, 0.12)
+	flash.size = VS.VIEWPORT_SIZE
+	canvas.add_child(flash)
+
+	var label := Label.new()
+	label.text = "鸡你太美!  %d" % amount
+	if target_count <= 0:
+		label.text = "鸡你太美!"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 28 if _berserk_active else 22)
+	label.add_theme_color_override("font_color", BERSERK_COLOR if _berserk_active else Color(1.0, 0.9, 0.35))
+	label.position = Vector2(330, 105)
+	label.size = Vector2(300, 40)
+	canvas.add_child(label)
+
+	var tween := create_tween()
+	tween.tween_property(flash, "modulate:a", 0.0, 0.18)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.35)
+	tween.tween_callback(canvas.queue_free)
+
+
+func _spawn_roosters(weapon: Dictionary) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var count: int = weapon.get("berserk_count", weapon.get("count", 1)) if _berserk_active else weapon.get("count", 1)
+	var damage: int = weapon.damage + damage_bonus
+	var speed: float = weapon.get("speed", 280.0)
+	var lifetime: float = weapon.get("lifetime", 4.0)
+	var monitor_range: float = weapon.get("monitor_range", 180.0)
+	var placement_radius := 14.0 if count > 1 else 0.0
+
+	for i in count:
+		var dir := _facing.normalized()
+		var spawn_pos := global_position
+		if count > 1:
+			var angle := TAU * float(i) / float(count)
+			dir = Vector2(cos(angle), sin(angle))
+			spawn_pos += dir * placement_radius
+		var projectile: Area2D = ROOSTER_PROJECTILE.new()
+		scene.add_child(projectile)
+		projectile.setup(spawn_pos, dir, damage, speed, lifetime, monitor_range, _berserk_active)
 
 
 func take_damage(amount: int) -> void:
@@ -333,34 +450,120 @@ func get_weapon_name() -> String:
 	return WEAPONS[_weapon_keys[_weapon_index]].name
 
 
+func _setup_sprite() -> void:
+	var texture := load(PLAYER_SPRITE_PATH) as Texture2D
+	if texture == null:
+		var image := Image.new()
+		var err := image.load(PLAYER_SPRITE_PATH)
+		if err != OK:
+			return
+		texture = ImageTexture.create_from_image(image)
+
+	_sprite = Sprite2D.new()
+	_sprite.texture = texture
+	_sprite.region_enabled = true
+	_sprite.centered = true
+	_sprite.z_index = 2
+	var sprite_scale := PLAYER_SPRITE_DISPLAY_HEIGHT / float(PLAYER_SPRITE_FRAME_SIZE.y)
+	_sprite.scale = Vector2(sprite_scale, sprite_scale)
+	add_child(_sprite)
+	_apply_sprite_frame()
+
+
+func _update_sprite_animation(delta: float) -> void:
+	if _sprite == null:
+		return
+
+	if _sprite_action_timer > 0.0:
+		_sprite_action_timer -= delta
+
+	var moving := _last_move_input.length() > 0.1
+	var next_anim := PlayerSpriteAnim.IDLE
+	if hp <= 0:
+		next_anim = PlayerSpriteAnim.FAIL
+	elif _dash_timer > 0.0:
+		next_anim = PlayerSpriteAnim.JUMP
+	elif _sprite_action_timer > 0.0 and not moving:
+		next_anim = PlayerSpriteAnim.WAVE
+	elif moving:
+		_sprite_idle_timer = 0.0
+		var horizontal := _last_move_input.x
+		if absf(horizontal) < 0.05:
+			horizontal = _facing.x
+		next_anim = PlayerSpriteAnim.RUN_LEFT if horizontal < 0.0 else PlayerSpriteAnim.RUN_RIGHT
+	else:
+		_sprite_idle_timer += delta
+		if _berserk_active:
+			next_anim = PlayerSpriteAnim.DANCE
+		elif _sprite_idle_timer > 8.0:
+			next_anim = PlayerSpriteAnim.INSPECT
+		elif _sprite_idle_timer > 4.0:
+			next_anim = PlayerSpriteAnim.WAIT
+		else:
+			next_anim = PlayerSpriteAnim.IDLE
+
+	if next_anim != _sprite_anim:
+		_sprite_anim = next_anim
+		_sprite_frame = 0
+		_sprite_timer = 0.0
+		_apply_sprite_frame()
+		return
+
+	_sprite_timer += delta
+	var frame_time := _get_sprite_frame_time(_sprite_anim)
+	if _sprite_timer >= frame_time:
+		_sprite_timer = fmod(_sprite_timer, frame_time)
+		var frame_count: int = PLAYER_SPRITE_FRAME_COUNTS[_sprite_anim]
+		_sprite_frame = (_sprite_frame + 1) % frame_count
+		_apply_sprite_frame()
+
+
+func _get_sprite_frame_time(anim: int) -> float:
+	match anim:
+		PlayerSpriteAnim.RUN_RIGHT, PlayerSpriteAnim.RUN_LEFT:
+			return 0.09
+		PlayerSpriteAnim.WAVE, PlayerSpriteAnim.JUMP:
+			return 0.12
+		PlayerSpriteAnim.DANCE:
+			return 0.10
+		PlayerSpriteAnim.FAIL:
+			return 0.16
+	return 0.18
+
+
+func _apply_sprite_frame() -> void:
+	if _sprite == null:
+		return
+	var frame_count: int = PLAYER_SPRITE_FRAME_COUNTS[_sprite_anim]
+	_sprite_frame = clampi(_sprite_frame, 0, frame_count - 1)
+	_sprite.region_rect = Rect2(
+		Vector2(_sprite_frame * PLAYER_SPRITE_FRAME_SIZE.x, _sprite_anim * PLAYER_SPRITE_FRAME_SIZE.y),
+		Vector2(PLAYER_SPRITE_FRAME_SIZE)
+	)
+
+
 func _draw() -> void:
 	# 小三角形角色
 	var angle := _facing.angle()
 	var size := VS.PLAYER_DISPLAY_SIZE * 0.5
-	var points := PackedVector2Array()
-	points.append(Vector2(cos(angle), sin(angle)) * size)
-	points.append(Vector2(cos(angle + 2.5), sin(angle + 2.5)) * size * 0.65)
-	points.append(Vector2(cos(angle - 2.5), sin(angle - 2.5)) * size * 0.65)
+	if _sprite == null:
+		var points := PackedVector2Array()
+		points.append(Vector2(cos(angle), sin(angle)) * size)
+		points.append(Vector2(cos(angle + 2.5), sin(angle + 2.5)) * size * 0.65)
+		points.append(Vector2(cos(angle - 2.5), sin(angle - 2.5)) * size * 0.65)
 
-	# 无敌闪烁
-	if _invuln_timer > 0.0 and int(_invuln_timer * 10) % 2 == 0:
-		return
+		# 无敌闪烁
+		if _invuln_timer > 0.0 and int(_invuln_timer * 10) % 2 == 0:
+			return
 
-	draw_colored_polygon(points, Color(0.0, 0.898, 1.0))
-	draw_polyline(points + PackedVector2Array([points[0]]), Color.WHITE, 1.5)
+		draw_colored_polygon(points, Color(0.0, 0.898, 1.0))
+		draw_polyline(points + PackedVector2Array([points[0]]), Color.WHITE, 1.5)
 
-	# 冰冻喷射器视觉
-	if _freeze_firing:
-		var weapon: Dictionary = WEAPONS["freeze"]
-		var spray_range: float = weapon.range
-		var spray_angle: float = weapon.angle
-		var cone := PackedVector2Array()
-		cone.append(Vector2.ZERO)
-		var segments := 12
-		for i in segments + 1:
-			var a := angle - spray_angle + (spray_angle * 2.0 * i / segments)
-			cone.append(Vector2(cos(a), sin(a)) * spray_range)
-		draw_colored_polygon(cone, Color(0.3, 0.7, 1.0, 0.2))
+	if _berserk_active:
+		var pulse := sin(Time.get_ticks_msec() * 0.018) * 0.18 + 0.72
+		draw_arc(Vector2.ZERO, size + 5.0, 0, TAU, 28, Color(BERSERK_COLOR.r, BERSERK_COLOR.g, BERSERK_COLOR.b, pulse), 2.0)
+		if _berserk_flash_timer > 0.0:
+			draw_circle(Vector2.ZERO, size + 8.0, Color(1.0, 0.35, 0.1, 0.18))
 
 
 # ── 武器管理 ──────────────────────────────────────────
@@ -375,6 +578,10 @@ func add_weapon(key: String) -> bool:
 
 func has_weapon(key: String) -> bool:
 	return key in _weapon_keys
+
+
+func is_berserk_active() -> bool:
+	return _berserk_active
 
 
 func get_all_weapon_keys() -> Array:

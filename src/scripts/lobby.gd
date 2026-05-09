@@ -60,7 +60,7 @@ func _create_player() -> void:
 
 	var col := CollisionShape2D.new()
 	var circle := CircleShape2D.new()
-	circle.radius = 8.0
+	circle.radius = 16.0
 	col.shape = circle
 	_player.add_child(col)
 
@@ -177,7 +177,7 @@ func _create_hud() -> void:
 
 	# 操作提示
 	var hint := Label.new()
-	hint.text = "WASD移动 | E交互 | B背包"
+	hint.text = "WASD移动 | E交互 | B背包 | 地牢中U狂暴"
 	hint.position = Vector2(700, 600)
 	hint.add_theme_font_size_override("font_size", 14)
 	hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))

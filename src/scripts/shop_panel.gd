@@ -7,7 +7,7 @@ const VS := preload("res://scripts/visual_spec.gd")
 var _canvas: CanvasLayer
 var _player: Node
 
-const SHOP_WEAPONS := ["shotgun", "gatling", "freeze", "dart"]
+const SHOP_WEAPONS := ["jntm", "chicken_foot"]
 
 
 func show_panel(player: Node) -> void:
@@ -93,9 +93,10 @@ func _create_weapon_row(key: String, y: float) -> void:
 	# 武器类型
 	var type_text := ""
 	match weapon.type:
-		"bullet": type_text = "射击"
-		"spray": type_text = "喷射"
-		"dart": type_text = "飞镖"
+		"basketball": type_text = "投射"
+		"room_blast": type_text = "全屏"
+		"rooster": type_text = "追击"
+		_: type_text = "武器"
 	var type_label := Label.new()
 	type_label.text = "[%s]" % type_text
 	type_label.position = Vector2(300, y + 3)
@@ -104,15 +105,7 @@ func _create_weapon_row(key: String, y: float) -> void:
 	_canvas.add_child(type_label)
 
 	# 属性
-	var stats_text := "伤害:%d" % weapon.damage
-	if weapon.type == "bullet" or weapon.type == "dart":
-		if weapon.count > 1:
-			stats_text += "  弹数:%d" % weapon.count
-		stats_text += "  CD:%.2fs" % weapon.cooldown
-	if weapon.has("mana") and weapon.mana > 0:
-		stats_text += "  蓝耗:%d" % weapon.mana
-	if weapon.has("mana_per_sec"):
-		stats_text += "  蓝耗:%d/秒" % weapon.mana_per_sec
+	var stats_text := _get_weapon_stats_text(weapon)
 	var stats_label := Label.new()
 	stats_label.text = stats_text
 	stats_label.position = Vector2(160, y + 26)
@@ -160,6 +153,17 @@ func _on_buy_input(event: InputEvent, key: String) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if GameManager.purchase_weapon(key):
 			_build_ui()
+
+
+func _get_weapon_stats_text(weapon: Dictionary) -> String:
+	match weapon.type:
+		"basketball":
+			return "伤害:%d  CD:%.2fs  狂暴CD:%.2fs" % [weapon.damage, weapon.cooldown, weapon.berserk_cooldown]
+		"room_blast":
+			return "全房间伤害:%d  CD:%.1fs  狂暴:3次/%.1fs" % [weapon.damage, weapon.cooldown, weapon.berserk_interval]
+		"rooster":
+			return "伤害:%d  CD:%.1fs  狂暴:%d只/CD%.1fs" % [weapon.damage, weapon.cooldown, weapon.berserk_count, weapon.berserk_cooldown]
+	return "伤害:%d" % weapon.damage
 
 
 func _on_close_input(event: InputEvent) -> void:

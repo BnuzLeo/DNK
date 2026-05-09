@@ -23,6 +23,44 @@ const SHOOT_BULLET_SPEED := 300.0
 const KEEP_DISTANCE_MIN := 150.0
 const KEEP_DISTANCE_MAX := 200.0
 
+const TYPE_ANIMATIONS := {
+	EnemyType.CHASER: {
+		"frame_size": 64,
+		"animations": {
+			"idle": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_idle_strip4.png", "frames": 4, "fps": 5.0, "loop": true},
+			"move": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_move_strip6.png", "frames": 6, "fps": 10.0, "loop": true},
+			"hit": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_hit_strip2.png", "frames": 2, "fps": 12.0, "loop": false},
+			"dead": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_dead_strip4.png", "frames": 4, "fps": 8.0, "loop": false},
+		},
+	},
+	EnemyType.SHOOTER: {
+		"frame_size": 64,
+		"animations": {
+			"idle": {"path": "res://assets/export/enemies/shooter/enemy_shooter_body_idle_strip4.png", "frames": 4, "fps": 5.0, "loop": true},
+			"move": {"path": "res://assets/export/enemies/shooter/enemy_shooter_body_move_strip6.png", "frames": 6, "fps": 9.0, "loop": true},
+			"tell": {"path": "res://assets/export/enemies/shooter/enemy_shooter_body_tell_strip4.png", "frames": 4, "fps": 12.0, "loop": true},
+			"dead": {"path": "res://assets/export/enemies/shooter/enemy_shooter_body_dead_strip4.png", "frames": 4, "fps": 8.0, "loop": false},
+		},
+	},
+	EnemyType.TANK: {
+		"frame_size": 64,
+		"animations": {
+			"idle": {"path": "res://assets/export/enemies/tank/enemy_tank_body_idle_strip4.png", "frames": 4, "fps": 4.0, "loop": true},
+			"move": {"path": "res://assets/export/enemies/tank/enemy_tank_body_move_strip6.png", "frames": 6, "fps": 7.0, "loop": true},
+			"hit": {"path": "res://assets/export/enemies/tank/enemy_tank_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
+			"dead": {"path": "res://assets/export/enemies/tank/enemy_tank_body_dead_strip4.png", "frames": 4, "fps": 7.0, "loop": false},
+		},
+	},
+	EnemyType.SWARM: {
+		"frame_size": 48,
+		"animations": {
+			"idle": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_idle_strip4.png", "frames": 4, "fps": 7.0, "loop": true},
+			"move": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_move_strip6.png", "frames": 6, "fps": 14.0, "loop": true},
+			"dead": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_dead_strip4.png", "frames": 4, "fps": 10.0, "loop": false},
+		},
+	},
+}
+
 var enemy_type: int = EnemyType.CHASER
 var max_hp := 20
 var hp := 20
@@ -34,6 +72,10 @@ var _player: CharacterBody2D
 var _contact_cooldown := 0.0
 var _dying := false
 var _spawn_invuln_timer := 0.0
+var _sprite: AnimatedSprite2D = null
+var _current_animation := ""
+var _moving_this_frame := false
+var _hit_timer := 0.0
 
 # 射击
 var _shoot_timer := 0.0
@@ -57,6 +99,7 @@ func _ready() -> void:
 
 	_spawn_invuln_timer = 0.5
 	_shoot_timer = randf_range(SHOOT_COOLDOWN_MIN, SHOOT_COOLDOWN_MAX)
+	_setup_sprite()
 
 
 func setup(player: CharacterBody2D, type: int = EnemyType.CHASER, pool: Node2D = null) -> void:
@@ -66,17 +109,22 @@ func setup(player: CharacterBody2D, type: int = EnemyType.CHASER, pool: Node2D =
 	var stats: Dictionary = TYPE_STATS[type]
 	max_hp = stats.hp
 	hp = stats.hp
+	if is_inside_tree():
+		_setup_sprite()
 
 
 func _physics_process(delta: float) -> void:
 	if GameManager.state != GameManager.GameState.PLAYING:
 		return
-	if _player == null:
+	if _player == null or _dying:
 		return
 
 	# 生成无敌
 	if _spawn_invuln_timer > 0.0:
 		_spawn_invuln_timer -= delta
+
+	if _hit_timer > 0.0:
+		_hit_timer -= delta
 
 	# 减速计时
 	if _slow_timer > 0.0:
@@ -90,10 +138,12 @@ func _physics_process(delta: float) -> void:
 		if _freeze_timer <= 0.0:
 			_frozen = false
 			_freeze_stacks = 0
-			modulate = _get_base_color()
+			_apply_idle_modulate()
 
 	# 冰冻状态不移动/射击
 	if _frozen:
+		_apply_idle_modulate()
+		_set_animation("idle")
 		queue_redraw()
 		return
 
@@ -116,17 +166,20 @@ func _physics_process(delta: float) -> void:
 	if _flash_timer > 0.0:
 		_flash_timer -= delta
 		if _flash_timer <= 0.0:
-			if _frozen:
-				modulate = Color(0.3, 0.7, 1.0)
-			else:
-				modulate = _get_base_color()
+			_apply_idle_modulate()
 
+	if _flash_timer <= 0.0 and not _shooting:
+		_apply_idle_modulate()
+
+	_update_animation()
 	queue_redraw()
 
 
 func _update_movement(delta: float) -> void:
+	var start_position := global_position
 	var dir := (_player.global_position - global_position).normalized()
 	var speed: float = TYPE_STATS[enemy_type].speed * _slow_factor
+	_face_direction(dir)
 
 	match enemy_type:
 		EnemyType.CHASER:
@@ -147,6 +200,7 @@ func _update_movement(delta: float) -> void:
 			# 群体追踪 + 随机偏移避免重叠
 			var offset := Vector2(randf_range(-0.3, 0.3), randf_range(-0.3, 0.3))
 			global_position += (dir + offset) * speed * delta
+	_moving_this_frame = global_position.distance_squared_to(start_position) > 0.01
 
 
 func _update_shooting(delta: float) -> void:
@@ -159,7 +213,7 @@ func _update_shooting(delta: float) -> void:
 		else:
 			# "告诉" 期间闪烁
 			var flash := sin(_shoot_tell_timer * 30.0) * 0.5 + 0.5
-			modulate = _get_base_color().lerp(Color.WHITE * 3.0, flash)
+			modulate = _get_base_modulate().lerp(Color.WHITE * 3.0, flash)
 		return
 
 	_shoot_timer -= delta
@@ -185,6 +239,129 @@ func _get_base_color() -> Color:
 	return TYPE_STATS[enemy_type].color
 
 
+func _get_base_modulate() -> Color:
+	return Color.WHITE if _sprite != null else _get_base_color()
+
+
+func _apply_idle_modulate() -> void:
+	var color := Color(0.3, 0.7, 1.0) if _frozen else _get_base_modulate()
+	if _sprite != null and _spawn_invuln_timer > 0.0:
+		color.a = sin(_spawn_invuln_timer * 20.0) * 0.3 + 0.5
+	modulate = color
+
+
+func _update_animation() -> void:
+	if _sprite == null:
+		return
+	if _shooting and _has_animation("tell"):
+		_set_animation("tell")
+	elif _hit_timer > 0.0 and _has_animation("hit"):
+		_set_animation("hit")
+	elif _moving_this_frame and _has_animation("move"):
+		_set_animation("move")
+	else:
+		_set_animation("idle")
+
+
+func _setup_sprite() -> void:
+	var config: Dictionary = TYPE_ANIMATIONS.get(enemy_type, {})
+	if config.is_empty():
+		return
+	var frames := _build_sprite_frames(config)
+	if frames == null:
+		return
+	if _sprite == null:
+		_sprite = AnimatedSprite2D.new()
+		_sprite.centered = true
+		_sprite.z_index = 2
+		add_child(_sprite)
+	_sprite.sprite_frames = frames
+	_current_animation = ""
+	var display_size := _get_display_size()
+	var frame_size := float(config.get("frame_size", 64))
+	if frame_size > 0.0:
+		var scale_factor: float = display_size / frame_size
+		_sprite.scale = Vector2(scale_factor, scale_factor)
+	_set_animation("idle", true)
+	_apply_idle_modulate()
+
+
+func _build_sprite_frames(config: Dictionary) -> SpriteFrames:
+	var sprite_frames := SpriteFrames.new()
+	sprite_frames.remove_animation("default")
+	var frame_size := int(config.get("frame_size", 64))
+	var animations: Dictionary = config.get("animations", {})
+	for animation_name in animations.keys():
+		var animation: Dictionary = animations[animation_name]
+		var texture := _load_texture(animation.get("path", ""))
+		if texture == null:
+			continue
+		sprite_frames.add_animation(animation_name)
+		sprite_frames.set_animation_speed(animation_name, float(animation.get("fps", 8.0)))
+		sprite_frames.set_animation_loop(animation_name, bool(animation.get("loop", true)))
+		var frame_count := int(animation.get("frames", 1))
+		for frame_index in frame_count:
+			var atlas := AtlasTexture.new()
+			atlas.atlas = texture
+			atlas.region = Rect2(frame_index * frame_size, 0, frame_size, frame_size)
+			sprite_frames.add_frame(animation_name, atlas)
+	if not sprite_frames.has_animation("idle"):
+		return null
+	return sprite_frames
+
+
+func _load_texture(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	var texture := load(path) as Texture2D
+	if texture != null:
+		return texture
+	var image := Image.new()
+	if image.load(path) != OK:
+		return null
+	return ImageTexture.create_from_image(image)
+
+
+func _get_display_size() -> float:
+	match enemy_type:
+		EnemyType.SWARM:
+			return VS.ENEMY_SWARM_DISPLAY_SIZE
+		EnemyType.TANK:
+			return VS.ENEMY_TANK_DISPLAY_SIZE
+	return VS.ENEMY_STANDARD_DISPLAY_SIZE
+
+
+func _face_direction(dir: Vector2) -> void:
+	if _sprite != null and dir.length_squared() > 0.001:
+		_sprite.rotation = dir.angle()
+
+
+func _has_animation(animation_name: String) -> bool:
+	return _sprite != null and _sprite.sprite_frames != null and _sprite.sprite_frames.has_animation(animation_name)
+
+
+func _set_animation(animation_name: String, restart: bool = false) -> void:
+	if _sprite == null or _sprite.sprite_frames == null:
+		return
+	var next_animation := animation_name
+	if not _sprite.sprite_frames.has_animation(next_animation):
+		next_animation = "idle"
+	if _current_animation == next_animation and not restart:
+		return
+	_current_animation = next_animation
+	_sprite.play(next_animation)
+
+
+func _get_animation_duration(animation_name: String) -> float:
+	if not _has_animation(animation_name):
+		return 0.2
+	var frame_count := _sprite.sprite_frames.get_frame_count(animation_name)
+	var fps := _sprite.sprite_frames.get_animation_speed(animation_name)
+	if fps <= 0.0:
+		return 0.2
+	return frame_count / fps
+
+
 func take_damage(amount: int) -> void:
 	if _dying or _spawn_invuln_timer > 0.0:
 		return
@@ -192,9 +369,12 @@ func take_damage(amount: int) -> void:
 		amount = int(amount * 1.5)
 	hp -= amount
 	_flash_timer = 0.1
+	_hit_timer = 0.16
 	modulate = Color.WHITE * 3.0
 	if hp <= 0:
 		_die()
+	elif _has_animation("hit"):
+		_set_animation("hit", true)
 
 
 func apply_slow(factor: float, duration: float) -> void:
@@ -208,14 +388,22 @@ func add_freeze_stack(amount: float) -> void:
 		_frozen = true
 		_freeze_timer = 3.0
 		_slow_factor = 0.0
-		modulate = Color(0.3, 0.7, 1.0)
+		_apply_idle_modulate()
 
 
 func _die() -> void:
 	_dying = true
 	died.emit()
+	if _has_animation("dead"):
+		modulate = _get_base_modulate()
+		_set_animation("dead", true)
+		var tween := create_tween()
+		tween.tween_interval(_get_animation_duration("dead"))
+		tween.tween_property(self, "scale", Vector2.ZERO, 0.12).set_ease(Tween.EASE_IN)
+		tween.tween_callback(queue_free)
+		return
 	# 闪烁 3 次 + 缩小消失
-	var base_col := _get_base_color()
+	var base_col := _get_base_modulate()
 	var tween := create_tween()
 	tween.set_parallel(false)
 	for i in 3:
@@ -243,13 +431,14 @@ func _draw() -> void:
 			radius = VS.ENEMY_SWARM_DISPLAY_SIZE * 0.5
 		EnemyType.TANK:
 			radius = VS.ENEMY_TANK_DISPLAY_SIZE * 0.5
-	var color := Color(0.3, 0.7, 1.0) if _frozen else _get_base_color()
-	# 生成无敌闪烁
-	if _spawn_invuln_timer > 0.0:
-		var flash := sin(_spawn_invuln_timer * 20.0) * 0.3 + 0.5
-		color.a = flash
-	draw_circle(Vector2.ZERO, radius, color)
-	draw_arc(Vector2.ZERO, radius, 0, TAU, 24, Color.WHITE, 1.5)
+	if _sprite == null:
+		var color := Color(0.3, 0.7, 1.0) if _frozen else _get_base_color()
+		# 生成无敌闪烁
+		if _spawn_invuln_timer > 0.0:
+			var flash := sin(_spawn_invuln_timer * 20.0) * 0.3 + 0.5
+			color.a = flash
+		draw_circle(Vector2.ZERO, radius, color)
+		draw_arc(Vector2.ZERO, radius, 0, TAU, 24, Color.WHITE, 1.5)
 	if _slow_factor < 1.0 and not _frozen:
 		draw_arc(Vector2.ZERO, radius + 3.0, 0, TAU * _slow_factor, 16, Color(0.3, 0.7, 1.0, 0.5), 2.0)
 	# 射击 "告诉" 指示器

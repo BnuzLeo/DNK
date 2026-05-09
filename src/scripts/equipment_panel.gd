@@ -184,9 +184,10 @@ func _draw_equipped_slots() -> void:
 			# 类型
 			var type_text := ""
 			match weapon.type:
-				"bullet": type_text = "射击"
-				"spray": type_text = "喷射"
-				"dart": type_text = "飞镖"
+				"basketball": type_text = "投射"
+				"room_blast": type_text = "全屏"
+				"rooster": type_text = "追击"
+				_: type_text = "武器"
 			var ts_size := ThemeDB.fallback_font.get_string_size(type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11)
 			ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - ts_size.x) / 2, base_y + 66), type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.5, 0.5, 0.5))
 			# 槽位编号
@@ -239,9 +240,10 @@ func _draw_backpack() -> void:
 		# 类型
 		var type_text := ""
 		match weapon.type:
-			"bullet": type_text = "射击"
-			"spray": type_text = "喷射"
-			"dart": type_text = "飞镖"
+			"basketball": type_text = "投射"
+			"room_blast": type_text = "全屏"
+			"rooster": type_text = "追击"
+			_: type_text = "武器"
 		var ts_size := ThemeDB.fallback_font.get_string_size(type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11)
 		ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - ts_size.x) / 2, base_y + 66), type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.5, 0.5, 0.5))
 
