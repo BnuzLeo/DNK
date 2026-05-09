@@ -12,13 +12,16 @@ var total_kills: int = 0
 var revive_coins: int = 1
 
 # ── 经济系统 ──
-var practice_time: int = 0
-var kun_coins: int = 0
+var practice_time: int = 1000
+var kun_coins: int = 100
 
 # ── 持久化玩家数据（跨场景保持）──
 var player_data: Dictionary = {
-	"weapon_keys": ["pistol"],
+	"owned_weapons": ["pistol"],
+	"equipped_weapons": ["pistol"],
 	"weapon_index": 0,
+	"max_weapon_slots": 3,
+	"_lobby_equipped": ["pistol"],
 	"upgrade_hp_level": 0,
 	"upgrade_speed_level": 0,
 	"upgrade_mana_level": 0,
@@ -41,6 +44,9 @@ const WEAPON_COSTS := {
 	"dart":    1,
 }
 
+# ── 装备槽位解锁费用（坤币）──
+const SLOT_UNLOCK_COSTS := {4: 2, 5: 5}
+
 
 func change_state(new_state: GameState) -> void:
 	if new_state == _state:
@@ -48,6 +54,9 @@ func change_state(new_state: GameState) -> void:
 	var old := _state
 	_state = new_state
 	match new_state:
+		GameState.MAIN_MENU:
+			get_tree().paused = false
+			Engine.time_scale = 1.0
 		GameState.LOBBY:
 			get_tree().paused = false
 			Engine.time_scale = 1.0
@@ -71,8 +80,11 @@ func restart_game() -> void:
 	practice_time = 0
 	kun_coins = 0
 	player_data = {
-		"weapon_keys": ["pistol"],
+		"owned_weapons": ["pistol"],
+		"equipped_weapons": ["pistol"],
 		"weapon_index": 0,
+		"max_weapon_slots": 3,
+		"_lobby_equipped": ["pistol"],
 		"upgrade_hp_level": 0,
 		"upgrade_speed_level": 0,
 		"upgrade_mana_level": 0,
@@ -125,10 +137,37 @@ func purchase_upgrade(stat: String) -> bool:
 func purchase_weapon(key: String) -> bool:
 	if key not in WEAPON_COSTS:
 		return false
-	if key in player_data.weapon_keys:
+	if key in player_data.owned_weapons:
 		return false
 	if kun_coins < WEAPON_COSTS[key]:
 		return false
 	kun_coins -= WEAPON_COSTS[key]
-	player_data.weapon_keys.append(key)
+	player_data.owned_weapons.append(key)
 	return true
+
+
+func unlock_weapon_slot() -> bool:
+	var current: int = player_data.max_weapon_slots
+	if current >= 5:
+		return false
+	var next_slot: int = current + 1
+	if next_slot not in SLOT_UNLOCK_COSTS:
+		return false
+	var cost: int = SLOT_UNLOCK_COSTS[next_slot]
+	if kun_coins < cost:
+		return false
+	kun_coins -= cost
+	player_data.max_weapon_slots = next_slot
+	return true
+
+
+func save_lobby_weapons() -> void:
+	if player_data.equipped_weapons.is_empty():
+		player_data.equipped_weapons = ["pistol"]
+	player_data._lobby_equipped = player_data.equipped_weapons.duplicate()
+
+
+func restore_lobby_weapons() -> void:
+	var lobby_equipped: Array = player_data.get("_lobby_equipped", ["pistol"])
+	player_data.equipped_weapons = lobby_equipped.duplicate() if not lobby_equipped.is_empty() else ["pistol"]
+	player_data.weapon_index = 0

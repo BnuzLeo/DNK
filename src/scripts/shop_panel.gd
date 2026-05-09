@@ -2,6 +2,8 @@ extends Node
 
 ## 鸡哥铁匠 — 武器商店面板
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 var _canvas: CanvasLayer
 var _player: Node
 
@@ -24,7 +26,7 @@ func _build_ui() -> void:
 	# 半透明遮罩
 	var bg := ColorRect.new()
 	bg.color = Color(0, 0, 0, 0.65)
-	bg.size = Vector2(960, 640)
+	bg.size = VS.VIEWPORT_SIZE
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	_canvas.add_child(bg)
 
@@ -77,7 +79,7 @@ func _draw_panel_border(panel: ColorRect) -> void:
 func _create_weapon_row(key: String, y: float) -> void:
 	var weapon: Dictionary = _player.WEAPONS[key]
 	var price: int = GameManager.WEAPON_COSTS[key]
-	var owned: bool = _player.has_weapon(key)
+	var owned: bool = key in GameManager.player_data.owned_weapons
 	var can_buy: bool = not owned and GameManager.kun_coins >= price
 
 	# 武器名
@@ -157,11 +159,7 @@ func _create_weapon_row(key: String, y: float) -> void:
 func _on_buy_input(event: InputEvent, key: String) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if GameManager.purchase_weapon(key):
-			if _player:
-				_player.add_weapon(key)
 			_build_ui()
-		else:
-			pass
 
 
 func _on_close_input(event: InputEvent) -> void:

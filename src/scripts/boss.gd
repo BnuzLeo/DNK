@@ -2,6 +2,8 @@ extends Area2D
 
 ## Boss 战 — 3阶段 + 扇形/环形弹幕 + 冲刺
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 enum Phase { P1, P2, P3 }
 enum AttackType { FAN, RING, DASH }
 
@@ -185,7 +187,7 @@ func _fire_fan(count: int, spread: float, speed: float, damage: int) -> void:
 		var angle := start_angle + i * spread
 		var dir := Vector2(cos(angle), sin(angle))
 		bullet_pool.spawn(
-			global_position + dir * 16.0,
+			global_position + dir * (VS.BOSS_DISPLAY_SIZE * 0.5),
 			dir,
 			speed,
 			damage,
@@ -198,7 +200,7 @@ func _fire_ring(count: int, speed: float, damage: int) -> void:
 		var angle := i * (TAU / count)
 		var dir := Vector2(cos(angle), sin(angle))
 		bullet_pool.spawn(
-			global_position + dir * 16.0,
+			global_position + dir * (VS.BOSS_DISPLAY_SIZE * 0.5),
 			dir,
 			speed,
 			damage,
@@ -241,15 +243,15 @@ func _on_body_entered(body: Node2D) -> void:
 
 func _draw() -> void:
 	# Boss 身体
-	var radius := 24.0
+	var radius := VS.BOSS_DISPLAY_SIZE * 0.5
 	var col := Color(0.3, 0.7, 1.0) if _dashing else _base_color
 	draw_circle(Vector2.ZERO, radius, col)
 	draw_arc(Vector2.ZERO, radius, 0, TAU, 32, Color.WHITE, 2.0)
 
 	# 眼睛
-	var eye_offset := 10.0
-	draw_circle(Vector2(-eye_offset, -6.0), 4.0, Color.WHITE)
-	draw_circle(Vector2(eye_offset, -6.0), 4.0, Color.WHITE)
+	var eye_offset := radius * 0.42
+	draw_circle(Vector2(-eye_offset, -radius * 0.25), 5.0, Color.WHITE)
+	draw_circle(Vector2(eye_offset, -radius * 0.25), 5.0, Color.WHITE)
 
 	# 阶段指示器
 	var hp_ratio := float(hp) / float(max_hp)
@@ -257,4 +259,4 @@ func _draw() -> void:
 
 	# 冲刺拖尾
 	if _dashing:
-		draw_line(Vector2.ZERO, -_dash_dir * 30.0, Color(1.0, 0.3, 0.3, 0.5), 6.0)
+		draw_line(Vector2.ZERO, -_dash_dir * (VS.BOSS_DISPLAY_SIZE * 0.65), Color(1.0, 0.3, 0.3, 0.5), 6.0)

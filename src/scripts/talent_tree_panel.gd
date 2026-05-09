@@ -5,6 +5,8 @@ extends Node
 var _canvas: CanvasLayer
 var _player: Node
 var _anim_timer := 0.0
+var _status_msg := ""
+var _status_timer := 0.0
 
 # 天赋节点定义
 # { key, name, desc, max_level, costs[], values[], pos, color }
@@ -110,6 +112,18 @@ func _define_tree() -> void:
 	]
 
 
+var _status_label: Label
+
+
+func _process(delta: float) -> void:
+	if _status_timer > 0.0:
+		_status_timer -= delta
+		if _status_timer <= 0.0:
+			_status_msg = ""
+			if _status_label:
+				_status_label.text = ""
+
+
 func show_panel(player: Node) -> void:
 	_player = player
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -177,6 +191,14 @@ func _build_ui() -> void:
 	close_btn.add_theme_font_size_override("font_size", 14)
 	close_btn.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 	_canvas.add_child(close_btn)
+
+	# 状态提示
+	_status_label = Label.new()
+	_status_label.text = _status_msg
+	_status_label.position = Vector2(350, 560)
+	_status_label.add_theme_font_size_override("font_size", 15)
+	_status_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.3))
+	_canvas.add_child(_status_label)
 
 	# 绘制连线和节点
 	var tree_draw := Control.new()
@@ -256,14 +278,16 @@ func _find_node(key: String) -> Dictionary:
 	return {}
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		get_viewport().set_input_as_handled()
 		_save_levels()
 		_apply_talents()
 		_close()
 		return
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		get_viewport().set_input_as_handled()
 		var click_pos: Vector2 = event.position
 		for node_def in _nodes:
 			if click_pos.distance_to(node_def.pos) < 25.0:
@@ -279,16 +303,20 @@ func _try_upgrade(node_def: Dictionary) -> void:
 
 	# 检查前置
 	if parent_key != "" and _node_levels.get(parent_key, 0) <= 0:
+		var parent_def := _find_node(parent_key)
+		_show_status("需要先学习: %s" % parent_def.name)
 		return
 
 	# 检查是否满级
 	if level >= max_lv:
+		_show_status("已满级")
 		return
 
 	# 检查费用
 	var costs: Array = node_def.costs
 	var cost: int = costs[level]
 	if GameManager.practice_time < cost:
+		_show_status("练习时长不足 (需要%d)" % cost)
 		return
 
 	# 购买
@@ -297,6 +325,13 @@ func _try_upgrade(node_def: Dictionary) -> void:
 	_save_levels()
 	_apply_talents()
 	_build_ui()
+
+
+func _show_status(msg: String) -> void:
+	_status_msg = msg
+	_status_timer = 2.0
+	if _status_label:
+		_status_label.text = msg
 
 
 func _on_reset_input(event: InputEvent) -> void:

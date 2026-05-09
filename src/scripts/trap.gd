@@ -2,6 +2,8 @@ extends Area2D
 
 ## 地刺陷阱 — 玩家踩上去持续受伤
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 const DAMAGE_INTERVAL := 0.5
 const DAMAGE := 1
 
@@ -52,20 +54,21 @@ func _draw() -> void:
 	var pulse := sin(_anim_timer * 4.0) * 0.2 + 0.8
 	var color := Color(1.0, 0.2, 0.2, pulse)
 	var warn_color := Color(1.0, 0.4, 0.1, pulse * 0.5)
+	var half := VS.TRAP_DISPLAY_SIZE * 0.5
 
 	# 地刺三角形
 	var spikes := PackedVector2Array()
-	spikes.append(Vector2(0, -10))
-	spikes.append(Vector2(-8, 8))
-	spikes.append(Vector2(8, 8))
+	spikes.append(Vector2(0, -half))
+	spikes.append(Vector2(-half * 0.75, half * 0.75))
+	spikes.append(Vector2(half * 0.75, half * 0.75))
 	draw_colored_polygon(spikes, color)
 
 	# 内部高光
 	var inner := PackedVector2Array()
-	inner.append(Vector2(0, -5))
-	inner.append(Vector2(-4, 5))
-	inner.append(Vector2(4, 5))
+	inner.append(Vector2(0, -half * 0.5))
+	inner.append(Vector2(-half * 0.35, half * 0.45))
+	inner.append(Vector2(half * 0.35, half * 0.45))
 	draw_colored_polygon(inner, warn_color)
 
 	# 外圈警告
-	draw_arc(Vector2.ZERO, 12, 0, TAU, 16, Color(1.0, 0.3, 0.2, 0.3 * pulse), 1.5)
+	draw_arc(Vector2.ZERO, half, 0, TAU, 16, Color(1.0, 0.3, 0.2, 0.3 * pulse), 1.5)

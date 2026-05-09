@@ -2,9 +2,11 @@ extends Node2D
 
 ## 练习生基地 — 游戏大厅
 
-const ROOM_W := 960
-const ROOM_H := 640
-const WALL_T := 12
+const VS := preload("res://scripts/visual_spec.gd")
+
+const ROOM_W := int(VS.VIEWPORT_SIZE.x)
+const ROOM_H := int(VS.VIEWPORT_SIZE.y)
+const WALL_T := int(VS.WALL_THICKNESS)
 
 var _player: CharacterBody2D
 var _portal_pos := Vector2(480, 120)
@@ -24,6 +26,7 @@ var _map_cards: Array[Control] = []
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameManager.change_state(GameManager.GameState.LOBBY)
 	_create_walls()
 	_create_player()
@@ -62,6 +65,9 @@ func _create_player() -> void:
 	_player.add_child(col)
 
 	var cam := Camera2D.new()
+	cam.offset = VS.CAMERA_LOBBY_BASE_OFFSET
+	cam.position_smoothing_enabled = true
+	cam.position_smoothing_speed = VS.CAMERA_SMOOTH_SPEED
 	cam.limit_left = 0
 	cam.limit_top = 0
 	cam.limit_right = ROOM_W
@@ -103,12 +109,14 @@ func _create_npcs() -> void:
 	smith.npc_color = Color(0.5, 0.6, 0.8)
 
 
+
 var _hp_bar_bg: ColorRect
 var _hp_bar: ColorRect
 var _hp_label: Label
 var _mana_bar_bg: ColorRect
 var _mana_bar: ColorRect
 var _hud_canvas: CanvasLayer
+var _equipment_panel: Node = null
 
 
 func _create_hud() -> void:
@@ -120,14 +128,14 @@ func _create_hud() -> void:
 	# HP 背景
 	_hp_bar_bg = ColorRect.new()
 	_hp_bar_bg.position = Vector2(20, 14)
-	_hp_bar_bg.size = Vector2(102, 14)
+	_hp_bar_bg.size = VS.HP_FRAME_SIZE
 	_hp_bar_bg.color = Color(0.2, 0.2, 0.2)
 	_hud_canvas.add_child(_hp_bar_bg)
 
 	# HP 填充
 	_hp_bar = ColorRect.new()
 	_hp_bar.position = Vector2(21, 15)
-	_hp_bar.size = Vector2(100, 12)
+	_hp_bar.size = VS.HP_FILL_SIZE
 	_hp_bar.color = Color(0.0, 0.8, 0.2)
 	_hud_canvas.add_child(_hp_bar)
 
@@ -149,14 +157,14 @@ func _create_hud() -> void:
 	# MP 背景
 	_mana_bar_bg = ColorRect.new()
 	_mana_bar_bg.position = Vector2(20, 32)
-	_mana_bar_bg.size = Vector2(102, 10)
+	_mana_bar_bg.size = VS.MANA_FRAME_SIZE
 	_mana_bar_bg.color = Color(0.2, 0.2, 0.2)
 	_hud_canvas.add_child(_mana_bar_bg)
 
 	# MP 填充
 	_mana_bar = ColorRect.new()
 	_mana_bar.position = Vector2(21, 33)
-	_mana_bar.size = Vector2(100, 8)
+	_mana_bar.size = VS.MANA_FILL_SIZE
 	_mana_bar.color = Color(0.2, 0.4, 1.0)
 	_hud_canvas.add_child(_mana_bar)
 
@@ -169,7 +177,7 @@ func _create_hud() -> void:
 
 	# 操作提示
 	var hint := Label.new()
-	hint.text = "WASD移动 | E交互"
+	hint.text = "WASD移动 | E交互 | B背包"
 	hint.position = Vector2(700, 600)
 	hint.add_theme_font_size_override("font_size", 14)
 	hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
@@ -182,7 +190,7 @@ func _process(delta: float) -> void:
 	if _player and is_instance_valid(_player):
 		# HP 条
 		var hp_ratio: float = float(_player.hp) / float(_player.MAX_HP)
-		_hp_bar.size.x = 100.0 * clampf(hp_ratio, 0.0, 1.0)
+		_hp_bar.size.x = VS.HP_FILL_SIZE.x * clampf(hp_ratio, 0.0, 1.0)
 		if hp_ratio > 0.3:
 			_hp_bar.color = Color(0.0, 0.8, 0.2).lerp(Color(1.0, 0.0, 0.0), 1.0 - hp_ratio)
 		else:
@@ -191,7 +199,7 @@ func _process(delta: float) -> void:
 
 		# MP 条
 		var mana_ratio: float = _player.mana / _player.MAX_MANA
-		_mana_bar.size.x = 100.0 * clampf(mana_ratio, 0.0, 1.0)
+		_mana_bar.size.x = VS.MANA_FILL_SIZE.x * clampf(mana_ratio, 0.0, 1.0)
 
 		_portal_near = _player.global_position.distance_to(_portal_pos) < 50.0
 
@@ -211,6 +219,7 @@ func _input(event: InputEvent) -> void:
 	# 地图选择界面的输入
 	if _map_select_open:
 		if event is InputEventKey and event.pressed:
+			get_viewport().set_input_as_handled()
 			match event.keycode:
 				KEY_A, KEY_LEFT:
 					_current_map_index = (_current_map_index - 1 + _map_names.size()) % _map_names.size()
@@ -228,6 +237,12 @@ func _input(event: InputEvent) -> void:
 		return
 
 	if GameManager.state != GameManager.GameState.LOBBY:
+		return
+
+	# B键打开装备背包
+	if event is InputEventKey and event.pressed and event.keycode == KEY_B:
+		get_viewport().set_input_as_handled()
+		_open_equipment_panel()
 		return
 
 	# 副本入口 — 打开地图选择
@@ -249,7 +264,7 @@ func _open_map_select() -> void:
 	# 半透明遮罩
 	var bg := ColorRect.new()
 	bg.color = Color(0, 0, 0, 0.65)
-	bg.size = Vector2(960, 640)
+	bg.size = VS.VIEWPORT_SIZE
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	_map_select_canvas.add_child(bg)
 
@@ -263,11 +278,11 @@ func _open_map_select() -> void:
 
 	# 三张地图卡片
 	_map_cards.clear()
-	var card_w := 180.0
-	var card_h := 240.0
+	var card_w := VS.MAP_CARD_SIZE.x
+	var card_h := VS.MAP_CARD_SIZE.y
 	var card_gap := 30.0
 	var total_w := card_w * 3 + card_gap * 2
-	var start_x := (960.0 - total_w) / 2.0
+	var start_x := (VS.VIEWPORT_SIZE.x - total_w) / 2.0
 	var card_y := 110.0
 
 	for i in _map_names.size():
@@ -424,10 +439,25 @@ func _close_map_select() -> void:
 		GameManager.change_state(GameManager.GameState.LOBBY)
 
 
+func _open_equipment_panel() -> void:
+	if _equipment_panel:
+		return
+	GameManager.change_state(GameManager.GameState.PAUSED)
+	_equipment_panel = load("res://scripts/equipment_panel.gd").new()
+	_equipment_panel.tree_exiting.connect(func():
+		_equipment_panel = null
+		if GameManager.state == GameManager.GameState.PAUSED:
+			GameManager.change_state(GameManager.GameState.LOBBY)
+	)
+	add_child(_equipment_panel)
+	_equipment_panel.show_panel(_player)
+
+
 func _enter_dungeon() -> void:
 	_map_select_open = false
 	if _map_select_canvas:
 		_map_select_canvas.queue_free()
+	GameManager.save_lobby_weapons()
 	_player.save_to_game_manager()
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
 
@@ -453,10 +483,11 @@ func _draw() -> void:
 
 	# 传送门
 	var pulse := sin(_anim_timer * 3.0) * 0.15 + 0.85
-	draw_circle(_portal_pos, 25.0, Color(0.0, 0.7, 1.0, 0.3 * pulse))
-	draw_arc(_portal_pos, 25.0, 0, TAU, 32, Color(0.0, 0.85, 1.0, 0.8 * pulse), 3.0)
-	draw_arc(_portal_pos, 18.0, 0, TAU, 32, Color(0.3, 0.9, 1.0, 0.5 * pulse), 2.0)
-	draw_arc(_portal_pos, 10.0, 0, TAU, 24, Color(0.6, 1.0, 1.0, 0.6 * pulse), 1.5)
+	var portal_radius := VS.PORTAL_LOBBY_DISPLAY_SIZE * 0.5
+	draw_circle(_portal_pos, portal_radius, Color(0.0, 0.7, 1.0, 0.3 * pulse))
+	draw_arc(_portal_pos, portal_radius, 0, TAU, 32, Color(0.0, 0.85, 1.0, 0.8 * pulse), 3.0)
+	draw_arc(_portal_pos, portal_radius * 0.72, 0, TAU, 32, Color(0.3, 0.9, 1.0, 0.5 * pulse), 2.0)
+	draw_arc(_portal_pos, portal_radius * 0.4, 0, TAU, 24, Color(0.6, 1.0, 1.0, 0.6 * pulse), 1.5)
 
 	# 传送门文字
 	draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-30, 45), "副本入口",

@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="弹幕骑士"
-run/main_scene="res://scenes/Lobby.tscn"
+config/name="坤坤地下城"
+run/main_scene="res://scenes/TitleScreen.tscn"
 config/features=PackedStringArray("4.6")
 
 [autoload]

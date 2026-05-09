@@ -3,6 +3,8 @@ extends Area2D
 ## 危险地面 — 岩浆/毒池
 ## 不阻挡移动，玩家和怪物踩上去持续扣血
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 const DAMAGE_INTERVAL := 0.5
 const DAMAGE := 2
 
@@ -78,12 +80,13 @@ func _draw() -> void:
 	var pulse := sin(_anim_timer * 3.0) * 0.15 + 0.85
 	var base_color := Color(0.8, 0.3, 0.05, 0.6 * pulse)  # 橙红岩浆
 	var glow_color := Color(1.0, 0.5, 0.1, 0.3 * pulse)
+	var patch_size := VS.HAZARD_PATCH_SIZE
 
 	# 底色
-	draw_rect(Rect2(-25, -18, 50, 36), base_color)
+	draw_rect(Rect2(-patch_size * 0.5, patch_size), base_color)
 	# 高光波纹
 	var wave_offset := sin(_anim_timer * 2.0) * 8.0
-	draw_rect(Rect2(-20 + wave_offset, -12, 15, 6), glow_color)
-	draw_rect(Rect2(5 - wave_offset, 2, 12, 5), glow_color)
+	draw_rect(Rect2(Vector2(-patch_size.x * 0.4 + wave_offset, -patch_size.y * 0.33), Vector2(patch_size.x * 0.3, patch_size.y * 0.17)), glow_color)
+	draw_rect(Rect2(Vector2(patch_size.x * 0.1 - wave_offset, patch_size.y * 0.06), Vector2(patch_size.x * 0.24, patch_size.y * 0.14)), glow_color)
 	# 边缘
-	draw_rect(Rect2(-25, -18, 50, 36), Color(1.0, 0.4, 0.1, 0.4 * pulse), false, 1.5)
+	draw_rect(Rect2(-patch_size * 0.5, patch_size), Color(1.0, 0.4, 0.1, 0.4 * pulse), false, 1.5)

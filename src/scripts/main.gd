@@ -2,21 +2,23 @@ extends Node2D
 
 ## 主场景控制器 - 走廊式房间制地牢 + HUD + 小地图
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 
 # 网格单元格大小（一个格子 = 房间 + 走廊空间）
-const CELL_W := 960
-const CELL_H := 640
+const CELL_W := int(VS.CELL_SIZE.x)
+const CELL_H := int(VS.CELL_SIZE.y)
 # 房间实际大小（小于单元格，留出走廊空间）
-const ROOM_W := 700
-const ROOM_H := 400
+const ROOM_W := int(VS.ROOM_SIZE.x)
+const ROOM_H := int(VS.ROOM_SIZE.y)
 # 房间在单元格内的偏移（居中）
-const ROOM_PAD_X := 130
-const ROOM_PAD_Y := 120
+const ROOM_PAD_X := int(VS.ROOM_PADDING.x)
+const ROOM_PAD_Y := int(VS.ROOM_PADDING.y)
 # 走廊宽度
-const CORRIDOR_W := 80
+const CORRIDOR_W := int(VS.CORRIDOR_WIDTH)
 # 墙壁厚度
-const WALL_T := 12
+const WALL_T := int(VS.WALL_THICKNESS)
 const DOOR_COLLISION_LAYER := 16
 
 const GRID_SIZE := 5
@@ -98,7 +100,7 @@ func _ready() -> void:
 
 	# 摄像机系统
 	_cam_mgr = CameraManager.new()
-	_cam_mgr.setup($Player/Camera2D)
+	_cam_mgr.setup($Player/Camera2D, VS.CAMERA_MAIN_BASE_OFFSET)
 
 	# 打击反馈信号
 	$BulletPool.hit_occurred.connect(_on_bullet_hit_feedback)
@@ -824,34 +826,34 @@ func _create_hud() -> void:
 
 	_hp_bar_bg = ColorRect.new()
 	_hp_bar_bg.position = Vector2(10, 68)
-	_hp_bar_bg.size = Vector2(102, 14)
+	_hp_bar_bg.size = VS.HP_FRAME_SIZE
 	_hp_bar_bg.color = Color(0.2, 0.2, 0.2)
 	canvas.add_child(_hp_bar_bg)
 
 	_hp_bar = ColorRect.new()
 	_hp_bar.position = Vector2(11, 69)
-	_hp_bar.size = Vector2(100, 12)
+	_hp_bar.size = VS.HP_FILL_SIZE
 	_hp_bar.color = Color(0.0, 0.8, 0.2)
 	canvas.add_child(_hp_bar)
 
 	_mana_bar_bg = ColorRect.new()
 	_mana_bar_bg.position = Vector2(10, 86)
-	_mana_bar_bg.size = Vector2(102, 10)
+	_mana_bar_bg.size = VS.MANA_FRAME_SIZE
 	_mana_bar_bg.color = Color(0.2, 0.2, 0.2)
 	canvas.add_child(_mana_bar_bg)
 
 	_mana_bar = ColorRect.new()
 	_mana_bar.position = Vector2(11, 87)
-	_mana_bar.size = Vector2(100, 8)
+	_mana_bar.size = VS.MANA_FILL_SIZE
 	_mana_bar.color = Color(0.2, 0.4, 1.0)
 	canvas.add_child(_mana_bar)
 
 	# 技能栏（右下角）：J攻击 / Q切换 / K闪避
-	var icon_size := 36.0
+	var icon_size := VS.ACTION_ICON_SIZE
 	var icon_gap := 6.0
 	var bar_width := icon_size * 3 + icon_gap * 2
-	var bar_x := 960 - bar_width - 10
-	var bar_y := 640 - icon_size - 10
+	var bar_x := VS.VIEWPORT_SIZE.x - bar_width - 10
+	var bar_y := VS.VIEWPORT_SIZE.y - icon_size - 10
 
 	_attack_icon = Control.new()
 	_attack_icon.position = Vector2(bar_x, bar_y)
@@ -874,13 +876,13 @@ func _create_hud() -> void:
 	# Buff 状态栏
 	_buff_bar = Control.new()
 	_buff_bar.position = Vector2(52, 108)
-	_buff_bar.size = Vector2(200, 20)
+	_buff_bar.size = Vector2(VS.BUFF_CHIP_SIZE.x * 4.0 + 12.0, VS.BUFF_CHIP_SIZE.y)
 	_buff_bar.draw.connect(_draw_buff_bar)
 	canvas.add_child(_buff_bar)
 
 
 func _draw_attack_icon() -> void:
-	var size := 36.0
+	var size := VS.ACTION_ICON_SIZE
 	# 背景
 	_attack_icon.draw_rect(Rect2(0, 0, size, size), Color(0.18, 0.12, 0.12))
 	_attack_icon.draw_rect(Rect2(0, 0, size, size), Color(0.9, 0.25, 0.15), false, 2.0)
@@ -895,7 +897,7 @@ func _draw_attack_icon() -> void:
 
 
 func _draw_switch_icon() -> void:
-	var size := 36.0
+	var size := VS.ACTION_ICON_SIZE
 	# 背景
 	_switch_icon.draw_rect(Rect2(0, 0, size, size), Color(0.12, 0.15, 0.18))
 	_switch_icon.draw_rect(Rect2(0, 0, size, size), Color(0.2, 0.7, 0.9), false, 2.0)
@@ -913,7 +915,7 @@ func _draw_switch_icon() -> void:
 
 
 func _draw_dash_icon() -> void:
-	var size := 36.0
+	var size := VS.ACTION_ICON_SIZE
 	var center := Vector2(size / 2, size / 2)
 	var radius := size / 2 - 2
 
@@ -957,10 +959,10 @@ func _draw_buff_bar() -> void:
 		var color: Color = info.color
 		var icon: String = info.icon
 		var name_short: String = info.name
-		var panel_w := 72
+		var panel_w := int(VS.BUFF_CHIP_SIZE.x)
 		# 背景
-		_buff_bar.draw_rect(Rect2(x, 0, panel_w, 20), Color(0, 0, 0, 0.6))
-		_buff_bar.draw_rect(Rect2(x, 0, panel_w, 20), color.darkened(0.3), false, 1.0)
+		_buff_bar.draw_rect(Rect2(x, 0, panel_w, VS.BUFF_CHIP_SIZE.y), Color(0, 0, 0, 0.6))
+		_buff_bar.draw_rect(Rect2(x, 0, panel_w, VS.BUFF_CHIP_SIZE.y), color.darkened(0.3), false, 1.0)
 		# 图标 + 名称
 		_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 3, 13), icon + name_short, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color)
 		# 层数
@@ -968,7 +970,7 @@ func _draw_buff_bar() -> void:
 			_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 50, 13), "x%d" % stacks, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color.WHITE)
 		# 时间条
 		var time_ratio := clampf(time_left / 30.0, 0.0, 1.0)
-		_buff_bar.draw_rect(Rect2(x + 1, 18, (panel_w - 2) * time_ratio, 2), color)
+		_buff_bar.draw_rect(Rect2(x + 1, VS.BUFF_CHIP_SIZE.y - 2.0, (panel_w - 2) * time_ratio, 2), color)
 		x += panel_w + 4
 
 
@@ -980,13 +982,13 @@ func _show_boss_hp(boss: Area2D) -> void:
 
 	_boss_hp_bar_bg = ColorRect.new()
 	_boss_hp_bar_bg.position = Vector2(230, 590)
-	_boss_hp_bar_bg.size = Vector2(500, 16)
+	_boss_hp_bar_bg.size = VS.BOSS_HP_FRAME_SIZE
 	_boss_hp_bar_bg.color = Color(0.15, 0.15, 0.15)
 	canvas.add_child(_boss_hp_bar_bg)
 
 	_boss_hp_bar = ColorRect.new()
 	_boss_hp_bar.position = Vector2(231, 591)
-	_boss_hp_bar.size = Vector2(498, 14)
+	_boss_hp_bar.size = VS.BOSS_HP_FILL_SIZE
 	_boss_hp_bar.color = Color(1.0, 0.0, 0.3)
 	canvas.add_child(_boss_hp_bar)
 
@@ -998,6 +1000,7 @@ func _show_boss_hp(boss: Area2D) -> void:
 
 
 func _process(delta: float) -> void:
+	var state := GameManager.state
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 	_kills_label.text = "击杀: %d" % GameManager.total_kills
 	_weapon_label.text = "武器: %s  蓝: %d" % [
@@ -1006,7 +1009,7 @@ func _process(delta: float) -> void:
 	]
 
 	var mana_ratio: float = $Player.mana / $Player.MAX_MANA
-	_mana_bar.size.x = 100.0 * mana_ratio
+	_mana_bar.size.x = VS.MANA_FILL_SIZE.x * mana_ratio
 
 	# 技能图标刷新
 	if _attack_icon:
@@ -1023,7 +1026,7 @@ func _process(delta: float) -> void:
 	# Boss 血条更新
 	if _boss_ref != null and is_instance_valid(_boss_ref) and _boss_hp_bar != null:
 		var boss_ratio: float = float(_boss_ref.hp) / float(_boss_ref.max_hp)
-		_boss_hp_bar.size.x = 498.0 * clampf(boss_ratio, 0.0, 1.0)
+		_boss_hp_bar.size.x = VS.BOSS_HP_FILL_SIZE.x * clampf(boss_ratio, 0.0, 1.0)
 		_boss_hp_label.text = "BOSS  %d / %d" % [_boss_ref.hp, _boss_ref.max_hp]
 	elif _boss_hp_bar_bg != null and (_boss_ref == null or not is_instance_valid(_boss_ref)):
 		_boss_hp_bar_bg.visible = false
@@ -1040,7 +1043,7 @@ func _process(delta: float) -> void:
 		_cam_mgr.update(delta)
 
 	# 复活倒计时（真实时间，不受暂停影响）
-	if GameManager.state == GameManager.GameState.REVIVING:
+	if state == GameManager.GameState.REVIVING:
 		_revive_timer -= delta
 		if _revive_countdown_label != null:
 			_revive_countdown_label.text = str(ceil(_revive_timer))
@@ -1049,6 +1052,9 @@ func _process(delta: float) -> void:
 			_game_over = true
 			GameManager.change_state(GameManager.GameState.GAME_OVER)
 			_show_game_over()
+
+	if state != GameManager.GameState.PLAYING:
+		return
 
 	# 怪物预警倒计时
 	if _spawn_warning_timer > 0.0:
@@ -1071,7 +1077,7 @@ func _on_player_hit() -> void:
 
 func _on_player_hp_changed(current: int, max_hp: int) -> void:
 	var ratio := float(current) / float(max_hp)
-	_hp_bar.size.x = 100.0 * ratio
+	_hp_bar.size.x = VS.HP_FILL_SIZE.x * ratio
 	if ratio > 0.3:
 		_hp_bar.color = Color(0.0, 0.8, 0.2).lerp(Color(1.0, 0.0, 0.0), 1.0 - ratio)
 	else:
@@ -1084,7 +1090,7 @@ func _on_player_died() -> void:
 		_revive_timer = 10.0
 		_show_revive_ui()
 	else:
-		$Player.save_to_game_manager()
+		GameManager.restore_lobby_weapons()
 		_game_over = true
 		GameManager.change_state(GameManager.GameState.GAME_OVER)
 		_show_game_over()
@@ -1093,7 +1099,7 @@ func _on_player_died() -> void:
 func _show_game_over() -> void:
 	var overlay := ColorRect.new()
 	overlay.color = Color(0, 0, 0, 0.7)
-	overlay.size = Vector2(960, 640)
+	overlay.size = VS.VIEWPORT_SIZE
 
 	var canvas := CanvasLayer.new()
 	canvas.layer = 40
@@ -1113,7 +1119,7 @@ func _show_game_over() -> void:
 func _show_victory() -> void:
 	var overlay := ColorRect.new()
 	overlay.color = Color(0, 0, 0, 0.7)
-	overlay.size = Vector2(960, 640)
+	overlay.size = VS.VIEWPORT_SIZE
 
 	var canvas := CanvasLayer.new()
 	canvas.layer = 40
@@ -1144,7 +1150,7 @@ func _show_revive_ui() -> void:
 	# 半透明背景
 	var bg := ColorRect.new()
 	bg.color = Color(0, 0, 0, 0.6)
-	bg.size = Vector2(960, 640)
+	bg.size = VS.VIEWPORT_SIZE
 	_revive_canvas.add_child(bg)
 
 	# 弹框面板
@@ -1235,14 +1241,14 @@ func _input(event: InputEvent) -> void:
 			return
 
 	if _game_over and event is InputEventKey and event.pressed and event.keycode == KEY_R:
-		$Player.save_to_game_manager()
+		GameManager.restore_lobby_weapons()
 		GameManager.return_to_lobby()
 
 	# E 键进入传送门（通关）
 	if _portal_active and event is InputEventKey and event.pressed and event.keycode == KEY_E:
 		if $Player.global_position.distance_to(_portal_pos) < 40.0:
 			_portal_active = false
-			$Player.save_to_game_manager()
+			GameManager.restore_lobby_weapons()
 			GameManager.add_dungeon_clear()
 			GameManager.return_to_lobby()
 
@@ -1259,7 +1265,7 @@ func _show_pause_menu() -> void:
 
 	var overlay := ColorRect.new()
 	overlay.color = Color(0, 0, 0, 0.6)
-	overlay.size = Vector2(960, 640)
+	overlay.size = VS.VIEWPORT_SIZE
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	_pause_canvas.add_child(overlay)
 
@@ -1311,7 +1317,7 @@ func _on_pause_continue_input(event: InputEvent) -> void:
 func _on_pause_lobby_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_hide_pause_menu()
-		$Player.save_to_game_manager()
+		GameManager.restore_lobby_weapons()
 		GameManager.return_to_lobby()
 
 
@@ -1563,14 +1569,16 @@ func _draw() -> void:
 
 	# 传送门
 	if _portal_active:
-		draw_circle(_portal_pos, 30.0, Color(0.0, 0.898, 1.0, 0.3))
-		draw_arc(_portal_pos, 30.0, 0, TAU, 24, Color(0.0, 0.898, 1.0), 3.0)
+		var portal_radius := VS.PORTAL_DUNGEON_DISPLAY_SIZE * 0.5
+		draw_circle(_portal_pos, portal_radius, Color(0.0, 0.898, 1.0, 0.3))
+		draw_arc(_portal_pos, portal_radius, 0, TAU, 24, Color(0.0, 0.898, 1.0), 3.0)
 
 	# 怪物出生预警
 	if _spawn_warning_timer > 0.0:
 		var alpha := clampf(_spawn_warning_timer / 1.0, 0.0, 1.0)
 		var flash := sin(_spawn_warning_timer * 12.0) * 0.5 + 0.5
+		var warning_radius := VS.SPAWN_WARNING_DISPLAY_SIZE * 0.5
 		for wpos in _spawn_warning_positions:
 			var c := Color(1.0, 0.2, 0.2, 0.4 * alpha * flash)
-			draw_circle(wpos, 14.0, c)
-			draw_arc(wpos, 14.0, 0, TAU, 16, Color(1.0, 0.3, 0.3, 0.8 * alpha), 2.0)
+			draw_circle(wpos, warning_radius, c)
+			draw_arc(wpos, warning_radius, 0, TAU, 16, Color(1.0, 0.3, 0.3, 0.8 * alpha), 2.0)

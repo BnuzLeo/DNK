@@ -4,19 +4,29 @@ class_name CameraManager
 ## 屏幕震动 + 房间边界管理
 ## 持有 Camera2D 引用，管理 shake offset 和 limit
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 var _camera: Camera2D
+var _base_offset := Vector2.ZERO
 var _shake_intensity := 0.0
 var _shake_duration_ms := 0
 var _shake_until_ms := 0
 var _shake_exponential := false
 
 
-func setup(camera: Camera2D) -> void:
+func setup(camera: Camera2D, base_offset: Vector2 = VS.CAMERA_MAIN_BASE_OFFSET) -> void:
 	_camera = camera
+	_base_offset = base_offset
 	_camera.position_smoothing_enabled = true
-	_camera.position_smoothing_speed = 8.0
-	_camera.offset = Vector2.ZERO
+	_camera.position_smoothing_speed = VS.CAMERA_SMOOTH_SPEED
+	_camera.offset = _base_offset
 	_camera.limit_smoothed = true
+
+
+func set_base_offset(offset: Vector2) -> void:
+	_base_offset = offset
+	if _camera != null and _shake_until_ms <= 0:
+		_camera.offset = _base_offset
 
 
 func set_room_bounds(room_rect: Rect2) -> void:
@@ -47,7 +57,7 @@ func update(_delta: float) -> void:
 	if _shake_until_ms > 0:
 		var now := Time.get_ticks_msec()
 		if now >= _shake_until_ms:
-			_camera.offset = Vector2.ZERO
+			_camera.offset = _base_offset
 			_shake_intensity = 0.0
 			_shake_until_ms = 0
 		else:
@@ -56,4 +66,6 @@ func update(_delta: float) -> void:
 			if _shake_exponential:
 				ratio = ratio * ratio
 			var offset_dir := Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)).normalized()
-			_camera.offset = offset_dir * _shake_intensity * ratio
+			_camera.offset = _base_offset + offset_dir * _shake_intensity * ratio
+	elif _camera.offset != _base_offset:
+		_camera.offset = _base_offset

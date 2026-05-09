@@ -2,6 +2,8 @@ extends StaticBody2D
 
 ## 木箱 — 可破坏障碍物，30% 概率掉落宝箱
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 var hp := 3
 var _flash_timer := 0.0
 var _dying := false
@@ -17,7 +19,7 @@ func setup(main: Node = null) -> void:
 	# 必须手动添加碰撞形状，否则 StaticBody2D 没有实际碰撞体
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
-	rect.size = Vector2(24, 24)
+	rect.size = Vector2(VS.CRATE_DISPLAY_SIZE, VS.CRATE_DISPLAY_SIZE)
 	shape.shape = rect
 	add_child(shape)
 
@@ -57,13 +59,15 @@ func _die() -> void:
 
 func _draw() -> void:
 	# 棕色木箱
-	draw_rect(Rect2(-12, -12, 24, 24), Color(0.55, 0.35, 0.15))
-	draw_rect(Rect2(-12, -12, 24, 24), Color(0.7, 0.45, 0.2), false, 1.5)
+	var half := VS.CRATE_DISPLAY_SIZE * 0.5
+	draw_rect(Rect2(-half, -half, VS.CRATE_DISPLAY_SIZE, VS.CRATE_DISPLAY_SIZE), Color(0.55, 0.35, 0.15))
+	draw_rect(Rect2(-half, -half, VS.CRATE_DISPLAY_SIZE, VS.CRATE_DISPLAY_SIZE), Color(0.7, 0.45, 0.2), false, 1.5)
 	# 木纹
-	draw_line(Vector2(-10, -3), Vector2(10, -3), Color(0.4, 0.25, 0.1), 1.0)
-	draw_line(Vector2(-10, 4), Vector2(10, 4), Color(0.4, 0.25, 0.1), 1.0)
+	draw_line(Vector2(-half + 3.0, -4), Vector2(half - 3.0, -4), Color(0.4, 0.25, 0.1), 1.0)
+	draw_line(Vector2(-half + 3.0, 5), Vector2(half - 3.0, 5), Color(0.4, 0.25, 0.1), 1.0)
 	# 铁钉
-	draw_circle(Vector2(-8, -8), 1.5, Color(0.7, 0.7, 0.7))
-	draw_circle(Vector2(8, -8), 1.5, Color(0.7, 0.7, 0.7))
-	draw_circle(Vector2(-8, 8), 1.5, Color(0.7, 0.7, 0.7))
-	draw_circle(Vector2(8, 8), 1.5, Color(0.7, 0.7, 0.7))
+	var nail := half - 5.0
+	draw_circle(Vector2(-nail, -nail), 1.5, Color(0.7, 0.7, 0.7))
+	draw_circle(Vector2(nail, -nail), 1.5, Color(0.7, 0.7, 0.7))
+	draw_circle(Vector2(-nail, nail), 1.5, Color(0.7, 0.7, 0.7))
+	draw_circle(Vector2(nail, nail), 1.5, Color(0.7, 0.7, 0.7))

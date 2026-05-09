@@ -2,6 +2,8 @@ extends Area2D
 
 ## 敌人 AI — 支持 CHASER / SHOOTER / TANK / SWARM 四种类型
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 signal died
 
 enum EnemyType { CHASER, SHOOTER, TANK, SWARM }
@@ -171,7 +173,7 @@ func _fire_at_player() -> void:
 		return
 	var dir := (_player.global_position - global_position).normalized()
 	bullet_pool.spawn(
-		global_position + dir * 12.0,
+		global_position + dir * (VS.ENEMY_STANDARD_DISPLAY_SIZE * 0.5),
 		dir,
 		SHOOT_BULLET_SPEED,
 		TYPE_STATS[EnemyType.SHOOTER].damage,
@@ -235,7 +237,12 @@ func _on_area_entered(_area: Area2D) -> void:
 
 
 func _draw() -> void:
-	var radius := 6.0 if enemy_type == EnemyType.SWARM else 8.0
+	var radius := VS.ENEMY_STANDARD_DISPLAY_SIZE * 0.5
+	match enemy_type:
+		EnemyType.SWARM:
+			radius = VS.ENEMY_SWARM_DISPLAY_SIZE * 0.5
+		EnemyType.TANK:
+			radius = VS.ENEMY_TANK_DISPLAY_SIZE * 0.5
 	var color := Color(0.3, 0.7, 1.0) if _frozen else _get_base_color()
 	# 生成无敌闪烁
 	if _spawn_invuln_timer > 0.0:

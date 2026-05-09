@@ -3,6 +3,8 @@ extends Area2D
 ## 宝箱 — 触碰后打开，掉落武器或限时 Buff
 ## is_weapon_choice = true 时为起始房间的 3 选 1 武器宝箱
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 signal opened(reward_type: String, reward_key: String)
 
 var _opened := false
@@ -131,7 +133,7 @@ func _show_weapon_choice(player: Node) -> void:
 	# 半透明背景
 	var bg := ColorRect.new()
 	bg.color = Color(0, 0, 0, 0.65)
-	bg.size = Vector2(960, 640)
+	bg.size = VS.VIEWPORT_SIZE
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	canvas.add_child(bg)
 
@@ -146,11 +148,11 @@ func _show_weapon_choice(player: Node) -> void:
 	canvas.add_child(title)
 
 	# 三个武器面板
-	var panel_w := 240
-	var panel_h := 280
+	var panel_w := int(VS.WEAPON_CHOICE_CARD_SIZE.x)
+	var panel_h := int(VS.WEAPON_CHOICE_CARD_SIZE.y)
 	var gap := 20
 	var total_w := panel_w * 3 + gap * 2
-	var start_x := (960 - total_w) / 2
+	var start_x := (VS.VIEWPORT_SIZE.x - total_w) / 2
 	var start_y := 140
 
 	for i in options.size():
@@ -295,11 +297,12 @@ func _draw() -> void:
 	var col_body := Color(0.2, 0.55, 0.7) if is_weapon_choice else Color(0.55, 0.35, 0.1)
 	var col_lid := Color(0.25, 0.7, 0.9) if is_weapon_choice else Color(0.7, 0.45, 0.15)
 	var col_lock := Color(0.0, 0.898, 1.0) if is_weapon_choice else Color(1.0, 0.84, 0.0)
+	var size := VS.CHEST_DISPLAY_SIZE
 	# 箱体
-	draw_rect(Rect2(base + Vector2(-10, -6), Vector2(20, 14)), col_body)
+	draw_rect(Rect2(base + Vector2(-size * 0.44, -size * 0.18), Vector2(size * 0.88, size * 0.56)), col_body)
 	# 箱盖
-	draw_rect(Rect2(base + Vector2(-12, -10), Vector2(24, 6)), col_lid)
+	draw_rect(Rect2(base + Vector2(-size * 0.5, -size * 0.38), Vector2(size, size * 0.24)), col_lid)
 	# 锁扣
-	draw_rect(Rect2(base + Vector2(-3, -8), Vector2(6, 4)), col_lock)
+	draw_rect(Rect2(base + Vector2(-size * 0.12, -size * 0.3), Vector2(size * 0.24, size * 0.16)), col_lock)
 	# 高光
-	draw_rect(Rect2(base + Vector2(-8, -4), Vector2(2, 8)), col_lid.lightened(0.3).darkened(0.2))
+	draw_rect(Rect2(base + Vector2(-size * 0.34, -size * 0.12), Vector2(size * 0.08, size * 0.32)), col_lid.lightened(0.3).darkened(0.2))

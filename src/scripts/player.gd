@@ -3,6 +3,8 @@ extends CharacterBody2D
 ## 玩家控制器 - 元气骑士风格
 ## WASD 移动 + J 键射击，射击方向为面朝方向
 
+const VS := preload("res://scripts/visual_spec.gd")
+
 var SPEED := 180.0
 var MAX_HP := 10
 var MAX_MANA := 50.0
@@ -129,9 +131,14 @@ func _load_from_game_manager() -> void:
 	var dmg_vals := [0, 1, 2, 4]
 	damage_bonus = dmg_vals[t_dmg_up] if t_dmg_up < dmg_vals.size() else 0
 
-	_weapon_keys = data.get("weapon_keys", ["pistol"]).duplicate()
+	_weapon_keys.clear()
+	for key in data.get("equipped_weapons", ["pistol"]):
+		if key in WEAPONS:
+			_weapon_keys.append(key)
+	if _weapon_keys.is_empty():
+		_weapon_keys.append("pistol")
 	_weapon_index = data.get("weapon_index", 0)
-	if _weapon_index >= _weapon_keys.size():
+	if _weapon_index < 0 or _weapon_index >= _weapon_keys.size():
 		_weapon_index = 0
 
 	hp = MAX_HP
@@ -139,7 +146,6 @@ func _load_from_game_manager() -> void:
 
 
 func save_to_game_manager() -> void:
-	GameManager.player_data.weapon_keys = _weapon_keys.duplicate()
 	GameManager.player_data.weapon_index = _weapon_index
 
 
@@ -268,7 +274,7 @@ func _shoot(weapon: Dictionary) -> void:
 			angle_offset = spread * (float(i) / (count - 1) - 0.5)
 		var dir := _facing.rotated(angle_offset)
 		bullet_pool.spawn(
-			global_position + dir * 14.0,
+			global_position + dir * (VS.PLAYER_DISPLAY_SIZE * 0.5),
 			dir,
 			weapon.speed,
 			weapon.damage + damage_bonus,
@@ -281,7 +287,7 @@ func _shoot_dart(weapon: Dictionary) -> void:
 	if bullet_pool == null:
 		return
 	bullet_pool.spawn(
-		global_position + _facing * 14.0,
+		global_position + _facing * (VS.PLAYER_DISPLAY_SIZE * 0.5),
 		_facing,
 		weapon.speed,
 		weapon.damage + damage_bonus,
@@ -330,7 +336,7 @@ func get_weapon_name() -> String:
 func _draw() -> void:
 	# 小三角形角色
 	var angle := _facing.angle()
-	var size := 10.0
+	var size := VS.PLAYER_DISPLAY_SIZE * 0.5
 	var points := PackedVector2Array()
 	points.append(Vector2(cos(angle), sin(angle)) * size)
 	points.append(Vector2(cos(angle + 2.5), sin(angle + 2.5)) * size * 0.65)
