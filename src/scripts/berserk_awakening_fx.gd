@@ -13,7 +13,7 @@ const FRAME_PATHS := [
 	"res://assets/export/characters/KUN/觉醒/觉醒_006.png",
 	"res://assets/export/characters/KUN/觉醒/觉醒_007.png",
 ]
-const AWAKENING_MUSIC_PATH := "res://assets/music/觉醒music.ogg"
+const AWAKENING_MUSIC_PATH := "res://assets/music/觉醒music.wav"
 
 const ANIMATION_NAME := "awakening"
 const DISPLAY_SIZE := Vector2(426.0, 240.0)
@@ -26,7 +26,6 @@ const FINISH_HOLD := 0.08
 var _stage: Control
 var _speed_lines: Control
 var _shine: Control
-var _music: AudioStreamPlayer
 var _shadow_sprite: AnimatedSprite2D
 var _glow_sprite: AnimatedSprite2D
 var _main_sprite: AnimatedSprite2D
@@ -70,11 +69,6 @@ func _build_scene() -> void:
 	_shine.draw.connect(_draw_shine.bind(_shine))
 	add_child(_shine)
 
-	_music = AudioStreamPlayer.new()
-	_music.bus = "Master"
-	_music.stream = load(AWAKENING_MUSIC_PATH) as AudioStream
-	add_child(_music)
-
 	_shadow_sprite = _make_sprite(frames, Vector2(0.0, 18.0), Color(0.0, 0.0, 0.0, 0.32), 1.03)
 	_glow_sprite = _make_sprite(frames, Vector2.ZERO, Color(1.0, 0.54, 0.16, 0.38), 1.05, true)
 	_main_sprite = _make_sprite(frames, Vector2.ZERO, Color.WHITE, 1.0)
@@ -108,6 +102,40 @@ func _load_texture(path: String) -> Texture2D:
 	if image.load(path) != OK:
 		return null
 	return ImageTexture.create_from_image(image)
+
+
+func _load_music_stream() -> AudioStream:
+	var stream := load(AWAKENING_MUSIC_PATH) as AudioStream
+	if stream != null:
+		return stream
+	var absolute_path := ProjectSettings.globalize_path(AWAKENING_MUSIC_PATH)
+	if FileAccess.file_exists(absolute_path):
+		return AudioStreamWAV.load_from_file(absolute_path)
+	if FileAccess.file_exists(AWAKENING_MUSIC_PATH):
+		return AudioStreamWAV.load_from_file(AWAKENING_MUSIC_PATH)
+	return null
+
+
+func _play_awakening_music() -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	for node in get_tree().get_nodes_in_group("berserk_awaken_music"):
+		if is_instance_valid(node):
+			node.queue_free()
+	var stream := _load_music_stream()
+	if stream == null:
+		push_warning("Awakening music failed to load: %s" % AWAKENING_MUSIC_PATH)
+		return
+	var player := AudioStreamPlayer.new()
+	player.bus = "Master"
+	player.volume_db = 2.0
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	player.stream = stream
+	player.finished.connect(player.queue_free)
+	player.add_to_group("berserk_awaken_music")
+	scene.add_child(player)
+	player.play()
 
 
 func _make_sprite(
@@ -144,8 +172,7 @@ func _get_exit_position() -> Vector2:
 
 
 func _play_intro() -> void:
-	if _music.stream != null:
-		_music.play()
+	_play_awakening_music()
 
 	var tween := create_tween()
 	tween.set_parallel(true)
@@ -179,8 +206,6 @@ func _on_main_animation_finished() -> void:
 	tween.tween_property(_glow_sprite, "position", _get_exit_position(), EXIT_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 	tween.tween_property(_main_sprite, "position", _get_exit_position(), EXIT_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 	await tween.finished
-	if _music.playing:
-		_music.stop()
 	queue_free()
 
 
