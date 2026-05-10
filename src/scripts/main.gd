@@ -74,14 +74,25 @@ var _kills_label: Label
 var _weapon_label: Label
 var _hp_bar: ColorRect
 var _hp_bar_bg: ColorRect
+var _hp_text: Label
+var _shield_bar: ColorRect
+var _shield_bar_bg: ColorRect
+var _shield_text: Label
 var _mana_bar: ColorRect
 var _mana_bar_bg: ColorRect
+var _mana_text: Label
 var _dash_icon: Control
 var _berserk_icon: Control
 var _attack_icon: Control
 var _switch_icon: Control
 var _minimap: Control
 var _buff_bar: Control
+var _practice_label: Label
+var _practice_panel: Control
+var _coin_label: Label
+var _hud_frame: Control
+var _coin_panel: Control
+var _pause_button: Control
 
 # 提示消息系统
 var _active_hints: Array[CanvasLayer] = []
@@ -805,142 +816,255 @@ func _physics_process(_delta: float) -> void:
 func _create_hud() -> void:
 	var canvas := CanvasLayer.new()
 	canvas.layer = 10
+	canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(canvas)
 
 	_fps_label = Label.new()
-	_fps_label.position = Vector2(830, 10)
-	_fps_label.add_theme_font_size_override("font_size", 14)
-	_fps_label.add_theme_color_override("font_color", Color.WHITE)
+	_fps_label.visible = false
 	canvas.add_child(_fps_label)
 
 	_kills_label = Label.new()
-	_kills_label.position = Vector2(830, 28)
-	_kills_label.add_theme_font_size_override("font_size", 14)
-	_kills_label.add_theme_color_override("font_color", Color(1.0, 0.53, 0.0))
+	_kills_label.visible = false
 	canvas.add_child(_kills_label)
 
-	_weapon_label = Label.new()
-	_weapon_label.position = Vector2(10, 46)
-	_weapon_label.add_theme_font_size_override("font_size", 14)
-	_weapon_label.add_theme_color_override("font_color", Color(0.0, 1.0, 0.53))
-	canvas.add_child(_weapon_label)
+	_hud_frame = Control.new()
+	_hud_frame.position = Vector2(12, 4)
+	_hud_frame.size = Vector2(206, 96)
+	_hud_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hud_frame.draw.connect(_draw_stats_frame)
+	canvas.add_child(_hud_frame)
 
 	_hp_bar_bg = ColorRect.new()
-	_hp_bar_bg.position = Vector2(10, 68)
-	_hp_bar_bg.size = VS.HP_FRAME_SIZE
-	_hp_bar_bg.color = Color(0.2, 0.2, 0.2)
+	_hp_bar_bg.position = Vector2(48, 20)
+	_hp_bar_bg.size = Vector2(140, 16)
+	_hp_bar_bg.color = Color(0.13, 0.08, 0.07)
 	canvas.add_child(_hp_bar_bg)
 
 	_hp_bar = ColorRect.new()
-	_hp_bar.position = Vector2(11, 69)
-	_hp_bar.size = VS.HP_FILL_SIZE
-	_hp_bar.color = Color(0.0, 0.8, 0.2)
+	_hp_bar.position = Vector2(50, 22)
+	_hp_bar.size = Vector2(136, 12)
+	_hp_bar.color = Color(0.88, 0.07, 0.15)
 	canvas.add_child(_hp_bar)
 
+	_hp_text = _make_hud_value_label(Vector2(96, 14), Color.WHITE)
+	canvas.add_child(_hp_text)
+
+	_shield_bar_bg = ColorRect.new()
+	_shield_bar_bg.position = Vector2(48, 39)
+	_shield_bar_bg.size = Vector2(140, 16)
+	_shield_bar_bg.color = Color(0.11, 0.12, 0.13)
+	canvas.add_child(_shield_bar_bg)
+
+	_shield_bar = ColorRect.new()
+	_shield_bar.position = Vector2(50, 41)
+	_shield_bar.size = Vector2(136, 12)
+	_shield_bar.color = Color(0.78, 0.85, 0.9)
+	canvas.add_child(_shield_bar)
+
+	_shield_text = _make_hud_value_label(Vector2(96, 33), Color.WHITE)
+	canvas.add_child(_shield_text)
+
 	_mana_bar_bg = ColorRect.new()
-	_mana_bar_bg.position = Vector2(10, 86)
-	_mana_bar_bg.size = VS.MANA_FRAME_SIZE
-	_mana_bar_bg.color = Color(0.2, 0.2, 0.2)
+	_mana_bar_bg.position = Vector2(48, 58)
+	_mana_bar_bg.size = Vector2(140, 16)
+	_mana_bar_bg.color = Color(0.08, 0.09, 0.18)
 	canvas.add_child(_mana_bar_bg)
 
 	_mana_bar = ColorRect.new()
-	_mana_bar.position = Vector2(11, 87)
-	_mana_bar.size = VS.MANA_FILL_SIZE
-	_mana_bar.color = Color(0.2, 0.4, 1.0)
+	_mana_bar.position = Vector2(50, 60)
+	_mana_bar.size = Vector2(136, 12)
+	_mana_bar.color = Color(0.22, 0.33, 0.9)
 	canvas.add_child(_mana_bar)
 
-	# 技能栏（右下角）：J攻击 / Q切换 / K闪避 / U狂暴
-	var icon_size := VS.ACTION_ICON_SIZE
-	var icon_gap := 6.0
-	var bar_width := icon_size * 4 + icon_gap * 3
-	var bar_x := VS.VIEWPORT_SIZE.x - bar_width - 10
-	var bar_y := VS.VIEWPORT_SIZE.y - icon_size - 10
+	_mana_text = _make_hud_value_label(Vector2(96, 52), Color.WHITE)
+	canvas.add_child(_mana_text)
+
+	_weapon_label = Label.new()
+	_weapon_label.visible = false
+	canvas.add_child(_weapon_label)
+
+	_practice_panel = Control.new()
+	_practice_panel.position = Vector2(656, 16)
+	_practice_panel.size = Vector2(144, 36)
+	_practice_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_practice_panel.draw.connect(_draw_practice_panel)
+	canvas.add_child(_practice_panel)
+
+	_practice_label = Label.new()
+	_practice_label.position = Vector2(694, 18)
+	_practice_label.size = Vector2(96, 22)
+	_practice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_practice_label.add_theme_font_size_override("font_size", 18)
+	_practice_label.add_theme_color_override("font_color", Color.WHITE)
+	canvas.add_child(_practice_label)
+
+	_coin_panel = Control.new()
+	_coin_panel.position = Vector2(814, 16)
+	_coin_panel.size = Vector2(96, 36)
+	_coin_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_coin_panel.draw.connect(_draw_coin_panel)
+	canvas.add_child(_coin_panel)
+
+	_coin_label = Label.new()
+	_coin_label.position = Vector2(846, 18)
+	_coin_label.size = Vector2(56, 22)
+	_coin_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_coin_label.add_theme_font_size_override("font_size", 18)
+	_coin_label.add_theme_color_override("font_color", Color.WHITE)
+	canvas.add_child(_coin_label)
+
+	_pause_button = Control.new()
+	_pause_button.position = Vector2(924, 14)
+	_pause_button.size = Vector2(28, 36)
+	_pause_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_pause_button.draw.connect(_draw_pause_button)
+	_pause_button.gui_input.connect(_on_pause_button_input)
+	canvas.add_child(_pause_button)
 
 	_attack_icon = Control.new()
-	_attack_icon.position = Vector2(bar_x, bar_y)
-	_attack_icon.size = Vector2(icon_size, icon_size)
+	_attack_icon.position = Vector2(796, 504)
+	_attack_icon.size = Vector2(112, 112)
+	_attack_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_attack_icon.draw.connect(_draw_attack_icon)
+	_attack_icon.gui_input.connect(_on_action_button_input.bind("shoot"))
 	canvas.add_child(_attack_icon)
 
 	_switch_icon = Control.new()
-	_switch_icon.position = Vector2(bar_x + icon_size + icon_gap, bar_y)
-	_switch_icon.size = Vector2(icon_size, icon_size)
+	_switch_icon.position = Vector2(814, 356)
+	_switch_icon.size = Vector2(86, 86)
+	_switch_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_switch_icon.draw.connect(_draw_switch_icon)
+	_switch_icon.gui_input.connect(_on_action_button_input.bind("switch_weapon"))
 	canvas.add_child(_switch_icon)
 
 	_dash_icon = Control.new()
-	_dash_icon.position = Vector2(bar_x + (icon_size + icon_gap) * 2, bar_y)
-	_dash_icon.size = Vector2(icon_size, icon_size)
+	_dash_icon.position = Vector2(664, 370)
+	_dash_icon.size = Vector2(56, 56)
+	_dash_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_dash_icon.draw.connect(_draw_dash_icon)
+	_dash_icon.gui_input.connect(_on_action_button_input.bind("dash"))
 	canvas.add_child(_dash_icon)
 
 	_berserk_icon = Control.new()
-	_berserk_icon.position = Vector2(bar_x + (icon_size + icon_gap) * 3, bar_y)
-	_berserk_icon.size = Vector2(icon_size, icon_size)
+	_berserk_icon.position = Vector2(708, 548)
+	_berserk_icon.size = Vector2(76, 76)
+	_berserk_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_berserk_icon.draw.connect(_draw_berserk_icon)
+	_berserk_icon.gui_input.connect(_on_action_button_input.bind("berserk"))
 	canvas.add_child(_berserk_icon)
 
 	# Buff 状态栏
 	_buff_bar = Control.new()
-	_buff_bar.position = Vector2(52, 108)
-	_buff_bar.size = Vector2(VS.BUFF_CHIP_SIZE.x * 4.0 + 12.0, VS.BUFF_CHIP_SIZE.y)
+	_buff_bar.position = Vector2(182, 22)
+	_buff_bar.size = Vector2(130, 28)
 	_buff_bar.draw.connect(_draw_buff_bar)
 	canvas.add_child(_buff_bar)
 
 
+func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
+	var label := Label.new()
+	label.position = pos
+	label.size = Vector2(108, 18)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_shadow_color", Color.BLACK)
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	return label
+
+
+func _draw_stats_frame() -> void:
+	var r := Rect2(Vector2.ZERO, _hud_frame.size)
+	_hud_frame.draw_rect(r, Color(0.58, 0.42, 0.24))
+	_hud_frame.draw_rect(r.grow(-3), Color(0.78, 0.62, 0.38))
+	_hud_frame.draw_rect(Rect2(10, 10, 34, 20), Color(0.18, 0.13, 0.09))
+	_hud_frame.draw_rect(Rect2(10, 31, 34, 20), Color(0.18, 0.13, 0.09))
+	_hud_frame.draw_rect(Rect2(10, 52, 34, 20), Color(0.18, 0.13, 0.09))
+	_hud_frame.draw_rect(Rect2(50, 15, 136, 16), Color.BLACK, false, 2.0)
+	_hud_frame.draw_rect(Rect2(50, 36, 136, 16), Color.BLACK, false, 2.0)
+	_hud_frame.draw_rect(Rect2(50, 57, 136, 16), Color.BLACK, false, 2.0)
+
+	var heart := PackedVector2Array([
+		Vector2(25, 28), Vector2(12, 16), Vector2(13, 10), Vector2(19, 8),
+		Vector2(25, 14), Vector2(31, 8), Vector2(37, 10), Vector2(38, 16),
+	])
+	_hud_frame.draw_colored_polygon(heart, Color(0.95, 0.13, 0.28))
+	_hud_frame.draw_polyline(heart + PackedVector2Array([heart[0]]), Color.BLACK, 2.0)
+	_hud_frame.draw_rect(Rect2(17, 31, 22, 16), Color(0.82, 0.9, 0.94))
+	_hud_frame.draw_rect(Rect2(19, 30, 18, 18), Color(0.78, 0.85, 0.9), false, 2.0)
+	_hud_frame.draw_line(Vector2(28, 31), Vector2(28, 48), Color(0.35, 0.45, 0.52), 1.0)
+	var gem := PackedVector2Array([Vector2(27, 52), Vector2(41, 63), Vector2(27, 76), Vector2(13, 63)])
+	_hud_frame.draw_colored_polygon(gem, Color(0.34, 0.64, 1.0))
+	_hud_frame.draw_polyline(gem + PackedVector2Array([gem[0]]), Color.BLACK, 2.0)
+
+
+func _draw_practice_panel() -> void:
+	var r := Rect2(Vector2.ZERO, _practice_panel.size)
+	_practice_panel.draw_rect(r, Color(0.22, 0.22, 0.24))
+	_practice_panel.draw_rect(r.grow(-3), Color(0.34, 0.34, 0.36))
+	_practice_panel.draw_circle(Vector2(20, 18), 8.0, Color(1.0, 0.86, 0.12))
+	_practice_panel.draw_arc(Vector2(20, 18), 8.0, 0, TAU, 18, Color(0.25, 0.12, 0.02), 2.0)
+
+
+func _draw_coin_panel() -> void:
+	var r := Rect2(Vector2.ZERO, _coin_panel.size)
+	_coin_panel.draw_rect(r, Color(0.22, 0.22, 0.24))
+	_coin_panel.draw_rect(r.grow(-3), Color(0.34, 0.34, 0.36))
+	_coin_panel.draw_circle(Vector2(18, 18), 8.0, Color(1.0, 0.86, 0.12))
+	_coin_panel.draw_arc(Vector2(18, 18), 8.0, 0, TAU, 18, Color(0.25, 0.12, 0.02), 2.0)
+
+
+func _draw_pause_button() -> void:
+	var r := Rect2(Vector2.ZERO, _pause_button.size)
+	_pause_button.draw_rect(r, Color(0.36, 0.28, 0.18))
+	_pause_button.draw_rect(r.grow(-3), Color(0.64, 0.49, 0.29))
+	_pause_button.draw_rect(r.grow(-8), Color(0.73, 0.58, 0.36))
+	_pause_button.draw_rect(Rect2(7, 8, 5, 20), Color(0.38, 0.28, 0.16))
+	_pause_button.draw_rect(Rect2(16, 8, 5, 20), Color(0.38, 0.28, 0.16))
+
+
+func _draw_button_key(ctrl: Control, key: String, color: Color = Color.WHITE) -> void:
+	var font := ThemeDB.fallback_font
+	var font_size := 18
+	var text_size := font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var pos := (ctrl.size - text_size) / 2.0
+	ctrl.draw_string(font, pos + Vector2(0, text_size.y), key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+
+
 func _draw_attack_icon() -> void:
-	var size := VS.ACTION_ICON_SIZE
-	# 背景
-	_attack_icon.draw_rect(Rect2(0, 0, size, size), Color(0.18, 0.12, 0.12))
-	_attack_icon.draw_rect(Rect2(0, 0, size, size), Color(0.9, 0.25, 0.15), false, 2.0)
-	# "J" 文字
-	_attack_icon.draw_string(ThemeDB.fallback_font, Vector2(10, 24), "J",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1.0, 0.6, 0.4))
-	# 十字准星装饰
-	var cx := size / 2
-	var cy := size / 2
-	_attack_icon.draw_line(Vector2(cx - 8, cy), Vector2(cx + 8, cy), Color(0.9, 0.3, 0.2), 1.0)
-	_attack_icon.draw_line(Vector2(cx, cy - 8), Vector2(cx, cy + 8), Color(0.9, 0.3, 0.2), 1.0)
+	var c := _attack_icon.size / 2.0
+	_attack_icon.draw_circle(c, 53.0, Color(0.63, 0.72, 0.78, 0.42))
+	_attack_icon.draw_circle(c, 38.0, Color(0.35, 0.45, 0.52, 0.42))
+	_attack_icon.draw_circle(c, 15.0, Color(0.35, 0.45, 0.52, 0.35))
+	_attack_icon.draw_arc(c, 34.0, 0, TAU, 36, Color(0.85, 0.93, 0.96, 0.7), 4.0)
+	_attack_icon.draw_line(c + Vector2(-36, 0), c + Vector2(-22, 0), Color(0.85, 0.93, 0.96, 0.75), 3.0)
+	_attack_icon.draw_line(c + Vector2(22, 0), c + Vector2(36, 0), Color(0.85, 0.93, 0.96, 0.75), 3.0)
+	_attack_icon.draw_line(c + Vector2(0, -36), c + Vector2(0, -22), Color(0.85, 0.93, 0.96, 0.75), 3.0)
+	_attack_icon.draw_line(c + Vector2(0, 22), c + Vector2(0, 36), Color(0.85, 0.93, 0.96, 0.75), 3.0)
+	_draw_button_key(_attack_icon, "J", Color(0.95, 0.25, 0.2))
 
 
 func _draw_switch_icon() -> void:
-	var size := VS.ACTION_ICON_SIZE
-	# 背景
-	_switch_icon.draw_rect(Rect2(0, 0, size, size), Color(0.12, 0.15, 0.18))
-	_switch_icon.draw_rect(Rect2(0, 0, size, size), Color(0.2, 0.7, 0.9), false, 2.0)
-	# "Q" 文字
-	_switch_icon.draw_string(ThemeDB.fallback_font, Vector2(10, 24), "Q",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.5, 0.9, 1.0))
-	# 双向箭头装饰
-	var cy := size / 2
-	_switch_icon.draw_line(Vector2(8, cy - 5), Vector2(28, cy - 5), Color(0.3, 0.8, 1.0), 1.5)
-	_switch_icon.draw_line(Vector2(24, cy - 9), Vector2(28, cy - 5), Color(0.3, 0.8, 1.0), 1.5)
-	_switch_icon.draw_line(Vector2(24, cy - 1), Vector2(28, cy - 5), Color(0.3, 0.8, 1.0), 1.5)
-	_switch_icon.draw_line(Vector2(8, cy + 5), Vector2(28, cy + 5), Color(0.3, 0.8, 1.0), 1.5)
-	_switch_icon.draw_line(Vector2(12, cy + 1), Vector2(8, cy + 5), Color(0.3, 0.8, 1.0), 1.5)
-	_switch_icon.draw_line(Vector2(12, cy + 9), Vector2(8, cy + 5), Color(0.3, 0.8, 1.0), 1.5)
+	var c := _switch_icon.size / 2.0
+	_switch_icon.draw_circle(c, 42.0, Color(0.40, 0.54, 0.62, 0.45))
+	_switch_icon.draw_arc(c, 39.0, -0.8, TAU - 0.8, 34, Color(0.17, 0.27, 0.32, 0.75), 9.0)
+	_switch_icon.draw_arc(c, 38.0, PI * 0.7, PI * 1.7, 18, Color(0.55, 0.70, 0.77, 0.55), 7.0)
+	_draw_button_key(_switch_icon, "Q", Color(0.78, 0.88, 0.94))
 
 
 func _draw_dash_icon() -> void:
-	var size := VS.ACTION_ICON_SIZE
-	var center := Vector2(size / 2, size / 2)
-	var radius := size / 2 - 2
-
-	# 背景
-	_dash_icon.draw_rect(Rect2(0, 0, size, size), Color(0.15, 0.15, 0.18))
-	_dash_icon.draw_rect(Rect2(0, 0, size, size), Color(0.9, 0.6, 0.1), false, 2.0)
-
-	# "K" 文字
-	_dash_icon.draw_string(ThemeDB.fallback_font, Vector2(10, 24), "K",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.8, 0.4))
-
-	# CD 覆盖（扇形遮罩）
+	var center := _dash_icon.size / 2.0
+	_dash_icon.draw_circle(center, 26.0, Color(0.58, 0.68, 0.75, 0.5))
+	_dash_icon.draw_circle(center, 19.0, Color(0.12, 0.18, 0.21, 0.75))
+	_dash_icon.draw_circle(center, 6.0, Color(0.78, 0.86, 0.89, 0.78))
+	_dash_icon.draw_circle(center + Vector2(-8, -5), 3.0, Color(0.78, 0.86, 0.89, 0.65))
+	_dash_icon.draw_circle(center + Vector2(8, -5), 3.0, Color(0.78, 0.86, 0.89, 0.65))
+	_dash_icon.draw_line(center + Vector2(-7, 7), center + Vector2(7, 7), Color(0.78, 0.86, 0.89, 0.65), 2.0)
 	var dash_cd: float = $Player._dash_cooldown
 	if dash_cd > 0.0:
 		var cd_ratio: float = clampf(dash_cd / $Player.DASH_COOLDOWN, 0.0, 1.0)
-		# 半透明黑色遮罩
-		_dash_icon.draw_rect(Rect2(0, 0, size, size), Color(0, 0, 0, 0.6))
-		# 扇形进度（从顶部顺时针）
+		var radius := 26.0
 		var points := PackedVector2Array()
 		points.append(center)
 		var segments := 24
@@ -950,29 +1074,24 @@ func _draw_dash_icon() -> void:
 			points.append(center + Vector2(cos(angle), sin(angle)) * radius)
 		if points.size() >= 3:
 			_dash_icon.draw_colored_polygon(points, Color(0, 0, 0, 0.55))
-		# CD 秒数
-		var cd_text := "%.1f" % dash_cd
-		_dash_icon.draw_string(ThemeDB.fallback_font, Vector2(6, 22), cd_text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.9))
+	_draw_button_key(_dash_icon, "K", Color(0.9, 0.8, 0.4))
 
 
 func _draw_berserk_icon() -> void:
-	var size := VS.ACTION_ICON_SIZE
 	var active: bool = $Player.has_method("is_berserk_active") and $Player.is_berserk_active()
-	var bg := Color(0.24, 0.08, 0.04) if active else Color(0.16, 0.12, 0.10)
-	var border := Color(1.0, 0.25, 0.08) if active else Color(0.65, 0.35, 0.18)
-	_berserk_icon.draw_rect(Rect2(0, 0, size, size), bg)
-	_berserk_icon.draw_rect(Rect2(0, 0, size, size), border, false, 2.0)
-	_berserk_icon.draw_string(ThemeDB.fallback_font, Vector2(9, 24), "U",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1.0, 0.75, 0.45))
-	var center := Vector2(size / 2, size / 2)
+	var c := _berserk_icon.size / 2.0
+	_berserk_icon.draw_circle(c, 36.0, Color(0.48, 0.57, 0.61, 0.48))
+	_berserk_icon.draw_circle(c, 29.0, Color(0.10, 0.14, 0.16, 0.8))
+	var glow := Color(1.0, 0.33, 0.06, 0.35 if active else 0.18)
 	var flame := PackedVector2Array([
-		center + Vector2(0, -9),
-		center + Vector2(7, 3),
-		center + Vector2(1, 9),
-		center + Vector2(-7, 3),
+		c + Vector2(-20, 12), c + Vector2(-12, -2), c + Vector2(-4, -22),
+		c + Vector2(4, -4), c + Vector2(16, -14), c + Vector2(10, 8),
+		c + Vector2(22, 18), c + Vector2(2, 24),
 	])
-	_berserk_icon.draw_colored_polygon(flame, Color(1.0, 0.28, 0.05, 0.75 if active else 0.35))
+	_berserk_icon.draw_colored_polygon(flame, Color(0.92, 0.58, 0.18))
+	_berserk_icon.draw_polyline(flame + PackedVector2Array([flame[0]]), Color(0.25, 0.13, 0.03), 2.0)
+	_berserk_icon.draw_circle(c, 36.0, glow)
+	_draw_button_key(_berserk_icon, "U", Color(1.0, 0.75, 0.45))
 
 
 func _draw_buff_bar() -> void:
@@ -984,20 +1103,48 @@ func _draw_buff_bar() -> void:
 		var time_left: float = buffs[type].time
 		var color: Color = info.color
 		var icon: String = info.icon
-		var name_short: String = info.name
-		var panel_w := int(VS.BUFF_CHIP_SIZE.x)
-		# 背景
-		_buff_bar.draw_rect(Rect2(x, 0, panel_w, VS.BUFF_CHIP_SIZE.y), Color(0, 0, 0, 0.6))
-		_buff_bar.draw_rect(Rect2(x, 0, panel_w, VS.BUFF_CHIP_SIZE.y), color.darkened(0.3), false, 1.0)
-		# 图标 + 名称
-		_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 3, 13), icon + name_short, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color)
+		var panel_w := 28
+		var center := Vector2(x + 14, 14)
+		_buff_bar.draw_circle(center, 13.0, Color(0.2, 0.13, 0.08, 0.75))
+		_buff_bar.draw_arc(center, 13.0, 0, TAU, 18, color.darkened(0.25), 2.0)
+		_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 8, 19), icon, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, color)
 		# 层数
 		if stacks > 1:
-			_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 50, 13), "x%d" % stacks, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color.WHITE)
+			_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 16, 26), "%d" % stacks, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color.WHITE)
 		# 时间条
 		var time_ratio := clampf(time_left / 30.0, 0.0, 1.0)
-		_buff_bar.draw_rect(Rect2(x + 1, VS.BUFF_CHIP_SIZE.y - 2.0, (panel_w - 2) * time_ratio, 2), color)
-		x += panel_w + 4
+		_buff_bar.draw_rect(Rect2(x + 3, 25, 22 * time_ratio, 2), color)
+		x += panel_w + 5
+
+
+func _on_action_button_input(event: InputEvent, action: String) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_emit_virtual_action(action, event.pressed)
+	elif event is InputEventScreenTouch:
+		_emit_virtual_action(action, event.pressed)
+
+
+func _emit_virtual_action(action: String, pressed: bool) -> void:
+	var input_event := InputEventAction.new()
+	input_event.action = action
+	input_event.pressed = pressed
+	Input.parse_input_event(input_event)
+
+
+func _on_pause_button_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_toggle_pause_from_hud()
+	elif event is InputEventScreenTouch and event.pressed:
+		_toggle_pause_from_hud()
+
+
+func _toggle_pause_from_hud() -> void:
+	if GameManager.state == GameManager.GameState.PLAYING:
+		GameManager.change_state(GameManager.GameState.PAUSED)
+		_show_pause_menu()
+	elif GameManager.state == GameManager.GameState.PAUSED:
+		_hide_pause_menu()
+		GameManager.change_state(GameManager.GameState.PLAYING)
 
 
 func _show_boss_hp(boss: Area2D) -> void:
@@ -1028,14 +1175,21 @@ func _show_boss_hp(boss: Area2D) -> void:
 func _process(delta: float) -> void:
 	var state := GameManager.state
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
-	_kills_label.text = "击杀: %d" % GameManager.total_kills
-	_weapon_label.text = "武器: %s  蓝: %d" % [
-		$Player.get_weapon_name() + (" [狂暴]" if $Player.has_method("is_berserk_active") and $Player.is_berserk_active() else ""),
-		int($Player.mana)
-	]
+	_kills_label.text = ""
+	_practice_label.text = str(GameManager.practice_time)
+	_coin_label.text = str(GameManager.kun_coins)
+
+	_hp_text.text = "%d/%d" % [$Player.hp, $Player.MAX_HP]
+	var shield_display: int = maxi($Player.shield, 5)
+	_shield_text.text = "%d/%d" % [shield_display, shield_display]
+	_mana_text.text = "%d/%d" % [int($Player.mana), int($Player.MAX_MANA)]
 
 	var mana_ratio: float = $Player.mana / $Player.MAX_MANA
-	_mana_bar.size.x = VS.MANA_FILL_SIZE.x * mana_ratio
+	_mana_bar.size.x = 136.0 * clampf(mana_ratio, 0.0, 1.0)
+	var hp_ratio: float = float($Player.hp) / float($Player.MAX_HP)
+	_hp_bar.size.x = 136.0 * clampf(hp_ratio, 0.0, 1.0)
+	_hp_bar.color = Color(0.88, 0.07, 0.15)
+	_shield_bar.size.x = 136.0
 
 	# 技能图标刷新
 	if _attack_icon:
@@ -1105,7 +1259,7 @@ func _on_player_hit() -> void:
 
 func _on_player_hp_changed(current: int, max_hp: int) -> void:
 	var ratio := float(current) / float(max_hp)
-	_hp_bar.size.x = VS.HP_FILL_SIZE.x * ratio
+	_hp_bar.size.x = 136.0 * ratio
 	if ratio > 0.3:
 		_hp_bar.color = Color(0.0, 0.8, 0.2).lerp(Color(1.0, 0.0, 0.0), 1.0 - ratio)
 	else:
@@ -1419,11 +1573,8 @@ func _create_minimap() -> void:
 	add_child(canvas)
 
 	var minimap_control := Control.new()
-	minimap_control.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	minimap_control.offset_left = 10
-	minimap_control.offset_top = -120
-	minimap_control.offset_right = 150
-	minimap_control.offset_bottom = -10
+	minimap_control.position = Vector2(856, 178)
+	minimap_control.size = Vector2(84, 116)
 	minimap_control.name = "Minimap"
 	minimap_control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	minimap_control.draw.connect(_draw_minimap.bind(minimap_control))
@@ -1435,12 +1586,15 @@ func _draw_minimap(ctrl: Control) -> void:
 	if _rooms.is_empty():
 		return
 
-	var cell_size := Vector2(20, 16)
-	var gap := 2.0
-	var padding := Vector2(8, 8)
+	var cell_size := Vector2(10, 10)
+	var gap := 1.5
+	var padding := Vector2(17, 22)
 	var total := Vector2(GRID_SIZE, GRID_SIZE) * cell_size + padding * 2
 
-	ctrl.draw_rect(Rect2(Vector2.ZERO, total), Color(0, 0, 0, 0.7))
+	ctrl.draw_rect(Rect2(Vector2(22, 4), Vector2(16, 24)), Color(0.32, 0.34, 0.36))
+	ctrl.draw_rect(Rect2(Vector2(29, 28), Vector2(2, 18)), Color(0.92, 0.94, 0.96))
+	ctrl.draw_rect(Rect2(Vector2(17, 44), Vector2(28, 28)), Color(0.92, 0.94, 0.96))
+	ctrl.draw_rect(Rect2(Vector2(21, 48), Vector2(20, 20)), Color(0.12, 0.16, 0.17))
 
 	# 先画走廊连线
 	for pos in _rooms:
@@ -1459,7 +1613,7 @@ func _draw_minimap(ctrl: Control) -> void:
 				var a_pos := padding + Vector2(adj_pos) * cell_size
 				var from := r_pos + cell_size / 2
 				var to := a_pos + cell_size / 2
-				ctrl.draw_line(from, to, Color(0.25, 0.25, 0.3), gap)
+				ctrl.draw_line(from, to, Color(0.78, 0.82, 0.84), gap)
 
 	# 画房间
 	for pos in _rooms:
@@ -1469,18 +1623,18 @@ func _draw_minimap(ctrl: Control) -> void:
 		if not room.explored:
 			continue
 
-		var color := Color(0.3, 0.3, 0.35)
+		var color := Color(0.42, 0.45, 0.48)
 		if room.is_boss:
-			color = Color(0.6, 0.15, 0.15)
+			color = Color(0.7, 0.16, 0.15)
 		elif room.state == RoomState.CLEARED:
-			color = Color(0.1, 0.5, 0.3)
+			color = Color(0.08, 0.85, 0.28)
 		elif room.state == RoomState.ACTIVE:
-			color = Color(0.5, 0.4, 0.1)
+			color = Color(0.7, 0.62, 0.15)
 
 		ctrl.draw_rect(Rect2(r_pos, cell_size), color)
 
 		if pos == _current_room:
-			ctrl.draw_rect(Rect2(r_pos - Vector2(1, 1), cell_size + Vector2(2, 2)), Color(1, 1, 0), false, 1.5)
+			ctrl.draw_rect(Rect2(r_pos - Vector2(3, 3), cell_size + Vector2(6, 6)), Color.WHITE, false, 2.0)
 
 
 func _get_door_dirs(pos: Vector2i) -> Array[String]:
