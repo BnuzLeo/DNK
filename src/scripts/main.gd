@@ -7,11 +7,12 @@ const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
 const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
 const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
 const STATUS_SCALE := 1.73
+const STATUS_POS := Vector2(24.0, 20.0)
 const STATUS_FILL_W := 59.0 * STATUS_SCALE
 const STATUS_FILL_H := 5.5 * STATUS_SCALE
 const ACTION_FRAME_SIZE := Vector2(50.67, 50.67)
 const ACTION_CONTROL_SIZE := Vector2(50.67, 78.0)
-const ACTION_ROW_Y := 552.0
+const ACTION_ROW_Y := 530.0
 const ACTION_Q_X := 646.0
 const ACTION_J_X := 716.0
 const ACTION_K_X := 786.0
@@ -845,55 +846,65 @@ func _create_hud() -> void:
 	canvas.add_child(_kills_label)
 
 	_hud_frame = Control.new()
-	_hud_frame.position = Vector2(12, 4)
+	_hud_frame.position = STATUS_POS
 	_hud_frame.size = Vector2(79, 39) * STATUS_SCALE
+	_hud_frame.z_index = 2
 	_hud_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud_frame.draw.connect(_draw_stats_frame)
 	canvas.add_child(_hud_frame)
 
 	_hp_bar_bg = ColorRect.new()
-	_hp_bar_bg.position = Vector2(12, 4) + Vector2(15, 4) * STATUS_SCALE
+	_hp_bar_bg.position = STATUS_POS + Vector2(15, 4) * STATUS_SCALE
 	_hp_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
+	_hp_bar_bg.z_index = 0
 	_hp_bar_bg.color = Color(0.08, 0.04, 0.03, 0.55)
 	canvas.add_child(_hp_bar_bg)
 
 	_hp_bar = ColorRect.new()
 	_hp_bar.position = _hp_bar_bg.position
 	_hp_bar.size = _hp_bar_bg.size
+	_hp_bar.z_index = 0
 	_hp_bar.color = Color(0.88, 0.07, 0.15)
 	canvas.add_child(_hp_bar)
 
-	_hp_text = _make_hud_value_label(Vector2(72, 7), Color.WHITE)
+	_hp_text = _make_hud_value_label(STATUS_POS + Vector2(60, 3), Color.WHITE)
+	_hp_text.z_index = 1
 	canvas.add_child(_hp_text)
 
 	_shield_bar_bg = ColorRect.new()
-	_shield_bar_bg.position = Vector2(12, 4) + Vector2(15, 16) * STATUS_SCALE
+	_shield_bar_bg.position = STATUS_POS + Vector2(15, 16) * STATUS_SCALE
 	_shield_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
+	_shield_bar_bg.z_index = 0
 	_shield_bar_bg.color = Color(0.06, 0.07, 0.08, 0.55)
 	canvas.add_child(_shield_bar_bg)
 
 	_shield_bar = ColorRect.new()
 	_shield_bar.position = _shield_bar_bg.position
 	_shield_bar.size = _shield_bar_bg.size
+	_shield_bar.z_index = 0
 	_shield_bar.color = Color(0.78, 0.85, 0.9)
 	canvas.add_child(_shield_bar)
 
-	_shield_text = _make_hud_value_label(Vector2(72, 38), Color.WHITE)
+	_shield_text = _make_hud_value_label(STATUS_POS + Vector2(60, 34), Color.WHITE)
+	_shield_text.z_index = 1
 	canvas.add_child(_shield_text)
 
 	_mana_bar_bg = ColorRect.new()
-	_mana_bar_bg.position = Vector2(12, 4) + Vector2(15, 28) * STATUS_SCALE
+	_mana_bar_bg.position = STATUS_POS + Vector2(15, 28) * STATUS_SCALE
 	_mana_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
+	_mana_bar_bg.z_index = 0
 	_mana_bar_bg.color = Color(0.04, 0.05, 0.12, 0.55)
 	canvas.add_child(_mana_bar_bg)
 
 	_mana_bar = ColorRect.new()
 	_mana_bar.position = _mana_bar_bg.position
 	_mana_bar.size = _mana_bar_bg.size
+	_mana_bar.z_index = 0
 	_mana_bar.color = Color(0.22, 0.33, 0.9)
 	canvas.add_child(_mana_bar)
 
-	_mana_text = _make_hud_value_label(Vector2(72, 69), Color.WHITE)
+	_mana_text = _make_hud_value_label(STATUS_POS + Vector2(60, 65), Color.WHITE)
+	_mana_text.z_index = 1
 	canvas.add_child(_mana_text)
 
 	_weapon_label = Label.new()
