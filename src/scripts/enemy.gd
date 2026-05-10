@@ -1,37 +1,54 @@
 extends Area2D
 
-## 敌人 AI — 支持 CHASER / SHOOTER / TANK / SWARM 四种类型
+## 敌人 AI — 支持 CHASER / SHOOTER / TANK 三种类型
 
 const VS := preload("res://scripts/visual_spec.gd")
+const CHASER_WEAPON_TEXTURE := preload("res://assets/export/enemies/chaser/电能矿工电棍.png")
+const TANK_WEAPON_TEXTURE := preload("res://assets/export/enemies/tank/矿工电钻.png")
 
 signal died
 
-enum EnemyType { CHASER, SHOOTER, TANK, SWARM }
+enum EnemyType { CHASER, SHOOTER, TANK }
+enum TankState { CHASE, AIM, CHARGE, RECOVER }
 
 const TYPE_STATS := {
-	EnemyType.CHASER:  {"speed": 100.0, "hp": 20, "damage": 1,  "color": Color(1.0, 0.0, 1.0)},
+	EnemyType.CHASER:  {"speed": 100.0, "hp": 20, "damage": 2,  "color": Color(1.0, 0.0, 1.0)},
 	EnemyType.SHOOTER: {"speed": 80.0,  "hp": 30, "damage": 5,  "color": Color(1.0, 0.6, 0.0)},
-	EnemyType.TANK:    {"speed": 50.0,  "hp": 80, "damage": 1,  "color": Color(0.5, 0.5, 0.5)},
-	EnemyType.SWARM:   {"speed": 120.0, "hp": 10, "damage": 1,  "color": Color(0.0, 1.0, 0.5)},
+	EnemyType.TANK:    {"speed": 58.0,  "hp": 80, "damage": 8,  "color": Color(0.5, 0.5, 0.5)},
 }
 
 const CONTACT_COOLDOWN := 1.0
+const CHASER_ATTACK_RANGE := 46.0
+const CHASER_ATTACK_TIME := 0.34
+const CHASER_ATTACK_HIT_TIME := 0.18
+const CHASER_ATTACK_COOLDOWN := 0.8
 const SHOOT_COOLDOWN_MIN := 1.5
 const SHOOT_COOLDOWN_MAX := 2.0
 const SHOOT_TELL_TIME := 0.3
 const SHOOT_BULLET_SPEED := 300.0
 const KEEP_DISTANCE_MIN := 150.0
 const KEEP_DISTANCE_MAX := 200.0
+const TANK_AIM_RANGE := 300.0
+const TANK_AIM_TIME := 0.7
+const TANK_CHARGE_TIME := 0.48
+const TANK_CHARGE_SPEED := 520.0
+const TANK_RECOVER_TIME := 0.35
+const TANK_CHARGE_COOLDOWN := 2.2
+const TANK_AFTERIMAGE_INTERVAL := 0.045
 
 const TYPE_ANIMATIONS := {
 	EnemyType.CHASER: {
-		"frame_size": 64,
+		"frame_size": 120,
 		"animations": {
-			"idle": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_idle_strip4.png", "frames": 4, "fps": 6.0, "loop": true},
-			"walk": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_move_strip6.png", "frames": 6, "fps": 10.0, "loop": true},
-			"shoot": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
-			"hit": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
-			"death": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_dead_strip4.png", "frames": 4, "fps": 8.0, "loop": false},
+			"idle": {"path": "res://assets/export/enemies/chaser/electric_miner_idle_strip2.png", "frames": 2, "fps": 4.0, "loop": true},
+			"walk": {"path": "res://assets/export/enemies/chaser/electric_miner_walk_strip4.png", "frames": 4, "fps": 8.0, "loop": true},
+			"shoot": {"paths": [
+				"res://assets/export/enemies/chaser/attack/01.png",
+				"res://assets/export/enemies/chaser/attack/02.png",
+				"res://assets/export/enemies/chaser/attack/03.png",
+				"res://assets/export/enemies/chaser/attack/04.png"
+			], "fps": 16.0, "loop": false},
+			"death": {"path": "res://assets/export/enemies/chaser/电能矿工死亡.png", "frames": 1, "fps": 1.0, "loop": false},
 		},
 	},
 	EnemyType.SHOOTER: {
@@ -44,22 +61,11 @@ const TYPE_ANIMATIONS := {
 		},
 	},
 	EnemyType.TANK: {
-		"frame_size": 64,
+		"frame_size": 120,
 		"animations": {
-			"idle": {"path": "res://assets/export/enemies/tank/enemy_tank_body_idle_strip4.png", "frames": 4, "fps": 6.0, "loop": true},
-			"walk": {"path": "res://assets/export/enemies/tank/enemy_tank_body_move_strip6.png", "frames": 6, "fps": 8.0, "loop": true},
-			"shoot": {"path": "res://assets/export/enemies/tank/enemy_tank_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
-			"hit": {"path": "res://assets/export/enemies/tank/enemy_tank_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
-			"death": {"path": "res://assets/export/enemies/tank/enemy_tank_body_dead_strip4.png", "frames": 4, "fps": 7.0, "loop": false},
-		},
-	},
-	EnemyType.SWARM: {
-		"frame_size": 48,
-		"animations": {
-			"idle": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_idle_strip4.png", "frames": 4, "fps": 7.0, "loop": true},
-			"walk": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_move_strip6.png", "frames": 6, "fps": 12.0, "loop": true},
-			"shoot": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_move_strip6.png", "frames": 6, "fps": 16.0, "loop": false},
-			"death": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_dead_strip4.png", "frames": 4, "fps": 9.0, "loop": false},
+			"idle": {"path": "res://assets/export/enemies/tank/christmas_miner_idle_strip2.png", "frames": 2, "fps": 4.0, "loop": true},
+			"walk": {"path": "res://assets/export/enemies/tank/christmas_miner_walk_strip4.png", "frames": 4, "fps": 8.0, "loop": true},
+			"death": {"path": "res://assets/export/enemies/tank/矿工圣诞节死亡.png", "frames": 1, "fps": 1.0, "loop": false},
 		},
 	},
 }
@@ -78,11 +84,20 @@ var _contact_cooldown := 0.0
 var _dying := false
 var _spawn_invuln_timer := 0.0
 var _sprite: AnimatedSprite2D = null
+var _weapon_sprite: Sprite2D = null
 var _archer_facing := 1.0
 var _current_animation := ""
 var _moving_this_frame := false
 var _hit_timer := 0.0
 var _sprite_action_timer := 0.0
+var _melee_attack_timer := 0.0
+var _melee_attack_hit_done := false
+var _melee_attack_cooldown := 0.0
+var _tank_state: int = TankState.CHASE
+var _tank_state_timer := 0.0
+var _tank_charge_cooldown := 0.0
+var _tank_charge_dir := Vector2.RIGHT
+var _tank_afterimage_timer := 0.0
 
 # 射击
 var _shoot_timer := 0.0
@@ -111,6 +126,8 @@ func _ready() -> void:
 
 func setup(player: CharacterBody2D, type: int = EnemyType.CHASER, pool: Node2D = null) -> void:
 	_player = player
+	if not TYPE_STATS.has(type):
+		type = EnemyType.CHASER
 	enemy_type = type
 	bullet_pool = pool
 	var stats: Dictionary = TYPE_STATS[type]
@@ -136,6 +153,12 @@ func _physics_process(delta: float) -> void:
 		_hit_timer -= delta
 	if _sprite_action_timer > 0.0:
 		_sprite_action_timer -= delta
+	if _melee_attack_cooldown > 0.0:
+		_melee_attack_cooldown -= delta
+	if _melee_attack_timer > 0.0:
+		_update_melee_attack(delta)
+	if _tank_charge_cooldown > 0.0:
+		_tank_charge_cooldown -= delta
 
 	# 减速计时
 	if _slow_timer > 0.0:
@@ -155,6 +178,7 @@ func _physics_process(delta: float) -> void:
 	if _frozen:
 		_apply_idle_modulate()
 		_set_animation("idle")
+		_update_weapon_visual()
 		queue_redraw()
 		return
 
@@ -179,11 +203,31 @@ func _physics_process(delta: float) -> void:
 		if _flash_timer <= 0.0:
 			_apply_idle_modulate()
 
-	if _flash_timer <= 0.0 and not _shooting:
+	if _flash_timer <= 0.0 and not _shooting and not (enemy_type == EnemyType.TANK and _tank_state == TankState.AIM):
 		_apply_idle_modulate()
 
 	_update_animation()
+	_update_weapon_visual()
 	queue_redraw()
+
+
+func _update_melee_attack(delta: float) -> void:
+	_melee_attack_timer -= delta
+	if not _melee_attack_hit_done and _melee_attack_timer <= CHASER_ATTACK_TIME - CHASER_ATTACK_HIT_TIME:
+		_melee_attack_hit_done = true
+		if _player != null and global_position.distance_to(_player.global_position) <= CHASER_ATTACK_RANGE + 18.0:
+			_player.take_damage(TYPE_STATS[EnemyType.CHASER].damage)
+	if _melee_attack_timer <= 0.0:
+		_melee_attack_timer = 0.0
+
+
+func _start_melee_attack() -> void:
+	_melee_attack_timer = CHASER_ATTACK_TIME
+	_melee_attack_hit_done = false
+	_melee_attack_cooldown = CHASER_ATTACK_COOLDOWN
+	_sprite_action_timer = CHASER_ATTACK_TIME
+	if _has_animation("shoot"):
+		_set_animation("shoot", true)
 
 
 func _update_movement(delta: float) -> void:
@@ -194,7 +238,13 @@ func _update_movement(delta: float) -> void:
 
 	match enemy_type:
 		EnemyType.CHASER:
-			global_position += dir * speed * delta
+			var dist := global_position.distance_to(_player.global_position)
+			if _melee_attack_timer > 0.0:
+				pass
+			elif dist <= CHASER_ATTACK_RANGE and _melee_attack_cooldown <= 0.0:
+				_start_melee_attack()
+			else:
+				global_position += dir * speed * delta
 
 		EnemyType.SHOOTER:
 			var dist := global_position.distance_to(_player.global_position)
@@ -205,13 +255,51 @@ func _update_movement(delta: float) -> void:
 			# 在范围内不动
 
 		EnemyType.TANK:
-			global_position += dir * speed * delta
-
-		EnemyType.SWARM:
-			# 群体追踪 + 随机偏移避免重叠
-			var offset := Vector2(randf_range(-0.3, 0.3), randf_range(-0.3, 0.3))
-			global_position += (dir + offset) * speed * delta
+			_update_tank_behavior(delta, dir, speed)
 	_moving_this_frame = global_position.distance_squared_to(start_position) > 0.01
+
+
+func _update_tank_behavior(delta: float, dir: Vector2, speed: float) -> void:
+	match _tank_state:
+		TankState.CHASE:
+			if global_position.distance_to(_player.global_position) <= TANK_AIM_RANGE and _tank_charge_cooldown <= 0.0:
+				_tank_state = TankState.AIM
+				_tank_state_timer = TANK_AIM_TIME
+				_tank_charge_dir = dir
+				_sprite_action_timer = TANK_AIM_TIME
+			else:
+				global_position += dir * speed * delta
+
+		TankState.AIM:
+			_tank_state_timer -= delta
+			_tank_charge_dir = (_player.global_position - global_position).normalized()
+			_face_direction(_tank_charge_dir)
+			var flash := sin(_tank_state_timer * 34.0) * 0.5 + 0.5
+			modulate = _get_base_modulate().lerp(Color(1.0, 0.86, 0.35), flash)
+			if _tank_state_timer <= 0.0:
+				_tank_state = TankState.CHARGE
+				_tank_state_timer = TANK_CHARGE_TIME
+				_tank_afterimage_timer = 0.0
+				_spawn_tank_afterimage()
+
+		TankState.CHARGE:
+			_tank_state_timer -= delta
+			global_position += _tank_charge_dir * TANK_CHARGE_SPEED * _slow_factor * delta
+			_face_direction(_tank_charge_dir)
+			_sprite_action_timer = max(_sprite_action_timer, 0.08)
+			_tank_afterimage_timer -= delta
+			if _tank_afterimage_timer <= 0.0:
+				_tank_afterimage_timer = TANK_AFTERIMAGE_INTERVAL
+				_spawn_tank_afterimage()
+			if _tank_state_timer <= 0.0:
+				_tank_state = TankState.RECOVER
+				_tank_state_timer = TANK_RECOVER_TIME
+				_tank_charge_cooldown = TANK_CHARGE_COOLDOWN
+
+		TankState.RECOVER:
+			_tank_state_timer -= delta
+			if _tank_state_timer <= 0.0:
+				_tank_state = TankState.CHASE
 
 
 func _update_shooting(delta: float) -> void:
@@ -271,6 +359,8 @@ func _update_animation() -> void:
 		return
 	if _dying:
 		_set_animation("death")
+	elif enemy_type == EnemyType.TANK and _tank_state == TankState.CHARGE and _has_animation("walk"):
+		_set_animation("walk")
 	elif (_shooting or _sprite_action_timer > 0.0) and _has_animation("shoot"):
 		_set_animation("shoot")
 	elif _hit_timer > 0.0 and _has_animation("hit"):
@@ -303,8 +393,101 @@ func _setup_sprite() -> void:
 	if frame_size > 0.0:
 		var scale_factor: float = display_size / frame_size
 		_sprite.scale = Vector2(scale_factor, scale_factor)
+	_setup_weapon_sprite()
 	_set_animation("idle", true)
 	_apply_idle_modulate()
+	_update_weapon_visual()
+
+
+func _setup_weapon_sprite() -> void:
+	var texture: Texture2D = null
+	match enemy_type:
+		EnemyType.CHASER:
+			texture = CHASER_WEAPON_TEXTURE
+		EnemyType.TANK:
+			texture = TANK_WEAPON_TEXTURE
+		_:
+			texture = null
+	if texture == null:
+		if _weapon_sprite != null:
+			_weapon_sprite.queue_free()
+			_weapon_sprite = null
+		return
+	if _weapon_sprite == null:
+		_weapon_sprite = Sprite2D.new()
+		_weapon_sprite.centered = true
+		_weapon_sprite.z_index = 3
+		add_child(_weapon_sprite)
+	_weapon_sprite.texture = texture
+
+
+func _update_weapon_visual() -> void:
+	if _weapon_sprite == null:
+		return
+	_weapon_sprite.visible = not _dying and not _frozen
+	if not _weapon_sprite.visible:
+		return
+	var facing := _archer_facing
+	_weapon_sprite.flip_h = facing < 0.0
+	match enemy_type:
+		EnemyType.CHASER:
+			var swing := 0.0
+			if _melee_attack_timer > 0.0:
+				swing = clampf(1.0 - _melee_attack_timer / CHASER_ATTACK_TIME, 0.0, 1.0)
+			_weapon_sprite.scale = Vector2(0.36, 0.36)
+			_weapon_sprite.position = Vector2(facing * (23.0 + 8.0 * swing), 5.0 - 5.0 * sin(swing * PI))
+			_weapon_sprite.rotation = facing * lerpf(-0.62, 0.92, swing)
+
+		EnemyType.TANK:
+			var thrust := 0.0
+			if _tank_state == TankState.AIM:
+				thrust = sin(_tank_state_timer * 32.0) * 0.08
+			elif _tank_state == TankState.CHARGE:
+				thrust = 0.35
+			_weapon_sprite.scale = Vector2(0.58, 0.58)
+			_weapon_sprite.position = Vector2(facing * (26.0 + 18.0 * thrust), 4.0)
+			_weapon_sprite.rotation = facing * (0.04 * sin(Time.get_ticks_msec() * 0.04) if _tank_state == TankState.CHARGE else 0.0)
+
+		_:
+			_weapon_sprite.visible = false
+
+
+func _spawn_tank_afterimage() -> void:
+	if _sprite == null or _sprite.sprite_frames == null:
+		return
+	var frame_texture := _sprite.sprite_frames.get_frame_texture(_sprite.animation, _sprite.frame)
+	if frame_texture == null:
+		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	var ghost := Sprite2D.new()
+	ghost.texture = frame_texture
+	ghost.centered = true
+	ghost.scale = _sprite.scale
+	ghost.flip_h = _sprite.flip_h
+	ghost.z_index = _sprite.z_index - 1
+	ghost.modulate = Color(0.48, 0.9, 1.0, 0.42)
+	parent.add_child(ghost)
+	ghost.global_position = global_position
+	var tween := ghost.create_tween()
+	tween.tween_property(ghost, "modulate:a", 0.0, 0.22)
+	tween.tween_callback(ghost.queue_free)
+
+	if _weapon_sprite != null and _weapon_sprite.visible:
+		var weapon_ghost := Sprite2D.new()
+		weapon_ghost.texture = _weapon_sprite.texture
+		weapon_ghost.centered = true
+		weapon_ghost.scale = _weapon_sprite.scale
+		weapon_ghost.flip_h = _weapon_sprite.flip_h
+		weapon_ghost.rotation = _weapon_sprite.rotation
+		weapon_ghost.z_index = _weapon_sprite.z_index - 1
+		weapon_ghost.modulate = Color(0.48, 0.9, 1.0, 0.34)
+		parent.add_child(weapon_ghost)
+		weapon_ghost.global_position = global_position + _weapon_sprite.position
+		var weapon_tween := weapon_ghost.create_tween()
+		weapon_tween.tween_property(weapon_ghost, "modulate:a", 0.0, 0.22)
+		weapon_tween.tween_callback(weapon_ghost.queue_free)
 
 
 func _build_sprite_frames(config: Dictionary) -> SpriteFrames:
@@ -314,17 +497,26 @@ func _build_sprite_frames(config: Dictionary) -> SpriteFrames:
 	var animations: Dictionary = config.get("animations", {})
 	for animation_name in animations.keys():
 		var animation: Dictionary = animations[animation_name]
-		var texture := _load_texture(animation.get("path", ""))
-		if texture == null:
-			continue
+		var animation_frame_size := int(animation.get("frame_size", frame_size))
+		var frame_paths: Array = animation.get("paths", [])
 		sprite_frames.add_animation(animation_name)
 		sprite_frames.set_animation_speed(animation_name, float(animation.get("fps", 8.0)))
 		sprite_frames.set_animation_loop(animation_name, bool(animation.get("loop", true)))
+		if not frame_paths.is_empty():
+			for path in frame_paths:
+				var texture := _load_texture(String(path))
+				if texture == null:
+					continue
+				sprite_frames.add_frame(animation_name, texture)
+			continue
+		var texture := _load_texture(animation.get("path", ""))
+		if texture == null:
+			continue
 		var frame_count := int(animation.get("frames", 1))
 		for frame_index in frame_count:
 			var atlas := AtlasTexture.new()
 			atlas.atlas = texture
-			atlas.region = Rect2(frame_index * frame_size, 0, frame_size, frame_size)
+			atlas.region = Rect2(frame_index * animation_frame_size, 0, animation_frame_size, animation_frame_size)
 			sprite_frames.add_frame(animation_name, atlas)
 	if not sprite_frames.has_animation("idle"):
 		return null
@@ -344,12 +536,7 @@ func _load_texture(path: String) -> Texture2D:
 
 
 func _get_display_size() -> float:
-	match enemy_type:
-		EnemyType.SWARM:
-			return VS.ENEMY_SWARM_DISPLAY_SIZE
-		EnemyType.TANK:
-			return VS.ENEMY_TANK_DISPLAY_SIZE
-	return VS.ENEMY_STANDARD_DISPLAY_SIZE
+	return VS.ENEMY_TANK_DISPLAY_SIZE if enemy_type == EnemyType.TANK else VS.ENEMY_STANDARD_DISPLAY_SIZE
 
 
 func _face_direction(dir: Vector2) -> void:
@@ -447,10 +634,16 @@ func _die() -> void:
 
 func _on_body_entered(body: Node2D) -> void:
 	if body.has_method("take_damage") and _contact_cooldown <= 0.0 and _spawn_invuln_timer <= 0.0:
+		if enemy_type == EnemyType.CHASER:
+			_start_melee_attack()
+			_contact_cooldown = CONTACT_COOLDOWN
+			return
+		if enemy_type == EnemyType.TANK and _tank_state != TankState.CHARGE:
+			return
 		var stats: Dictionary = TYPE_STATS[enemy_type]
 		body.take_damage(stats.damage)
-		_sprite_action_timer = 0.22
 		if _has_animation("shoot"):
+			_sprite_action_timer = 0.22
 			_set_animation("shoot", true)
 		_contact_cooldown = CONTACT_COOLDOWN
 
@@ -461,11 +654,8 @@ func _on_area_entered(_area: Area2D) -> void:
 
 func _draw() -> void:
 	var radius := VS.ENEMY_STANDARD_DISPLAY_SIZE * 0.5
-	match enemy_type:
-		EnemyType.SWARM:
-			radius = VS.ENEMY_SWARM_DISPLAY_SIZE * 0.5
-		EnemyType.TANK:
-			radius = VS.ENEMY_TANK_DISPLAY_SIZE * 0.5
+	if enemy_type == EnemyType.TANK:
+		radius = VS.ENEMY_TANK_DISPLAY_SIZE * 0.5
 	if _sprite == null:
 		var color := Color(0.3, 0.7, 1.0) if _frozen else _get_base_color()
 		# 生成无敌闪烁

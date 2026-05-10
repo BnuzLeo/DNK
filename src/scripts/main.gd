@@ -600,14 +600,12 @@ func _spawn_enemy(pos: Vector2, room: RoomData, bounds: Rect2, type: int = 0) ->
 
 func _random_enemy_type() -> int:
 	var roll := randf()
-	if roll < 0.45:
+	if roll < 0.50:
 		return 0  # CHASER
-	elif roll < 0.70:
+	elif roll < 0.78:
 		return 1  # SHOOTER
-	elif roll < 0.85:
-		return 2  # TANK
 	else:
-		return 3  # SWARM
+		return 2  # TANK
 
 
 func _spawn_boss(pos: Vector2, room: RoomData, bounds: Rect2) -> void:
@@ -1852,6 +1850,13 @@ func _draw_wall_tiles(rect: Rect2, seed: int) -> void:
 	_draw_tiled_textures(rect, ICE_WALL_TILES, seed, Color(0.96, 0.99, 1.0), true)
 
 
+func _draw_room_corner_tiles(rx: float, ry: float, seed: int) -> void:
+	_draw_wall_tiles(Rect2(rx - MAP_TILE_SIZE, ry - MAP_TILE_SIZE, MAP_TILE_SIZE, MAP_TILE_SIZE), seed)
+	_draw_wall_tiles(Rect2(rx + ROOM_W, ry - MAP_TILE_SIZE, MAP_TILE_SIZE, MAP_TILE_SIZE), seed + 1)
+	_draw_wall_tiles(Rect2(rx - MAP_TILE_SIZE, ry + ROOM_H, MAP_TILE_SIZE, MAP_TILE_SIZE), seed + 2)
+	_draw_wall_tiles(Rect2(rx + ROOM_W, ry + ROOM_H, MAP_TILE_SIZE, MAP_TILE_SIZE), seed + 3)
+
+
 func _draw() -> void:
 	for pos in _rooms:
 		var room: RoomData = _rooms[pos]
@@ -1925,6 +1930,7 @@ func _draw() -> void:
 			_draw_wall_tiles(Rect2(rx + ROOM_W, gap_b, MAP_TILE_SIZE, ry + ROOM_H - gap_b), 900 + pos.x * 17 + pos.y * 31)
 		else:
 			_draw_wall_tiles(Rect2(rx + ROOM_W, ry, MAP_TILE_SIZE, ROOM_H), 910 + pos.x * 17 + pos.y * 31)
+		_draw_room_corner_tiles(rx, ry, 920 + pos.x * 17 + pos.y * 31)
 
 		# Boss 标记
 		if room.is_boss and room.state != RoomState.CLEARED:
