@@ -4,10 +4,7 @@ extends Area2D
 
 const VS := preload("res://scripts/visual_spec.gd")
 
-const NPC_TEXTURES := {
-	"broker": "res://assets/export/characters/npc_broker/npc_broker_body_idle_128.png",
-	"smith": "res://assets/export/characters/npc_smith/npc_smith_body_idle_128.png",
-}
+const NPC_TEXTURES := {}
 
 var npc_type: String = ""
 var display_name: String = ""
@@ -87,6 +84,10 @@ func _on_panel_closed() -> void:
 func _setup_sprite() -> void:
 	var path: String = NPC_TEXTURES.get(npc_type, "")
 	if path.is_empty():
+		if _sprite != null:
+			_sprite.queue_free()
+			_sprite = null
+		_sprite_type = npc_type
 		return
 	var texture := _load_texture(path)
 	if texture == null:

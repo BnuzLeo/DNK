@@ -23,43 +23,7 @@ const SHOOT_BULLET_SPEED := 300.0
 const KEEP_DISTANCE_MIN := 150.0
 const KEEP_DISTANCE_MAX := 200.0
 
-const TYPE_ANIMATIONS := {
-	EnemyType.CHASER: {
-		"frame_size": 64,
-		"animations": {
-			"idle": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_idle_strip4.png", "frames": 4, "fps": 5.0, "loop": true},
-			"move": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_move_strip6.png", "frames": 6, "fps": 10.0, "loop": true},
-			"hit": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_hit_strip2.png", "frames": 2, "fps": 12.0, "loop": false},
-			"dead": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_dead_strip4.png", "frames": 4, "fps": 8.0, "loop": false},
-		},
-	},
-	EnemyType.SHOOTER: {
-		"frame_size": 64,
-		"animations": {
-			"idle": {"path": "res://assets/export/enemies/shooter/enemy_shooter_body_idle_strip4.png", "frames": 4, "fps": 5.0, "loop": true},
-			"move": {"path": "res://assets/export/enemies/shooter/enemy_shooter_body_move_strip6.png", "frames": 6, "fps": 9.0, "loop": true},
-			"tell": {"path": "res://assets/export/enemies/shooter/enemy_shooter_body_tell_strip4.png", "frames": 4, "fps": 12.0, "loop": true},
-			"dead": {"path": "res://assets/export/enemies/shooter/enemy_shooter_body_dead_strip4.png", "frames": 4, "fps": 8.0, "loop": false},
-		},
-	},
-	EnemyType.TANK: {
-		"frame_size": 64,
-		"animations": {
-			"idle": {"path": "res://assets/export/enemies/tank/enemy_tank_body_idle_strip4.png", "frames": 4, "fps": 4.0, "loop": true},
-			"move": {"path": "res://assets/export/enemies/tank/enemy_tank_body_move_strip6.png", "frames": 6, "fps": 7.0, "loop": true},
-			"hit": {"path": "res://assets/export/enemies/tank/enemy_tank_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
-			"dead": {"path": "res://assets/export/enemies/tank/enemy_tank_body_dead_strip4.png", "frames": 4, "fps": 7.0, "loop": false},
-		},
-	},
-	EnemyType.SWARM: {
-		"frame_size": 48,
-		"animations": {
-			"idle": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_idle_strip4.png", "frames": 4, "fps": 7.0, "loop": true},
-			"move": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_move_strip6.png", "frames": 6, "fps": 14.0, "loop": true},
-			"dead": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_dead_strip4.png", "frames": 4, "fps": 10.0, "loop": false},
-		},
-	},
-}
+const TYPE_ANIMATIONS := {}
 
 var enemy_type: int = EnemyType.CHASER
 var max_hp := 20
@@ -270,6 +234,9 @@ func _update_animation() -> void:
 func _setup_sprite() -> void:
 	var config: Dictionary = TYPE_ANIMATIONS.get(enemy_type, {})
 	if config.is_empty():
+		if _sprite != null:
+			_sprite.queue_free()
+			_sprite = null
 		return
 	var frames := _build_sprite_frames(config)
 	if frames == null:

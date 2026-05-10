@@ -14,15 +14,7 @@ const DASH_DAMAGE := 20
 
 const FAN_BULLET_SPEED := 250.0
 const RING_BULLET_SPEED := 200.0
-const BOSS_ANIMATIONS := {
-	"frame_size": 128,
-	"animations": {
-		"idle": {"path": "res://assets/export/bosses/main/boss_main_body_idle_strip6.png", "frames": 6, "fps": 5.0, "loop": true},
-		"tell": {"path": "res://assets/export/bosses/main/boss_main_body_tell_strip4.png", "frames": 4, "fps": 10.0, "loop": true},
-		"dash": {"path": "res://assets/export/bosses/main/boss_main_body_dash_strip6.png", "frames": 6, "fps": 12.0, "loop": true},
-		"dead": {"path": "res://assets/export/bosses/main/boss_main_body_dead_strip8.png", "frames": 8, "fps": 8.0, "loop": false},
-	},
-}
+const BOSS_ANIMATIONS := {}
 
 const PHASE_CONFIGS := {
 	Phase.P1: {
@@ -285,6 +277,9 @@ func _apply_idle_modulate() -> void:
 func _setup_sprite() -> void:
 	var frames := _build_sprite_frames(BOSS_ANIMATIONS)
 	if frames == null:
+		if _sprite != null:
+			_sprite.queue_free()
+			_sprite = null
 		return
 	if _sprite == null:
 		_sprite = AnimatedSprite2D.new()
