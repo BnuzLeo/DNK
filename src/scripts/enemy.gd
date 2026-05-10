@@ -445,7 +445,7 @@ func _update_weapon_visual() -> void:
 			elif _tank_state == TankState.CHARGE:
 				thrust = 0.35
 			_weapon_sprite.scale = Vector2(0.58, 0.58)
-			_weapon_sprite.position = Vector2(facing * (26.0 + 18.0 * thrust), 4.0)
+			_weapon_sprite.position = Vector2(facing * (26.0 + 18.0 * thrust), 18.0)
 			_weapon_sprite.rotation = facing * (0.04 * sin(Time.get_ticks_msec() * 0.04) if _tank_state == TankState.CHARGE else 0.0)
 
 		_:
@@ -674,3 +674,10 @@ func _draw() -> void:
 		draw_rect(Rect2(bar_pos, bar_size), Color(0.08, 0.08, 0.08, 0.75), true)
 		draw_rect(Rect2(bar_pos, Vector2(bar_size.x * (1.0 - tell_ratio), bar_size.y)), Color(1.0, 0.25, 0.18, 0.95), true)
 		draw_rect(Rect2(bar_pos, bar_size), Color(1.0, 0.9, 0.75, 0.9), false, 1.0)
+	if enemy_type == EnemyType.TANK and _tank_state == TankState.AIM:
+		var charge_ratio := clampf(1.0 - _tank_state_timer / TANK_AIM_TIME, 0.0, 1.0)
+		var bar_size := Vector2(50.0, 6.0)
+		var bar_pos := Vector2(-bar_size.x * 0.5, -radius - 15.0)
+		draw_rect(Rect2(bar_pos, bar_size), Color(0.06, 0.06, 0.07, 0.8), true)
+		draw_rect(Rect2(bar_pos, Vector2(bar_size.x * charge_ratio, bar_size.y)), Color(1.0, 0.72, 0.18, 0.96), true)
+		draw_rect(Rect2(bar_pos, bar_size), Color(1.0, 0.94, 0.68, 0.95), false, 1.0)

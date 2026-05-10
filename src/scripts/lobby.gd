@@ -10,6 +10,7 @@ const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
 const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
 const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
+const LOBBY_BACKGROUND := preload("res://assets/export/gui/大厅/底图.png")
 const STATUS_SCALE := 1.73
 const STATUS_POS := Vector2(24.0, 20.0)
 const STATUS_FILL_W := 59.0 * STATUS_SCALE
@@ -899,25 +900,8 @@ func _enter_dungeon() -> void:
 
 
 func _draw() -> void:
-	# 地板
-	draw_rect(Rect2(WALL_T, WALL_T, ROOM_W - WALL_T * 2, ROOM_H - WALL_T * 2),
-		Color(0.13, 0.12, 0.10))
+	draw_texture_rect(LOBBY_BACKGROUND, Rect2(Vector2.ZERO, Vector2(ROOM_W, ROOM_H)), false)
 
-	# 地板装饰线条
-	for i in range(0, ROOM_W, 80):
-		draw_line(Vector2(i + WALL_T, WALL_T), Vector2(i + WALL_T, ROOM_H - WALL_T),
-			Color(0.15, 0.14, 0.12), 1.0)
-	for j in range(0, ROOM_H, 80):
-		draw_line(Vector2(WALL_T, j + WALL_T), Vector2(ROOM_W - WALL_T, j + WALL_T),
-			Color(0.15, 0.14, 0.12), 1.0)
-
-	# 墙壁
-	draw_rect(Rect2(0, 0, ROOM_W, WALL_T), Color(0.25, 0.22, 0.18))
-	draw_rect(Rect2(0, ROOM_H - WALL_T, ROOM_W, WALL_T), Color(0.25, 0.22, 0.18))
-	draw_rect(Rect2(0, 0, WALL_T, ROOM_H), Color(0.25, 0.22, 0.18))
-	draw_rect(Rect2(ROOM_W - WALL_T, 0, WALL_T, ROOM_H), Color(0.25, 0.22, 0.18))
-
-	var pulse := sin(_anim_timer * 3.0) * 0.15 + 0.85
 	if _portal_near and not _map_select_open:
 		draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-34, -76), "按 E 交互",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
