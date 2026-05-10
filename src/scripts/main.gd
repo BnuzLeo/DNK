@@ -7,6 +7,17 @@ const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
 const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
 const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
+const ICE_FLOOR_TILES := [
+	preload("res://assets/export/map/冰封篮球场/地砖_01.png"),
+	preload("res://assets/export/map/冰封篮球场/地砖_02.png"),
+	preload("res://assets/export/map/冰封篮球场/地砖_03.png"),
+	preload("res://assets/export/map/冰封篮球场/地砖_04.png"),
+	preload("res://assets/export/map/冰封篮球场/地砖_05.png")
+]
+const ICE_WALL_TILES := [
+	preload("res://assets/export/map/冰封篮球场/墙壁_01.png"),
+	preload("res://assets/export/map/冰封篮球场/墙壁_02.png")
+]
 const STATUS_SCALE := 1.73
 const STATUS_POS := Vector2(24.0, 20.0)
 const STATUS_FILL_W := 59.0 * STATUS_SCALE
@@ -40,6 +51,7 @@ const CORRIDOR_W := int(VS.CORRIDOR_WIDTH)
 # 墙壁厚度
 const WALL_T := int(VS.WALL_THICKNESS)
 const DOOR_COLLISION_LAYER := 16
+const MAP_TILE_SIZE := 64.0
 
 const GRID_SIZE := 5
 const CENTER := Vector2i(2, 2)
@@ -1787,6 +1799,51 @@ func _draw_locked_doors() -> void:
 			draw_rect(rect.grow(-3.0), Color(0.35, 0.18, 0.05))
 
 
+func _stable_tile_index(tile_x: int, tile_y: int, seed: int, count: int) -> int:
+	var value := tile_x * 73856093 + tile_y * 19349663 + seed * 83492791
+	return posmod(value, count)
+
+
+func _draw_tiled_textures(rect: Rect2, textures: Array, seed: int, tint: Color = Color.WHITE) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0 or textures.is_empty():
+		return
+
+	var start_x := int(floor(rect.position.x / MAP_TILE_SIZE))
+	var start_y := int(floor(rect.position.y / MAP_TILE_SIZE))
+	var end_x := int(ceil(rect.end.x / MAP_TILE_SIZE))
+	var end_y := int(ceil(rect.end.y / MAP_TILE_SIZE))
+
+	for tile_x in range(start_x, end_x):
+		for tile_y in range(start_y, end_y):
+			var tile_rect := Rect2(
+				Vector2(tile_x * MAP_TILE_SIZE, tile_y * MAP_TILE_SIZE),
+				Vector2(MAP_TILE_SIZE, MAP_TILE_SIZE)
+			)
+			var clipped := tile_rect.intersection(rect)
+			if clipped.size.x <= 0.0 or clipped.size.y <= 0.0:
+				continue
+			var texture: Texture2D = textures[_stable_tile_index(tile_x, tile_y, seed, textures.size())]
+			var source_rect := Rect2(clipped.position - tile_rect.position, clipped.size)
+			draw_texture_rect_region(texture, clipped, source_rect, tint)
+
+
+func _draw_floor_tiles(rect: Rect2, room: RoomData, seed: int) -> void:
+	var tint := Color.WHITE
+	if room.is_start:
+		tint = Color(1.0, 1.0, 1.0)
+	elif room.is_boss:
+		tint = Color(0.88, 0.95, 1.0)
+	_draw_tiled_textures(rect, ICE_FLOOR_TILES, seed, tint)
+
+
+func _draw_corridor_tiles(rect: Rect2, seed: int) -> void:
+	_draw_tiled_textures(rect, ICE_FLOOR_TILES, seed, Color(0.94, 0.98, 1.0))
+
+
+func _draw_wall_tiles(rect: Rect2, seed: int) -> void:
+	_draw_tiled_textures(rect, ICE_WALL_TILES, seed, Color(0.96, 0.99, 1.0))
+
+
 func _draw() -> void:
 	for pos in _rooms:
 		var room: RoomData = _rooms[pos]
@@ -1797,12 +1854,7 @@ func _draw() -> void:
 		var ry: float = pos.y * CELL_H + ROOM_PAD_Y
 
 		# 房间背景
-		var bg_color := Color(0.13, 0.14, 0.16)
-		if room.is_boss:
-			bg_color = Color(0.18, 0.10, 0.10)
-		elif room.is_start:
-			bg_color = Color(0.10, 0.16, 0.13)
-		draw_rect(Rect2(rx, ry, ROOM_W, ROOM_H), bg_color)
+		_draw_floor_tiles(Rect2(rx, ry, ROOM_W, ROOM_H), room, 100 + pos.x * 17 + pos.y * 31)
 
 		# 走廊（南走廊）
 		var south_pos := Vector2i(pos.x, pos.y + 1)
@@ -1811,7 +1863,13 @@ func _draw() -> void:
 			var corr_x: float = pos.x * CELL_W + CELL_W / 2 - CORRIDOR_W / 2
 			var corr_y_top: float = ry + ROOM_H
 			var corr_y_bot: float = (pos.y + 1) * CELL_H + ROOM_PAD_Y
-			draw_rect(Rect2(corr_x, corr_y_top, CORRIDOR_W, corr_y_bot - corr_y_top), Color(0.12, 0.13, 0.15))
+			var corr_h: float = corr_y_bot - corr_y_top
+			_draw_corridor_tiles(Rect2(corr_x, corr_y_top, CORRIDOR_W, corr_h), 300 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(corr_x, corr_y_top, WALL_T, corr_h), 600 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(corr_x + CORRIDOR_W - WALL_T, corr_y_top, WALL_T, corr_h), 610 + pos.x * 17 + pos.y * 31)
+			var next_ry: float = (pos.y + 1) * CELL_H + ROOM_PAD_Y
+			_draw_wall_tiles(Rect2(corr_x, next_ry - WALL_T, WALL_T, WALL_T), 620 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(corr_x + CORRIDOR_W - WALL_T, next_ry - WALL_T, WALL_T, WALL_T), 630 + pos.x * 17 + pos.y * 31)
 
 		# 走廊（东走廊）
 		var east_pos := Vector2i(pos.x + 1, pos.y)
@@ -1820,10 +1878,15 @@ func _draw() -> void:
 			var corr_y: float = pos.y * CELL_H + CELL_H / 2 - CORRIDOR_W / 2
 			var corr_x_left: float = rx + ROOM_W
 			var corr_x_right: float = (pos.x + 1) * CELL_W + ROOM_PAD_X
-			draw_rect(Rect2(corr_x_left, corr_y, corr_x_right - corr_x_left, CORRIDOR_W), Color(0.12, 0.13, 0.15))
+			var corr_w: float = corr_x_right - corr_x_left
+			_draw_corridor_tiles(Rect2(corr_x_left, corr_y, corr_w, CORRIDOR_W), 400 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(corr_x_left, corr_y, corr_w, WALL_T), 700 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(corr_x_left, corr_y + CORRIDOR_W - WALL_T, corr_w, WALL_T), 710 + pos.x * 17 + pos.y * 31)
+			var next_rx: float = (pos.x + 1) * CELL_W + ROOM_PAD_X
+			_draw_wall_tiles(Rect2(next_rx - WALL_T, corr_y, WALL_T, WALL_T), 720 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(next_rx - WALL_T, corr_y + CORRIDOR_W - WALL_T, WALL_T, WALL_T), 730 + pos.x * 17 + pos.y * 31)
 
 		# 墙壁视觉
-		var wall_color := Color(0.35, 0.35, 0.35)
 		var has_north := _has_room_connection(pos, Vector2i(pos.x, pos.y - 1))
 		var has_west := _has_room_connection(pos, Vector2i(pos.x - 1, pos.y))
 		var gap_l: float = rx + ROOM_W / 2 - CORRIDOR_W / 2
@@ -1832,28 +1895,28 @@ func _draw() -> void:
 		var gap_b: float = ry + ROOM_H / 2 + CORRIDOR_W / 2
 		# 北墙
 		if has_north:
-			draw_rect(Rect2(rx, ry, gap_l - rx, WALL_T), wall_color)
-			draw_rect(Rect2(gap_r, ry, rx + ROOM_W - gap_r, WALL_T), wall_color)
+			_draw_wall_tiles(Rect2(rx, ry, gap_l - rx, WALL_T), 800 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(gap_r, ry, rx + ROOM_W - gap_r, WALL_T), 810 + pos.x * 17 + pos.y * 31)
 		else:
-			draw_rect(Rect2(rx, ry, ROOM_W, WALL_T), wall_color)
+			_draw_wall_tiles(Rect2(rx, ry, ROOM_W, WALL_T), 820 + pos.x * 17 + pos.y * 31)
 		# 南墙
 		if has_south:
-			draw_rect(Rect2(rx, ry + ROOM_H - WALL_T, gap_l - rx, WALL_T), wall_color)
-			draw_rect(Rect2(gap_r, ry + ROOM_H - WALL_T, rx + ROOM_W - gap_r, WALL_T), wall_color)
+			_draw_wall_tiles(Rect2(rx, ry + ROOM_H - WALL_T, gap_l - rx, WALL_T), 830 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(gap_r, ry + ROOM_H - WALL_T, rx + ROOM_W - gap_r, WALL_T), 840 + pos.x * 17 + pos.y * 31)
 		else:
-			draw_rect(Rect2(rx, ry + ROOM_H - WALL_T, ROOM_W, WALL_T), wall_color)
+			_draw_wall_tiles(Rect2(rx, ry + ROOM_H - WALL_T, ROOM_W, WALL_T), 850 + pos.x * 17 + pos.y * 31)
 		# 西墙
 		if has_west:
-			draw_rect(Rect2(rx, ry, WALL_T, gap_t - ry), wall_color)
-			draw_rect(Rect2(rx, gap_b, WALL_T, ry + ROOM_H - gap_b), wall_color)
+			_draw_wall_tiles(Rect2(rx, ry, WALL_T, gap_t - ry), 860 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(rx, gap_b, WALL_T, ry + ROOM_H - gap_b), 870 + pos.x * 17 + pos.y * 31)
 		else:
-			draw_rect(Rect2(rx, ry, WALL_T, ROOM_H), wall_color)
+			_draw_wall_tiles(Rect2(rx, ry, WALL_T, ROOM_H), 880 + pos.x * 17 + pos.y * 31)
 		# 东墙
 		if has_east:
-			draw_rect(Rect2(rx + ROOM_W - WALL_T, ry, WALL_T, gap_t - ry), wall_color)
-			draw_rect(Rect2(rx + ROOM_W - WALL_T, gap_b, WALL_T, ry + ROOM_H - gap_b), wall_color)
+			_draw_wall_tiles(Rect2(rx + ROOM_W - WALL_T, ry, WALL_T, gap_t - ry), 890 + pos.x * 17 + pos.y * 31)
+			_draw_wall_tiles(Rect2(rx + ROOM_W - WALL_T, gap_b, WALL_T, ry + ROOM_H - gap_b), 900 + pos.x * 17 + pos.y * 31)
 		else:
-			draw_rect(Rect2(rx + ROOM_W - WALL_T, ry, WALL_T, ROOM_H), wall_color)
+			_draw_wall_tiles(Rect2(rx + ROOM_W - WALL_T, ry, WALL_T, ROOM_H), 910 + pos.x * 17 + pos.y * 31)
 
 		# Boss 标记
 		if room.is_boss and room.state != RoomState.CLEARED:
