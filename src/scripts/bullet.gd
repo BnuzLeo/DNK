@@ -1,6 +1,7 @@
 extends Area2D
 
 const VS := preload("res://scripts/visual_spec.gd")
+const SNOWBALL_TEXTURE := preload("res://assets/export/projectiles/snowball.png")
 
 func _draw() -> void:
 	if not visible:
@@ -24,6 +25,9 @@ func _draw() -> void:
 		draw_colored_polygon(PackedVector2Array([Vector2(16.0, 0.0), Vector2(8.0, -4.0), Vector2(8.0, 4.0)]), tip)
 		draw_line(Vector2(-14.0, 0.0), Vector2(-19.0, -4.0), Color(0.85, 0.85, 0.85), 1.2)
 		draw_line(Vector2(-14.0, 0.0), Vector2(-19.0, 4.0), Color(0.85, 0.85, 0.85), 1.2)
+	elif projectile_type == "snowball":
+		var snowball_size := Vector2(18.0, 18.0)
+		draw_texture_rect(SNOWBALL_TEXTURE, Rect2(-snowball_size * 0.5, snowball_size), false)
 	elif is_dart:
 		# 飞镖：菱形，Neon Orange
 		var color := Color(1.0, 0.53, 0.0)

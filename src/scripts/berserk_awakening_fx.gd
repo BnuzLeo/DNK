@@ -13,7 +13,7 @@ const FRAME_PATHS := [
 	"res://assets/export/characters/KUN/觉醒/觉醒_006.png",
 	"res://assets/export/characters/KUN/觉醒/觉醒_007.png",
 ]
-const AWAKENING_MUSIC_PATH := "res://assets/music/觉醒music.wav"
+const AWAKENING_MUSIC_PATH := "res://assets/music/dialogue/觉醒music.wav"
 
 const ANIMATION_NAME := "awakening"
 const DISPLAY_SIZE := Vector2(426.0, 240.0)

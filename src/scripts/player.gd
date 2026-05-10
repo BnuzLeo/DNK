@@ -6,7 +6,7 @@ extends CharacterBody2D
 const VS := preload("res://scripts/visual_spec.gd")
 const ROOSTER_PROJECTILE := preload("res://scripts/rooster_projectile.gd")
 const BERSERK_AWAKENING_FX := preload("res://scripts/berserk_awakening_fx.gd")
-const PLAYER_SPRITE_PATH := "res://assets/export/characters/sprite.webp"
+const PLAYER_SPRITE_PATH := "res://assets/export/effects/sprite.webp"
 const PLAYER_SPRITE_FRAME_SIZE := Vector2i(192, 208)
 const PLAYER_SPRITE_FRAME_COUNTS := [6, 8, 8, 4, 5, 8, 6, 6, 6]
 const PLAYER_SPRITE_DISPLAY_HEIGHT := 88.0

@@ -5,8 +5,8 @@ extends Node2D
 const VS := preload("res://scripts/visual_spec.gd")
 const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
 
-const LOBBY_MUSIC_PATH := "res://assets/music/鸡你太美.wav"
-const BLUE_SHOCKWAVE_SHEET := "res://assets/export/characters/shockwave_blue_sheet.png"
+const LOBBY_MUSIC_PATH := "res://assets/music/dialogue/鸡你太美.wav"
+const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
 const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
 const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")

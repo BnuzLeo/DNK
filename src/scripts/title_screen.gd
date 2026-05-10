@@ -2,7 +2,7 @@ extends Node2D
 
 const VS := preload("res://scripts/visual_spec.gd")
 
-const TITLE_STINGER_PATH := "res://assets/music/真的是你啊.MP3"
+const TITLE_STINGER_PATH := "res://assets/music/dialogue/真的是你啊.MP3"
 const VIDEO_PATH := "res://assets/export/start/开场视频.ogv"
 const KUN_PARALLAX_RANGE := Vector2(36.0, 24.0)
 const SKIP_HOLD_TIME := 1.0

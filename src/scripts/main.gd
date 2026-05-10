@@ -20,8 +20,8 @@ const ACTION_K_X := 786.0
 const ACTION_L_X := 856.0
 const ACTION_KEY_Y := 55.0
 const ACTION_KEY_COLOR := Color(0.78, 0.88, 0.94)
-const BLUE_SHOCKWAVE_SHEET := "res://assets/export/characters/shockwave_blue_sheet.png"
-const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/characters/shockwave_yellow_sheet.png"
+const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
+const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_yellow_sheet.png"
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 

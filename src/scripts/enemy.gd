@@ -247,7 +247,7 @@ func _fire_at_player() -> void:
 		false,
 		false,
 		0.0,
-		"arrow"
+		"snowball"
 	)
 
 
