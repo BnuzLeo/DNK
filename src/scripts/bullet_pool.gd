@@ -111,7 +111,7 @@ func _recycle_bullet(bullet: Area2D, is_player: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if GameManager.state != GameManager.GameState.PLAYING:
+	if GameManager.state != GameManager.GameState.PLAYING and GameManager.state != GameManager.GameState.LOBBY:
 		return
 
 	for bullet in _player_bullets:

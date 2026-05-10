@@ -64,6 +64,8 @@ const TYPE_ANIMATIONS := {
 var enemy_type: int = EnemyType.CHASER
 var max_hp := 20
 var hp := 20
+var max_armor := 0
+var armor := 0
 var room_bounds := Rect2()
 var bullet_pool: Node2D  # 由 main.gd 传入
 
@@ -109,6 +111,8 @@ func setup(player: CharacterBody2D, type: int = EnemyType.CHASER, pool: Node2D =
 	var stats: Dictionary = TYPE_STATS[type]
 	max_hp = stats.hp
 	hp = stats.hp
+	max_armor = int(stats.get("armor", 0))
+	armor = max_armor
 	if is_inside_tree():
 		_setup_sprite()
 
@@ -363,11 +367,17 @@ func _get_animation_duration(animation_name: String) -> float:
 
 
 func take_damage(amount: int) -> void:
-	if _dying or _spawn_invuln_timer > 0.0:
+	if _dying or _spawn_invuln_timer > 0.0 or amount <= 0:
 		return
 	if _frozen:
 		amount = int(amount * 1.5)
-	hp -= amount
+	var remaining := amount
+	if armor > 0:
+		var absorbed := mini(armor, remaining)
+		armor -= absorbed
+		remaining -= absorbed
+	if remaining > 0:
+		hp -= remaining
 	_flash_timer = 0.1
 	_hit_timer = 0.16
 	modulate = Color.WHITE * 3.0

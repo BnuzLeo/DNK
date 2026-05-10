@@ -44,6 +44,8 @@ const PHASE_CONFIGS := {
 
 var max_hp := 500
 var hp := 500
+var max_armor := 0
+var armor := 0
 var room_bounds := Rect2()
 var bullet_pool: Node2D
 
@@ -236,9 +238,15 @@ func _clamp_bounds() -> void:
 
 
 func take_damage(amount: int) -> void:
-	if _dying:
+	if _dying or amount <= 0:
 		return
-	hp -= amount
+	var remaining := amount
+	if armor > 0:
+		var absorbed := mini(armor, remaining)
+		armor -= absorbed
+		remaining -= absorbed
+	if remaining > 0:
+		hp -= remaining
 	_flash_timer = 0.1
 	modulate = Color.WHITE * 3.0
 	if hp <= 0:

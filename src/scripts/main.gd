@@ -93,6 +93,8 @@ var _coin_label: Label
 var _hud_frame: Control
 var _coin_panel: Control
 var _pause_button: Control
+var _bag_button: Control
+var _equipment_panel: Node = null
 
 # 提示消息系统
 var _active_hints: Array[CanvasLayer] = []
@@ -921,6 +923,14 @@ func _create_hud() -> void:
 	_pause_button.gui_input.connect(_on_pause_button_input)
 	canvas.add_child(_pause_button)
 
+	_bag_button = Control.new()
+	_bag_button.position = Vector2(622, 14)
+	_bag_button.size = Vector2(28, 36)
+	_bag_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_bag_button.draw.connect(_draw_bag_button)
+	_bag_button.gui_input.connect(_on_bag_button_input)
+	canvas.add_child(_bag_button)
+
 	_attack_icon = Control.new()
 	_attack_icon.position = Vector2(796, 504)
 	_attack_icon.size = Vector2(112, 112)
@@ -1022,6 +1032,16 @@ func _draw_pause_button() -> void:
 	_pause_button.draw_rect(r.grow(-8), Color(0.73, 0.58, 0.36))
 	_pause_button.draw_rect(Rect2(7, 8, 5, 20), Color(0.38, 0.28, 0.16))
 	_pause_button.draw_rect(Rect2(16, 8, 5, 20), Color(0.38, 0.28, 0.16))
+
+
+func _draw_bag_button() -> void:
+	var r := Rect2(Vector2.ZERO, _bag_button.size)
+	_bag_button.draw_rect(r, Color(0.30, 0.24, 0.16))
+	_bag_button.draw_rect(r.grow(-3), Color(0.59, 0.46, 0.28))
+	_bag_button.draw_rect(Rect2(7, 10, 14, 14), Color(0.79, 0.66, 0.42))
+	_bag_button.draw_rect(Rect2(9, 7, 10, 5), Color(0.79, 0.66, 0.42))
+	_bag_button.draw_arc(Vector2(14, 11), 4.0, PI, TAU, 10, Color(0.35, 0.22, 0.10), 1.5)
+	_draw_button_key(_bag_button, "B", Color(0.98, 0.90, 0.62))
 
 
 func _draw_button_key(ctrl: Control, key: String, color: Color = Color.WHITE) -> void:
@@ -1138,6 +1158,13 @@ func _on_pause_button_input(event: InputEvent) -> void:
 		_toggle_pause_from_hud()
 
 
+func _on_bag_button_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_open_equipment_panel()
+	elif event is InputEventScreenTouch and event.pressed:
+		_open_equipment_panel()
+
+
 func _toggle_pause_from_hud() -> void:
 	if GameManager.state == GameManager.GameState.PLAYING:
 		GameManager.change_state(GameManager.GameState.PAUSED)
@@ -1180,8 +1207,7 @@ func _process(delta: float) -> void:
 	_coin_label.text = str(GameManager.kun_coins)
 
 	_hp_text.text = "%d/%d" % [$Player.hp, $Player.MAX_HP]
-	var shield_display: int = maxi($Player.shield, 5)
-	_shield_text.text = "%d/%d" % [shield_display, shield_display]
+	_shield_text.text = "%d/%d" % [$Player.armor, $Player.max_armor]
 	_mana_text.text = "%d/%d" % [int($Player.mana), int($Player.MAX_MANA)]
 
 	var mana_ratio: float = $Player.mana / $Player.MAX_MANA
@@ -1189,7 +1215,11 @@ func _process(delta: float) -> void:
 	var hp_ratio: float = float($Player.hp) / float($Player.MAX_HP)
 	_hp_bar.size.x = 136.0 * clampf(hp_ratio, 0.0, 1.0)
 	_hp_bar.color = Color(0.88, 0.07, 0.15)
-	_shield_bar.size.x = 136.0
+	var armor_ratio := 0.0 if $Player.max_armor <= 0 else float($Player.armor) / float($Player.max_armor)
+	_shield_bar.size.x = 136.0 * clampf(armor_ratio, 0.0, 1.0)
+	_shield_bar.visible = $Player.max_armor > 0
+	_shield_bar_bg.visible = $Player.max_armor > 0
+	_shield_text.visible = $Player.max_armor > 0
 
 	# 技能图标刷新
 	if _attack_icon:
@@ -1380,6 +1410,7 @@ func _do_revive() -> void:
 	$BulletPool.clear_all()
 	# 恢复玩家
 	$Player.hp = int($Player.MAX_HP * 0.5)
+	$Player.armor = $Player.max_armor
 	$Player.hp_changed.emit($Player.hp, $Player.MAX_HP)
 	$Player._invuln_timer = 1.5
 	# 重新生成当前房间的敌人
@@ -1421,6 +1452,11 @@ func _input(event: InputEvent) -> void:
 			_hide_pause_menu()
 			GameManager.change_state(GameManager.GameState.PLAYING)
 			return
+
+	if GameManager.state == GameManager.GameState.PLAYING and event is InputEventKey and event.pressed and event.keycode == KEY_B:
+		get_viewport().set_input_as_handled()
+		_open_equipment_panel()
+		return
 
 	if _game_over and event is InputEventKey and event.pressed and event.keycode == KEY_R:
 		GameManager.restore_lobby_weapons()
@@ -1488,6 +1524,21 @@ func _hide_pause_menu() -> void:
 	if _pause_canvas != null:
 		_pause_canvas.queue_free()
 		_pause_canvas = null
+
+
+func _open_equipment_panel() -> void:
+	if _equipment_panel != null or GameManager.state != GameManager.GameState.PLAYING:
+		return
+	GameManager.change_state(GameManager.GameState.PAUSED)
+	_equipment_panel = load("res://scripts/equipment_panel.gd").new()
+	_equipment_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	_equipment_panel.tree_exiting.connect(func():
+		_equipment_panel = null
+		if GameManager.state == GameManager.GameState.PAUSED and _pause_canvas == null:
+			GameManager.change_state(GameManager.GameState.PLAYING)
+	)
+	add_child(_equipment_panel)
+	_equipment_panel.show_panel($Player)
 
 
 func _on_pause_continue_input(event: InputEvent) -> void:

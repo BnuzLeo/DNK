@@ -22,6 +22,7 @@ const BASE_SPEED := 180.0
 const BASE_MAX_HP := 10
 const BASE_MAX_MANA := 50.0
 const BASE_MANA_REGEN := 3.0
+const BASE_ARMOR := 5
 const HP_PER_LEVEL := 2
 const SPEED_PER_LEVEL := 10.0
 const MANA_PER_LEVEL := 10.0
@@ -32,6 +33,7 @@ const DASH_SPEED := 500.0
 const DASH_DURATION := 0.25
 const DASH_COOLDOWN := 5.0
 const DASH_INVULN := 0.5
+const BERSERK_DURATION := 5.0
 const BERSERK_COLOR := Color(1.0, 0.25, 0.08)
 
 const WEAPONS := {
@@ -62,6 +64,7 @@ var _weapon_index := 0
 var _weapon_keys := ["basketball"]
 var _invuln_timer := 0.0
 var _berserk_active := false
+var _berserk_timer := 0.0
 var _berserk_flash_timer := 0.0
 var _room_blast_pending := 0
 var _room_blast_timer := 0.0
@@ -98,10 +101,12 @@ signal player_hit
 var bullet_pool: Node2D
 
 
-var shield := 0
+var max_armor := 0
+var armor := 0
 var hp_regen_rate := 0.0
 var damage_bonus := 0
 var _talent_dash_cd_reduction := 0.0
+var _pending_weapon_switch := false
 
 
 func _load_from_game_manager() -> void:
@@ -137,7 +142,8 @@ func _load_from_game_manager() -> void:
 
 	# 天赋：护盾
 	var shield_vals := [0, 2, 5, 10]
-	shield = shield_vals[t_shield] if t_shield < shield_vals.size() else 0
+	max_armor = BASE_ARMOR + (shield_vals[t_shield] if t_shield < shield_vals.size() else 0)
+	armor = max_armor
 
 	# 天赋：闪避冷却
 	_talent_dash_cd_reduction = t_dash_cd * 0.5
@@ -183,8 +189,17 @@ func _physics_process(delta: float) -> void:
 		_invuln_timer -= delta
 
 	# 闪避冷却
-	if _dash_cooldown > 0.0:
+	if s != GameManager.GameState.LOBBY and _dash_cooldown > 0.0:
 		_dash_cooldown -= delta
+	elif s == GameManager.GameState.LOBBY:
+		_dash_cooldown = 0.0
+
+	# 副本内狂暴持续时间
+	if s == GameManager.GameState.PLAYING and _berserk_active and _berserk_timer > 0.0:
+		_berserk_timer -= delta
+		if _berserk_timer <= 0.0:
+			_berserk_active = false
+			_berserk_timer = 0.0
 
 	# 闪避中 —— 高速移动 + 无敌，不接受其他输入
 	if _dash_timer > 0.0:
@@ -211,14 +226,10 @@ func _physics_process(delta: float) -> void:
 	_update_buffs(delta)
 	_update_room_blast_combo(delta)
 
-	if s == GameManager.GameState.PLAYING and Input.is_action_just_pressed("berserk"):
-		_berserk_active = not _berserk_active
-		_berserk_flash_timer = 0.25
-
 	# 闪避输入（Shift）
 	if Input.is_action_just_pressed("dash") and _dash_cooldown <= 0.0:
 		_dash_timer = DASH_DURATION
-		_dash_cooldown = DASH_COOLDOWN - _talent_dash_cd_reduction
+		_dash_cooldown = 0.0 if s == GameManager.GameState.LOBBY else DASH_COOLDOWN - _talent_dash_cd_reduction
 		# 有移动输入就用移动方向，否则用朝向
 		var dash_input := Vector2(
 			Input.get_axis("move_left", "move_right"),
@@ -246,9 +257,9 @@ func _physics_process(delta: float) -> void:
 		_facing = input.normalized()
 
 	# 武器切换
-	if Input.is_action_just_pressed("switch_weapon"):
-		_weapon_index = (_weapon_index + 1) % _weapon_keys.size()
-		GameManager.player_data.weapon_index = _weapon_index
+	if _pending_weapon_switch:
+		_pending_weapon_switch = false
+		_cycle_weapon()
 
 	# 蓝量恢复
 	var regen: float = MANA_REGEN * (1.0 + get_buff_stacks(BuffType.MANA_REGEN) * 0.5)
@@ -274,6 +285,34 @@ func _physics_process(delta: float) -> void:
 		_berserk_flash_timer -= delta
 	_update_sprite_animation(delta)
 	queue_redraw()
+
+
+func _input(event: InputEvent) -> void:
+	if GameManager.state != GameManager.GameState.PLAYING and GameManager.state != GameManager.GameState.LOBBY:
+		return
+	if event is InputEventKey and event.echo:
+		return
+	if event.is_action_pressed("switch_weapon") or (event is InputEventKey and event.pressed and event.keycode == KEY_Q):
+		_pending_weapon_switch = true
+	elif event.is_action_pressed("berserk"):
+		_trigger_berserk()
+
+
+func _cycle_weapon() -> void:
+	if _weapon_keys.size() <= 1:
+		return
+	_weapon_index = (_weapon_index + 1) % _weapon_keys.size()
+	GameManager.player_data.weapon_index = _weapon_index
+
+
+func _trigger_berserk() -> void:
+	if GameManager.state == GameManager.GameState.LOBBY:
+		_berserk_active = not _berserk_active
+		_berserk_timer = 0.0
+	else:
+		_berserk_active = true
+		_berserk_timer = BERSERK_DURATION
+	_berserk_flash_timer = 0.25
 
 
 func _get_weapon_cooldown(weapon: Dictionary) -> float:
@@ -332,7 +371,7 @@ func _start_room_blast(weapon: Dictionary) -> void:
 func _update_room_blast_combo(delta: float) -> void:
 	if _room_blast_pending <= 0:
 		return
-	if GameManager.state != GameManager.GameState.PLAYING:
+	if GameManager.state != GameManager.GameState.PLAYING and GameManager.state != GameManager.GameState.LOBBY:
 		return
 	_room_blast_timer -= delta
 	if _room_blast_timer > 0.0:
@@ -436,10 +475,16 @@ func _spawn_roosters(weapon: Dictionary) -> void:
 
 
 func take_damage(amount: int) -> void:
-	if _invuln_timer > 0.0:
+	if _invuln_timer > 0.0 or amount <= 0:
 		return
-	hp -= amount
-	hp_changed.emit(hp, MAX_HP)
+	var remaining := amount
+	if armor > 0:
+		var absorbed := mini(armor, remaining)
+		armor -= absorbed
+		remaining -= absorbed
+	if remaining > 0:
+		hp -= remaining
+		hp_changed.emit(hp, MAX_HP)
 	player_hit.emit()
 	_invuln_timer = 0.5
 	if hp <= 0:

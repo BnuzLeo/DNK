@@ -49,7 +49,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if GameManager.state != GameManager.GameState.PLAYING:
+	if GameManager.state != GameManager.GameState.PLAYING and GameManager.state != GameManager.GameState.LOBBY:
 		return
 
 	_age += delta
