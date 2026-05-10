@@ -64,7 +64,7 @@ var _bag_button: Control
 var _map_select_open := false
 var _map_select_canvas: CanvasLayer
 var _current_map_index := 0
-var _map_names := ["废弃矿洞", "敬请期待", "敬请期待"]
+var _map_names := ["冰封篮球场", "练习生雨林", "流量和爆炸"]
 var _map_cards: Array[Control] = []
 
 
@@ -560,20 +560,8 @@ func _input(event: InputEvent) -> void:
 	if _map_select_open:
 		if event is InputEventKey and event.pressed:
 			get_viewport().set_input_as_handled()
-			match event.keycode:
-				KEY_A, KEY_LEFT:
-					_current_map_index = (_current_map_index - 1 + _map_names.size()) % _map_names.size()
-					_refresh_map_cards()
-				KEY_D, KEY_RIGHT:
-					_current_map_index = (_current_map_index + 1) % _map_names.size()
-					_refresh_map_cards()
-				KEY_E:
-					if _current_map_index == 0:
-						_enter_dungeon()
-					else:
-						pass  # 敬请期待
-				KEY_ESCAPE:
-					_close_map_select()
+			if event.keycode == KEY_ESCAPE:
+				_close_map_select()
 		return
 
 	if GameManager.state != GameManager.GameState.LOBBY:
@@ -595,70 +583,100 @@ func _input(event: InputEvent) -> void:
 
 func _open_map_select() -> void:
 	_map_select_open = true
+	_current_map_index = 0
 	GameManager.change_state(GameManager.GameState.PAUSED)
 	_map_select_canvas = CanvasLayer.new()
 	_map_select_canvas.layer = 29
 	_map_select_canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_map_select_canvas)
 
-	# 半透明遮罩
 	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.65)
+	bg.color = Color(0, 0, 0, 0)
 	bg.size = VS.VIEWPORT_SIZE
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	_map_select_canvas.add_child(bg)
 
-	# 标题
+	var window_size := VS.VIEWPORT_SIZE * 0.70
+	var window_pos := (VS.VIEWPORT_SIZE - window_size) * 0.5
+	var window := Control.new()
+	window.position = window_pos
+	window.size = window_size
+	window.clip_contents = true
+	window.mouse_filter = Control.MOUSE_FILTER_STOP
+	window.draw.connect(_draw_map_select_backdrop.bind(window))
+	_map_select_canvas.add_child(window)
+
 	var title := Label.new()
-	title.text = "选择副本"
-	title.position = Vector2(410, 50)
-	title.add_theme_font_size_override("font_size", 24)
-	title.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
-	_map_select_canvas.add_child(title)
+	title.text = "关卡模式"
+	title.position = Vector2((window_size.x - 180.0) * 0.5, 14)
+	title.size = Vector2(180, 42)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_color_override("font_color", Color.WHITE)
+	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+	title.add_theme_constant_override("shadow_offset_x", 2)
+	title.add_theme_constant_override("shadow_offset_y", 2)
+	window.add_child(title)
 
-	# 三张地图卡片
+	var close_button := Button.new()
+	close_button.text = "X"
+	close_button.position = Vector2(window_size.x - 48, 14)
+	close_button.size = Vector2(34, 34)
+	close_button.focus_mode = Control.FOCUS_NONE
+	close_button.add_theme_font_size_override("font_size", 22)
+	close_button.add_theme_color_override("font_color", Color.WHITE)
+	close_button.add_theme_stylebox_override("normal", _make_flat_style(Color(0.72, 0.04, 0.12), Color(0.18, 0.0, 0.02), 0, 3))
+	close_button.add_theme_stylebox_override("hover", _make_flat_style(Color(0.95, 0.08, 0.16), Color(0.22, 0.0, 0.02), 0, 3))
+	close_button.add_theme_stylebox_override("pressed", _make_flat_style(Color(0.48, 0.02, 0.08), Color(0.10, 0.0, 0.02), 0, 3))
+	close_button.pressed.connect(_close_map_select)
+	window.add_child(close_button)
+
+	var tab_size := Vector2(96, 58)
+	var card_size := Vector2(156, 216)
+	var card_gap := 14.0
+	var group_gap := 18.0
+	var card_y := 82.0
+	var content_w := tab_size.x + group_gap + card_size.x * 3.0 + card_gap * 2.0
+	var content_x := (window_size.x - content_w) * 0.5
+	var card_start_x := content_x + tab_size.x + group_gap
+	var tabs_h := tab_size.y * 3.0 + 10.0 * 2.0
+	var tab_start_y := card_y + (card_size.y - tabs_h) * 0.5
+
+	var modes := [
+		{"name": "关卡模式", "selected": true, "locked": false},
+		{"name": "赛季模式", "selected": false, "locked": true},
+		{"name": "古迹战场", "selected": false, "locked": true},
+	]
+	for i in modes.size():
+		var tab := Control.new()
+		tab.position = Vector2(content_x, tab_start_y + i * (tab_size.y + 10.0))
+		tab.size = tab_size
+		tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tab.draw.connect(_draw_mode_tab.bind(tab, String(modes[i].name), bool(modes[i].selected), bool(modes[i].locked), i))
+		window.add_child(tab)
+
 	_map_cards.clear()
-	var card_w := VS.MAP_CARD_SIZE.x
-	var card_h := VS.MAP_CARD_SIZE.y
-	var card_gap := 30.0
-	var total_w := card_w * 3 + card_gap * 2
-	var start_x := (VS.VIEWPORT_SIZE.x - total_w) / 2.0
-	var card_y := 110.0
-
 	for i in _map_names.size():
 		var card := Control.new()
-		card.position = Vector2(start_x + i * (card_w + card_gap), card_y)
-		card.size = Vector2(card_w, card_h)
+		card.position = Vector2(card_start_x + i * (card_size.x + card_gap), card_y)
+		card.size = card_size
 		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.draw.connect(_draw_map_card.bind(card, i))
-		_map_select_canvas.add_child(card)
+		window.add_child(card)
 		_map_cards.append(card)
 
-	# AD 切换提示
-	var switch_hint := Label.new()
-	switch_hint.text = "< A          D >"
-	switch_hint.position = Vector2(380, 380)
-	switch_hint.add_theme_font_size_override("font_size", 18)
-	switch_hint.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))
-	switch_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	switch_hint.size = Vector2(200, 30)
-	_map_select_canvas.add_child(switch_hint)
-
-	# 进入按钮
-	var enter_btn := Label.new()
-	enter_btn.text = "[ 按 E 进入 ]"
-	enter_btn.position = Vector2(400, 420)
-	enter_btn.add_theme_font_size_override("font_size", 20)
-	enter_btn.add_theme_color_override("font_color", Color(0.0, 0.9, 0.4))
-	_map_select_canvas.add_child(enter_btn)
-
-	# 关闭提示
-	var close_hint := Label.new()
-	close_hint.text = "ESC 返回"
-	close_hint.position = Vector2(430, 460)
-	close_hint.add_theme_font_size_override("font_size", 14)
-	close_hint.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
-	_map_select_canvas.add_child(close_hint)
+	var start_button := Button.new()
+	start_button.text = "开始游玩"
+	start_button.position = Vector2((window_size.x - 180.0) * 0.5, 318)
+	start_button.size = Vector2(180, 38)
+	start_button.focus_mode = Control.FOCUS_NONE
+	start_button.add_theme_font_size_override("font_size", 22)
+	start_button.add_theme_color_override("font_color", Color.WHITE)
+	start_button.add_theme_stylebox_override("normal", _make_flat_style(Color(0.16, 0.78, 0.02), Color(0.02, 0.18, 0.0), 0, 3))
+	start_button.add_theme_stylebox_override("hover", _make_flat_style(Color(0.22, 0.94, 0.04), Color(0.02, 0.20, 0.0), 0, 3))
+	start_button.add_theme_stylebox_override("pressed", _make_flat_style(Color(0.10, 0.52, 0.02), Color(0.0, 0.12, 0.0), 0, 3))
+	start_button.pressed.connect(_enter_dungeon)
+	window.add_child(start_button)
 
 	_refresh_map_cards()
 
@@ -666,101 +684,167 @@ func _open_map_select() -> void:
 func _draw_map_card(card: Control, index: int) -> void:
 	var w := card.size.x
 	var h := card.size.y
-	var is_selected := index == _current_map_index
 	var available := index == 0
 
-	# 卡片背景
-	var bg_color := Color(0.12, 0.13, 0.18) if is_selected else Color(0.08, 0.08, 0.10)
+	var bg_color := Color(0.08, 0.095, 0.13, 0.97) if available else Color(0.01, 0.012, 0.018, 0.91)
 	card.draw_rect(Rect2(Vector2.ZERO, card.size), bg_color)
+	card.draw_rect(Rect2(Vector2(4, 4), card.size - Vector2(8, 8)), Color(0.11, 0.125, 0.16, 0.55) if available else Color(0, 0, 0, 0.45), false, 2.0)
+	_draw_corner_caps(card, Rect2(Vector2.ZERO, card.size), available)
 
-	# 缩略图区域
-	var thumb_rect := Rect2(8, 8, w - 16, h - 80)
-	if available:
-		_draw_mine_thumbnail(card, thumb_rect)
-	else:
-		# 未开放 — 暗色 + 锁
-		card.draw_rect(thumb_rect, Color(0.06, 0.06, 0.08))
-		var lock_text := "?"
-		var lock_size := ThemeDB.fallback_font.get_string_size(lock_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 32)
-		card.draw_string(ThemeDB.fallback_font, thumb_rect.position + Vector2((thumb_rect.size.x - lock_size.x) / 2, thumb_rect.size.y / 2 + 10), lock_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 32, Color(0.3, 0.3, 0.3))
+	var star_col := Color(0.92, 0.93, 0.94) if available else Color(0.18, 0.18, 0.20)
+	if index == 2:
+		star_col = Color(0.78, 0.58, 0.12)
+	_draw_star(card, Vector2(22, 25), 11.0, star_col)
 
-	# 地图名
-	var name_color := Color(1.0, 1.0, 1.0) if available else Color(0.4, 0.4, 0.4)
 	var map_name: String = _map_names[index]
-	var name_size := ThemeDB.fallback_font.get_string_size(map_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 18)
-	card.draw_string(ThemeDB.fallback_font, Vector2((w - name_size.x) / 2, h - 42), map_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, name_color)
+	var title_color := Color.WHITE if available else Color(0.28, 0.28, 0.30)
+	card.draw_string(ThemeDB.fallback_font, Vector2(42, 32), map_name, HORIZONTAL_ALIGNMENT_LEFT, w - 50, 18, title_color)
 
-	# 状态标签
+	var divider_y := 48.0
+	card.draw_line(Vector2(14, divider_y), Vector2(w - 14, divider_y), Color(0.15, 0.17, 0.22, 0.8), 2.0)
+
+	var thumb_rect := Rect2(18, 70, w - 36, 92)
 	if available:
-		var status_text := "可进入"
-		var st_size := ThemeDB.fallback_font.get_string_size(status_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
-		card.draw_string(ThemeDB.fallback_font, Vector2((w - st_size.x) / 2, h - 20), status_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.0, 0.9, 0.4))
+		card.draw_string(ThemeDB.fallback_font, Vector2(24, 65), "已有记录: I-I", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.86, 0.88, 0.90))
+		_draw_frozen_court_thumbnail(card, thumb_rect)
 	else:
-		var status_text := "敬请期待"
-		var st_size := ThemeDB.fallback_font.get_string_size(status_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
-		card.draw_string(ThemeDB.fallback_font, Vector2((w - st_size.x) / 2, h - 20), status_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.5, 0.3, 0.3))
+		card.draw_rect(thumb_rect, Color(0.02, 0.025, 0.035, 0.95))
+		_draw_frozen_court_thumbnail(card, thumb_rect)
+		card.draw_rect(Rect2(Vector2.ZERO, card.size), Color(0, 0, 0, 0.62))
+		_draw_lock(card, Vector2(w * 0.5, h * 0.48), 36.0)
+		var req := "敬请期待"
+		var req_size := ThemeDB.fallback_font.get_string_size(req, HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
+		card.draw_string(ThemeDB.fallback_font, Vector2((w - req_size.x) * 0.5, h - 42), req, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.74, 0.74, 0.74))
+		var desc := "敬请期待"
+		card.draw_string(ThemeDB.fallback_font, Vector2(18, h - 18), desc, HORIZONTAL_ALIGNMENT_LEFT, w - 36, 11, Color(0.30, 0.30, 0.34))
 
-	# 选中边框
-	if is_selected:
-		var border_color := Color(0.3, 0.7, 1.0) if available else Color(0.4, 0.4, 0.5)
-		card.draw_rect(Rect2(Vector2.ZERO, card.size), border_color, false, 2.5)
+
+func _draw_map_select_backdrop(ctrl: Control) -> void:
+	var size := ctrl.size
+	ctrl.draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.06, 0.075, 1.0))
+	var stripe_h := size.y / 12.0
+	for i in range(12):
+		var t := float(i) / 11.0
+		var col := Color(0.05 + t * 0.04, 0.12 + t * 0.12, 0.16 + t * 0.16, 0.24)
+		ctrl.draw_rect(Rect2(0, i * stripe_h, size.x, stripe_h), col)
+	ctrl.draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.18))
+	ctrl.draw_rect(Rect2(Vector2.ZERO, size), Color(0.74, 0.84, 0.90, 0.95), false, 2.0)
 
 
-func _draw_mine_thumbnail(card: Control, rect: Rect2) -> void:
-	# 废弃矿洞缩略图：深色洞穴 + 矿石
-	card.draw_rect(rect, Color(0.08, 0.07, 0.06))
+func _draw_mode_tab(ctrl: Control, label: String, selected: bool, locked: bool, index: int) -> void:
+	var rect := Rect2(Vector2.ZERO, ctrl.size)
+	var base := Color(0.04, 0.18, 0.18, 0.96) if selected else Color(0.03, 0.14 + 0.03 * index, 0.19 + 0.02 * index, 0.92)
+	if locked:
+		base = Color(0.025, 0.03, 0.04, 0.94)
+	ctrl.draw_rect(rect, base)
+	ctrl.draw_rect(rect, Color(0.94, 0.73, 0.18) if selected else Color(0.02, 0.03, 0.04), false, 2.0)
+	ctrl.draw_rect(Rect2(4, 4, rect.size.x - 8, rect.size.y - 8), Color(0.06, 0.34, 0.30, 0.55) if selected else Color(0.06, 0.20, 0.28, 0.50))
+	if locked:
+		ctrl.draw_rect(Rect2(4, 4, rect.size.x - 8, rect.size.y - 8), Color(0, 0, 0, 0.34))
+	var court := Rect2(10, 8, rect.size.x - 20, 28)
+	ctrl.draw_rect(court, Color(0.08, 0.45, 0.35) if selected else Color(0.05, 0.28, 0.34))
+	ctrl.draw_line(court.position + Vector2(court.size.x * 0.5, 0), court.position + Vector2(court.size.x * 0.5, court.size.y), Color(0.6, 0.95, 0.85, 0.45), 1.0)
+	if locked:
+		_draw_lock(ctrl, court.get_center(), 14.0)
+	elif index == 1:
+		_draw_small_demon(ctrl, court.get_center() + Vector2(-10, 0))
+		ctrl.draw_circle(court.get_center() + Vector2(16, -2), 8, Color(0.2, 0.9, 1.0, 0.7))
+	else:
+		_draw_chibi_player(ctrl, court.get_center() + Vector2(-8, 4))
+		_draw_basketball(ctrl, court.get_center() + Vector2(18, 3), 5.0)
+	if locked:
+		var coming_size := ThemeDB.fallback_font.get_string_size("敬请期待", HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
+		ctrl.draw_string(ThemeDB.fallback_font, Vector2((rect.size.x - coming_size.x) * 0.5, rect.size.y - 19), "敬请期待", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.72, 0.72, 0.76))
+	var text_size := ThemeDB.fallback_font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
+	var text_color := Color.WHITE if not locked else Color(0.66, 0.66, 0.70)
+	ctrl.draw_string(ThemeDB.fallback_font, Vector2((rect.size.x - text_size.x) * 0.5, rect.size.y - 4), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, text_color)
 
-	# 洞穴顶部轮廓
-	var ceiling := PackedVector2Array()
-	ceiling.append(Vector2(rect.position.x, rect.position.y))
-	var segments := 12
-	for i in segments + 1:
-		var t := float(i) / float(segments)
-		var x := rect.position.x + t * rect.size.x
-		var y := rect.position.y + 15.0 + sin(t * 4.0 + 1.2) * 12.0 + sin(t * 7.0) * 6.0
-		ceiling.append(Vector2(x, y))
-	ceiling.append(Vector2(rect.position.x + rect.size.x, rect.position.y))
-	card.draw_colored_polygon(ceiling, Color(0.15, 0.12, 0.10))
 
-	# 地面
-	var ground_y := rect.position.y + rect.size.y - 20.0
-	card.draw_rect(Rect2(rect.position.x, ground_y, rect.size.x, 20.0), Color(0.12, 0.10, 0.08))
+func _draw_frozen_court_thumbnail(card: Control, rect: Rect2) -> void:
+	card.draw_rect(rect, Color(0.04, 0.15, 0.18))
+	card.draw_rect(rect.grow(-6), Color(0.06, 0.38, 0.34))
+	card.draw_line(Vector2(rect.position.x + rect.size.x * 0.5, rect.position.y + 8), Vector2(rect.position.x + rect.size.x * 0.5, rect.end.y - 8), Color(0.5, 0.9, 0.95, 0.65), 2.0)
+	card.draw_arc(rect.get_center(), 22, -PI * 0.5, PI * 0.5, 20, Color(0.65, 0.95, 1.0, 0.5), 2.0)
+	card.draw_arc(rect.get_center(), 22, PI * 0.5, PI * 1.5, 20, Color(0.65, 0.95, 1.0, 0.5), 2.0)
+	for i in range(5):
+		var x := rect.position.x + 12 + i * ((rect.size.x - 24.0) / 4.0)
+		card.draw_line(Vector2(x, rect.position.y + 12), Vector2(x + 12, rect.position.y + 28), Color(0.75, 0.95, 1.0, 0.23), 1.0)
+		card.draw_line(Vector2(x + 8, rect.end.y - 20), Vector2(x + 23, rect.end.y - 8), Color(0.75, 0.95, 1.0, 0.18), 1.0)
+	_draw_chibi_player(card, rect.position + Vector2(rect.size.x * 0.32, rect.size.y * 0.56))
+	_draw_chibi_player(card, rect.position + Vector2(rect.size.x * 0.62, rect.size.y * 0.58))
+	_draw_chibi_player(card, rect.position + Vector2(rect.size.x * 0.48, rect.size.y * 0.80))
+	_draw_basketball(card, rect.position + Vector2(rect.size.x * 0.50, rect.size.y * 0.54), 5.0)
+	for p in [rect.position + Vector2(rect.size.x * 0.22, rect.size.y * 0.22), rect.position + Vector2(rect.size.x * 0.78, rect.size.y * 0.30), rect.position + Vector2(rect.size.x * 0.84, rect.size.y * 0.75)]:
+		card.draw_circle(p, 3.0, Color(0.65, 0.95, 1.0, 0.9))
 
-	# 矿石晶体（散落在地面和墙壁上）
-	var crystal_colors := [Color(0.2, 0.6, 1.0), Color(0.8, 0.2, 0.6), Color(0.1, 0.9, 0.3), Color(1.0, 0.7, 0.1)]
-	var crystal_positions := [
-		Vector2(rect.position.x + 30, ground_y - 8),
-		Vector2(rect.position.x + 80, ground_y - 5),
-		Vector2(rect.position.x + 130, ground_y - 10),
-		Vector2(rect.position.x + 15, rect.position.y + 30),
-		Vector2(rect.position.x + rect.size.x - 20, rect.position.y + 40),
-		Vector2(rect.position.x + 60, ground_y - 6),
-	]
-	for ci in crystal_positions:
-		var col: Color = crystal_colors[int(ci.x) % crystal_colors.size()]
-		var pts := PackedVector2Array()
-		pts.append(ci + Vector2(0, -8))
-		pts.append(ci + Vector2(4, 0))
-		pts.append(ci + Vector2(0, 3))
-		pts.append(ci + Vector2(-4, 0))
-		card.draw_colored_polygon(pts, col)
-		card.draw_colored_polygon(pts, col.lightened(0.4))
 
-	# 坑道木桩支撑
-	var wood := Color(0.35, 0.22, 0.10)
-	card.draw_rect(Rect2(rect.position.x + 40, rect.position.y + 25, 4, rect.size.y - 50), wood)
-	card.draw_rect(Rect2(rect.position.x + rect.size.x - 45, rect.position.y + 30, 4, rect.size.y - 55), wood)
-	# 横梁
-	card.draw_rect(Rect2(rect.position.x + 38, rect.position.y + 23, 12, 4), wood.lightened(0.15))
-	card.draw_rect(Rect2(rect.position.x + rect.size.x - 47, rect.position.y + 28, 12, 4), wood.lightened(0.15))
+func _draw_corner_caps(ctrl: Control, rect: Rect2, bright: bool) -> void:
+	var col := Color(0.28, 0.32, 0.42) if bright else Color(0.12, 0.13, 0.16)
+	var s := 28.0
+	ctrl.draw_colored_polygon(PackedVector2Array([rect.position, rect.position + Vector2(s, 0), rect.position]), col)
+	ctrl.draw_rect(Rect2(rect.position, Vector2(s, 5)), col)
+	ctrl.draw_rect(Rect2(rect.position, Vector2(5, s)), col)
+	ctrl.draw_rect(Rect2(rect.end - Vector2(s, 5), Vector2(s, 5)), col)
+	ctrl.draw_rect(Rect2(rect.end - Vector2(5, s), Vector2(5, s)), col)
+	ctrl.draw_rect(Rect2(rect.position.x, rect.end.y - 5, s, 5), col)
+	ctrl.draw_rect(Rect2(rect.position.x, rect.end.y - s, 5, s), col)
+	ctrl.draw_rect(Rect2(rect.end.x - s, rect.position.y, s, 5), col)
+	ctrl.draw_rect(Rect2(rect.end.x - 5, rect.position.y, 5, s), col)
 
-	# 灯光（中间偏上）
-	var light_pos := Vector2(rect.position.x + rect.size.x / 2, rect.position.y + 20)
-	card.draw_circle(light_pos, 3.0, Color(1.0, 0.85, 0.4))
-	# 光晕
-	for r: float in [12.0, 20.0, 30.0]:
-		var a: float = 0.15 - r * 0.004
-		card.draw_circle(light_pos, r, Color(1.0, 0.85, 0.3, a))
+
+func _draw_star(ctrl: Control, center: Vector2, radius: float, color: Color) -> void:
+	var pts := PackedVector2Array()
+	for i in range(10):
+		var r := radius if i % 2 == 0 else radius * 0.43
+		var a := -PI * 0.5 + float(i) * PI / 5.0
+		pts.append(center + Vector2(cos(a), sin(a)) * r)
+	ctrl.draw_colored_polygon(pts, color)
+	ctrl.draw_polyline(pts + PackedVector2Array([pts[0]]), Color(0, 0, 0, 0.65), 1.0)
+
+
+func _draw_lock(ctrl: Control, center: Vector2, size: float) -> void:
+	var body := Rect2(center.x - size * 0.45, center.y - size * 0.08, size * 0.9, size * 0.65)
+	ctrl.draw_arc(center + Vector2(0, -size * 0.08), size * 0.28, PI, TAU, 18, Color(0.86, 0.86, 0.82), size * 0.14)
+	ctrl.draw_rect(body, Color(0.86, 0.86, 0.80))
+	ctrl.draw_rect(body.grow(-5), Color(0.96, 0.96, 0.90))
+	ctrl.draw_circle(center + Vector2(0, size * 0.20), size * 0.07, Color(0.18, 0.18, 0.17))
+	ctrl.draw_rect(Rect2(center.x - size * 0.025, center.y + size * 0.20, size * 0.05, size * 0.16), Color(0.18, 0.18, 0.17))
+
+
+func _draw_basketball(ctrl: Control, pos: Vector2, radius: float) -> void:
+	ctrl.draw_circle(pos, radius, Color(0.92, 0.42, 0.08))
+	ctrl.draw_arc(pos, radius, -PI * 0.45, PI * 0.45, 12, Color(0.18, 0.08, 0.03), 1.0)
+	ctrl.draw_line(pos + Vector2(0, -radius), pos + Vector2(0, radius), Color(0.18, 0.08, 0.03), 1.0)
+
+
+func _draw_chibi_player(ctrl: Control, pos: Vector2) -> void:
+	ctrl.draw_circle(pos + Vector2(0, -10), 8.0, Color(0.96, 0.82, 0.56))
+	ctrl.draw_rect(Rect2(pos.x - 7, pos.y - 2, 14, 17), Color(0.18, 0.18, 0.22))
+	ctrl.draw_circle(pos + Vector2(-4, -10), 1.5, Color.BLACK)
+	ctrl.draw_circle(pos + Vector2(4, -10), 1.5, Color.BLACK)
+	ctrl.draw_rect(Rect2(pos.x - 9, pos.y + 10, 6, 9), Color(0.85, 0.85, 0.88))
+	ctrl.draw_rect(Rect2(pos.x + 3, pos.y + 10, 6, 9), Color(0.85, 0.85, 0.88))
+
+
+func _draw_small_demon(ctrl: Control, pos: Vector2) -> void:
+	ctrl.draw_circle(pos, 11.0, Color(0.36, 0.08, 0.58))
+	ctrl.draw_colored_polygon(PackedVector2Array([pos + Vector2(-8, -6), pos + Vector2(-15, -17), pos + Vector2(-2, -10)]), Color(0.60, 0.12, 0.78))
+	ctrl.draw_colored_polygon(PackedVector2Array([pos + Vector2(8, -6), pos + Vector2(15, -17), pos + Vector2(2, -10)]), Color(0.60, 0.12, 0.78))
+	ctrl.draw_circle(pos + Vector2(-4, -1), 2.0, Color(0.1, 0, 0))
+	ctrl.draw_circle(pos + Vector2(4, -1), 2.0, Color(0.1, 0, 0))
+
+
+func _make_flat_style(fill: Color, border: Color, radius: int = 0, border_width: int = 1) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = 6
+	style.content_margin_right = 6
+	style.content_margin_top = 4
+	style.content_margin_bottom = 4
+	return style
 
 
 func _refresh_map_cards() -> void:
@@ -836,5 +920,5 @@ func _draw() -> void:
 
 	# 靠近提示
 	if _portal_near and not _map_select_open:
-		draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-40, 65), "按 E 选择副本",
+		draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-52, 65), "靠近后打开副本选择",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
