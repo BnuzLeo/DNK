@@ -5,6 +5,7 @@ extends CharacterBody2D
 
 const VS := preload("res://scripts/visual_spec.gd")
 const ROOSTER_PROJECTILE := preload("res://scripts/rooster_projectile.gd")
+const BERSERK_AWAKENING_FX := preload("res://scripts/berserk_awakening_fx.gd")
 const PLAYER_SPRITE_PATH := "res://assets/export/characters/sprite.webp"
 const PLAYER_SPRITE_FRAME_SIZE := Vector2i(192, 208)
 const PLAYER_SPRITE_FRAME_COUNTS := [6, 8, 8, 4, 5, 8, 6, 6, 6]
@@ -306,6 +307,7 @@ func _cycle_weapon() -> void:
 
 
 func _trigger_berserk() -> void:
+	var was_active := _berserk_active
 	if GameManager.state == GameManager.GameState.LOBBY:
 		_berserk_active = not _berserk_active
 		_berserk_timer = 0.0
@@ -313,6 +315,19 @@ func _trigger_berserk() -> void:
 		_berserk_active = true
 		_berserk_timer = BERSERK_DURATION
 	_berserk_flash_timer = 0.25
+	if not was_active and _berserk_active:
+		_play_berserk_awakening_fx()
+
+
+func _play_berserk_awakening_fx() -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	for node in get_tree().get_nodes_in_group("berserk_awaken_fx"):
+		if is_instance_valid(node):
+			node.queue_free()
+	var fx := BERSERK_AWAKENING_FX.new()
+	scene.add_child(fx)
 
 
 func _get_weapon_cooldown(weapon: Dictionary) -> float:
