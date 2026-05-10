@@ -24,6 +24,37 @@ const ACTION_K_X := 786.0
 const ACTION_L_X := 856.0
 const ACTION_KEY_Y := 55.0
 const ACTION_KEY_COLOR := Color(0.78, 0.88, 0.94)
+const LOBBY_OBJECT_SCALE := 0.625
+const PLAYER_TOP_Z_INDEX := 1000
+const LOBBY_OBJECTS := [
+	{"file": "Group 1.png", "source_pos": Vector2(690.0, 418.0)},
+	{"file": "Groups-1.png", "source_pos": Vector2(1362.0, 514.0)},
+	{"file": "Groups-2.png", "source_pos": Vector2(1286.0, 286.0)},
+	{"file": "Groups.png", "source_pos": Vector2(254.0, 836.0)},
+	{"file": "Image-1.png", "source_pos": Vector2(978.0, 804.0)},
+	{"file": "Image-10.png", "source_pos": Vector2(296.0, 842.0)},
+	{"file": "Image-11.png", "source_pos": Vector2(686.0, 498.0)},
+	{"file": "Image-12.png", "source_pos": Vector2(190.0, 144.0)},
+	{"file": "Image-13.png", "source_pos": Vector2(356.0, 892.0)},
+	{"file": "Image-14.png", "source_pos": Vector2(916.0, 788.0)},
+	{"file": "Image-15.png", "source_pos": Vector2(104.0, 842.0)},
+	{"file": "Image-16.png", "source_pos": Vector2(280.0, 116.0)},
+	{"file": "Image-17.png", "source_pos": Vector2(342.0, 740.0)},
+	{"file": "Image-18.png", "source_pos": Vector2(74.0, 508.0)},
+	{"file": "Image-2.png", "source_pos": Vector2(570.0, 656.0)},
+	{"file": "Image-3.png", "source_pos": Vector2(878.0, 634.0)},
+	{"file": "Image-4.png", "source_pos": Vector2(356.0, 774.0)},
+	{"file": "Image-5.png", "source_pos": Vector2(344.0, 750.0)},
+	{"file": "Image-6.png", "source_pos": Vector2(158.0, 366.0)},
+	{"file": "Image-7.png", "source_pos": Vector2(860.0, 162.0)},
+	{"file": "Image-8.png", "source_pos": Vector2(176.0, 130.0)},
+	{"file": "Image-9.png", "source_pos": Vector2(178.0, 212.0)},
+	{"file": "Image.png", "source_pos": Vector2(1384.0, 362.0)},
+	{"file": "Object-1.png", "source_pos": Vector2(440.0, 774.0)},
+	{"file": "Object-2.png", "source_pos": Vector2(1096.0, 744.0)},
+	{"file": "Object-3.png", "source_pos": Vector2(52.0, 700.0)},
+	{"file": "Object.png", "source_pos": Vector2(576.0, 836.0)},
+]
 
 const ROOM_W := int(VS.VIEWPORT_SIZE.x)
 const ROOM_H := int(VS.VIEWPORT_SIZE.y)
@@ -75,6 +106,7 @@ func _ready() -> void:
 	GameManager.change_state(GameManager.GameState.LOBBY)
 	_start_lobby_music()
 	_create_walls()
+	_create_lobby_objects()
 	_create_bullet_pool()
 	_create_player()
 	_create_npcs()
@@ -138,6 +170,40 @@ func _make_wall(pos: Vector2, size: Vector2) -> void:
 	add_child(wall)
 
 
+func _create_lobby_objects() -> void:
+	for object_data in LOBBY_OBJECTS:
+		var texture := load("res://assets/export/gui/大厅/objects/%s" % String(object_data.file)) as Texture2D
+		if texture == null:
+			continue
+		var source_pos: Vector2 = object_data.source_pos
+		var display_size := texture.get_size() * LOBBY_OBJECT_SCALE
+		var top_left := source_pos * LOBBY_OBJECT_SCALE
+
+		var sprite := Sprite2D.new()
+		sprite.name = "LobbyObject_%s" % String(object_data.file).get_basename()
+		sprite.texture = texture
+		sprite.centered = true
+		sprite.position = top_left + display_size * 0.5
+		sprite.scale = Vector2(LOBBY_OBJECT_SCALE, LOBBY_OBJECT_SCALE)
+		sprite.z_index = 1
+		add_child(sprite)
+
+		var body := StaticBody2D.new()
+		body.name = "%sCollision" % sprite.name
+		body.position = sprite.position
+		body.collision_layer = 16
+		body.collision_mask = 0
+		var shape := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		var footprint_h := clampf(display_size.y * 0.22, 16.0, 50.0)
+		var footprint_w := clampf(display_size.x * 0.68, 20.0, maxf(20.0, display_size.x * 0.9))
+		rect.size = Vector2(footprint_w, footprint_h)
+		shape.position = Vector2(0.0, display_size.y * 0.5 - footprint_h * 0.5)
+		shape.shape = rect
+		body.add_child(shape)
+		add_child(body)
+
+
 func _create_bullet_pool() -> void:
 	_bullet_pool = Node2D.new()
 	_bullet_pool.name = "BulletPool"
@@ -148,6 +214,7 @@ func _create_bullet_pool() -> void:
 func _create_player() -> void:
 	_player = CharacterBody2D.new()
 	_player.position = Vector2(480, 450)
+	_player.z_index = PLAYER_TOP_Z_INDEX
 	_player.set_script(load("res://scripts/player.gd"))
 
 	var col := CollisionShape2D.new()
