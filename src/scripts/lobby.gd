@@ -7,11 +7,19 @@ const VS := preload("res://scripts/visual_spec.gd")
 const LOBBY_MUSIC_PATH := "res://assets/music/鸡你太美.wav"
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
 const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
-const GUI_SWITCH_FRAME := preload("res://assets/export/gui/换武器框.png")
 const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
-const STATUS_SCALE := 2.6
+const STATUS_SCALE := 1.73
 const STATUS_FILL_W := 59.0 * STATUS_SCALE
 const STATUS_FILL_H := 5.5 * STATUS_SCALE
+const ACTION_FRAME_SIZE := Vector2(50.67, 50.67)
+const ACTION_CONTROL_SIZE := Vector2(50.67, 78.0)
+const ACTION_ROW_Y := 552.0
+const ACTION_Q_X := 646.0
+const ACTION_J_X := 716.0
+const ACTION_K_X := 786.0
+const ACTION_L_X := 856.0
+const ACTION_KEY_Y := 55.0
+const ACTION_KEY_COLOR := Color(0.78, 0.88, 0.94)
 
 const ROOM_W := int(VS.VIEWPORT_SIZE.x)
 const ROOM_H := int(VS.VIEWPORT_SIZE.y)
@@ -291,32 +299,32 @@ func _create_hud() -> void:
 	_hud_canvas.add_child(_bag_button)
 
 	_attack_icon = Control.new()
-	_attack_icon.position = Vector2(814, 522)
-	_attack_icon.size = Vector2(76, 76)
+	_attack_icon.position = Vector2(ACTION_J_X, ACTION_ROW_Y)
+	_attack_icon.size = ACTION_CONTROL_SIZE
 	_attack_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_attack_icon.draw.connect(_draw_attack_icon)
 	_attack_icon.gui_input.connect(_on_action_button_input.bind("shoot"))
 	_hud_canvas.add_child(_attack_icon)
 
 	_switch_icon = Control.new()
-	_switch_icon.position = Vector2(813, 359)
-	_switch_icon.size = Vector2(88, 80)
+	_switch_icon.position = Vector2(ACTION_Q_X, ACTION_ROW_Y)
+	_switch_icon.size = ACTION_CONTROL_SIZE
 	_switch_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_switch_icon.draw.connect(_draw_switch_icon)
 	_switch_icon.gui_input.connect(_on_action_button_input.bind("switch_weapon"))
 	_hud_canvas.add_child(_switch_icon)
 
 	_dash_icon = Control.new()
-	_dash_icon.position = Vector2(654, 360)
-	_dash_icon.size = Vector2(76, 76)
+	_dash_icon.position = Vector2(ACTION_K_X, ACTION_ROW_Y)
+	_dash_icon.size = ACTION_CONTROL_SIZE
 	_dash_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_dash_icon.draw.connect(_draw_dash_icon)
 	_dash_icon.gui_input.connect(_on_action_button_input.bind("dash"))
 	_hud_canvas.add_child(_dash_icon)
 
 	_berserk_icon = Control.new()
-	_berserk_icon.position = Vector2(708, 548)
-	_berserk_icon.size = Vector2(76, 76)
+	_berserk_icon.position = Vector2(ACTION_L_X, ACTION_ROW_Y)
+	_berserk_icon.size = ACTION_CONTROL_SIZE
 	_berserk_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_berserk_icon.draw.connect(_draw_berserk_icon)
 	_berserk_icon.gui_input.connect(_on_action_button_input.bind("berserk"))
@@ -426,26 +434,36 @@ func _draw_button_key(ctrl: Control, key: String, color: Color = Color.WHITE) ->
 	ctrl.draw_string(font, pos + Vector2(0, text_size.y), key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 
+func _draw_action_key(ctrl: Control, key: String, color: Color = Color.WHITE) -> void:
+	var font: Font = ThemeDB.fallback_font
+	var font_size: int = 14
+	var text_size: Vector2 = font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var x: float = (ACTION_FRAME_SIZE.x - text_size.x) * 0.5
+	var pos: Vector2 = Vector2(x, ACTION_KEY_Y + text_size.y)
+	ctrl.draw_string(font, pos + Vector2(1, 1), key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.8))
+	ctrl.draw_string(font, pos, key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+
+
 func _draw_attack_icon() -> void:
-	_attack_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, _attack_icon.size), false)
-	var logo_size := _attack_icon.size * 0.48
-	var logo_rect := Rect2((_attack_icon.size - logo_size) * 0.5 + Vector2(0, -3), logo_size)
+	_attack_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
+	var logo_size: Vector2 = Vector2(28, 28)
+	var logo_rect: Rect2 = Rect2((ACTION_FRAME_SIZE - logo_size) * 0.5, logo_size)
 	_attack_icon.draw_texture_rect(GUI_ATTACK_LOGO, logo_rect, false)
-	_draw_button_key(_attack_icon, "J", Color(0.95, 0.25, 0.2))
+	_draw_action_key(_attack_icon, "J", ACTION_KEY_COLOR)
 
 
 func _draw_switch_icon() -> void:
-	_switch_icon.draw_texture_rect(GUI_SWITCH_FRAME, Rect2(Vector2.ZERO, _switch_icon.size), false)
-	_draw_button_key(_switch_icon, "Q", Color(0.78, 0.88, 0.94))
+	_switch_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
+	_draw_action_key(_switch_icon, "Q", ACTION_KEY_COLOR)
 
 
 func _draw_dash_icon() -> void:
-	var center := _dash_icon.size / 2.0
-	_dash_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, _dash_icon.size), false)
+	var center: Vector2 = ACTION_FRAME_SIZE / 2.0
+	_dash_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
 	var dash_cd: float = _player._dash_cooldown
 	if dash_cd > 0.0:
 		var cd_ratio: float = clampf(dash_cd / _player.DASH_COOLDOWN, 0.0, 1.0)
-		var radius := _dash_icon.size.x * 0.36
+		var radius: float = ACTION_FRAME_SIZE.x * 0.36
 		var points := PackedVector2Array()
 		points.append(center)
 		var segments := 24
@@ -455,23 +473,12 @@ func _draw_dash_icon() -> void:
 			points.append(center + Vector2(cos(angle), sin(angle)) * radius)
 		if points.size() >= 3:
 			_dash_icon.draw_colored_polygon(points, Color(0, 0, 0, 0.55))
-	_draw_button_key(_dash_icon, "K", Color(0.9, 0.8, 0.4))
+	_draw_action_key(_dash_icon, "K", ACTION_KEY_COLOR)
 
 
 func _draw_berserk_icon() -> void:
-	var active: bool = _player.has_method("is_berserk_active") and _player.is_berserk_active()
-	var c := _berserk_icon.size / 2.0
-	_berserk_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, _berserk_icon.size), false)
-	var glow := Color(1.0, 0.33, 0.06, 0.35 if active else 0.18)
-	var flame := PackedVector2Array([
-		c + Vector2(-20, 12), c + Vector2(-12, -2), c + Vector2(-4, -22),
-		c + Vector2(4, -4), c + Vector2(16, -14), c + Vector2(10, 8),
-		c + Vector2(22, 18), c + Vector2(2, 24),
-	])
-	_berserk_icon.draw_colored_polygon(flame, Color(0.92, 0.58, 0.18))
-	_berserk_icon.draw_polyline(flame + PackedVector2Array([flame[0]]), Color(0.25, 0.13, 0.03), 2.0)
-	_berserk_icon.draw_circle(c, 36.0, glow)
-	_draw_button_key(_berserk_icon, "U", Color(1.0, 0.75, 0.45))
+	_berserk_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
+	_draw_action_key(_berserk_icon, "L", ACTION_KEY_COLOR)
 
 
 func _draw_buff_bar() -> void:
