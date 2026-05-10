@@ -83,6 +83,8 @@ var _last_move_input := Vector2.ZERO
 var _dash_timer := 0.0
 var _dash_cooldown := 0.0
 var _dash_dir := Vector2.ZERO
+var _dash_afterimage_timer := 0.0
+var _dash_invuln_visual_timer := 0.0
 
 # Buff 系统
 enum BuffType { MANA_REGEN, SPEED, REVIVE, BULLET }
@@ -207,17 +209,20 @@ func _physics_process(delta: float) -> void:
 		_dash_timer -= delta
 		velocity = _dash_dir * DASH_SPEED
 		_invuln_timer = max(_invuln_timer, DASH_INVULN)
+		_dash_invuln_visual_timer = max(_dash_invuln_visual_timer, _dash_timer)
 		move_and_slide()
 		_last_move_input = _dash_dir
 		_update_sprite_animation(delta)
-		# 半透明 + 闪烁
-		var blink := sin(_dash_timer * 40.0) * 0.3 + 0.5
-		modulate = Color(1, 1, 1, blink)
+		_update_dash_afterimages(delta)
+		modulate = Color.WHITE
 		queue_redraw()
 		return
 
 	# 无敌闪烁（闪避后延续的无敌时间）
-	if _invuln_timer > 0.0:
+	if _dash_invuln_visual_timer > 0.0:
+		_dash_invuln_visual_timer -= delta
+		modulate = Color.WHITE
+	elif _invuln_timer > 0.0:
 		var blink := sin(_invuln_timer * 20.0) * 0.4 + 0.6
 		modulate = Color(1, 1, 1, blink)
 	else:
@@ -238,6 +243,9 @@ func _physics_process(delta: float) -> void:
 		)
 		_dash_dir = dash_input.normalized() if dash_input.length() > 0.1 else _facing
 		_last_move_input = _dash_dir
+		_dash_afterimage_timer = 0.0
+		_dash_invuln_visual_timer = DASH_INVULN
+		_spawn_dash_afterimage()
 		_update_sprite_animation(delta)
 		return
 
@@ -600,6 +608,37 @@ func _apply_sprite_frame() -> void:
 		Vector2(_sprite_frame * PLAYER_SPRITE_FRAME_SIZE.x, _sprite_anim * PLAYER_SPRITE_FRAME_SIZE.y),
 		Vector2(PLAYER_SPRITE_FRAME_SIZE)
 	)
+
+
+func _update_dash_afterimages(delta: float) -> void:
+	_dash_afterimage_timer -= delta
+	if _dash_afterimage_timer > 0.0:
+		return
+	_dash_afterimage_timer = 0.035
+	_spawn_dash_afterimage()
+
+
+func _spawn_dash_afterimage() -> void:
+	if _sprite == null:
+		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	var ghost := Sprite2D.new()
+	ghost.texture = _sprite.texture
+	ghost.region_enabled = true
+	ghost.region_rect = _sprite.region_rect
+	ghost.centered = true
+	ghost.global_position = global_position
+	ghost.global_rotation = _sprite.global_rotation
+	ghost.scale = _sprite.global_scale
+	ghost.z_index = _sprite.z_index - 1
+	ghost.modulate = Color(0.4, 0.85, 1.0, 0.42)
+	parent.add_child(ghost)
+	var tween := ghost.create_tween()
+	tween.tween_property(ghost, "modulate:a", 0.0, 0.22)
+	tween.parallel().tween_property(ghost, "scale", ghost.scale * 1.08, 0.22)
+	tween.tween_callback(ghost.queue_free)
 
 
 func _draw() -> void:

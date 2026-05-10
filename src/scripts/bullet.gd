@@ -17,6 +17,13 @@ func _draw() -> void:
 		draw_line(Vector2(0, -radius), Vector2(0, radius), Color(0.18, 0.08, 0.03), 1.2)
 		draw_line(Vector2(-radius, 0), Vector2(radius, 0), Color(0.18, 0.08, 0.03), 1.2)
 		draw_circle(Vector2.ZERO, radius + 2.0, Color(1.0, 0.45, 0.05, 0.25))
+	elif projectile_type == "arrow":
+		var shaft := Color(0.72, 0.48, 0.25)
+		var tip := Color(0.9, 0.9, 0.82)
+		draw_line(Vector2(-14.0, 0.0), Vector2(11.0, 0.0), shaft, 2.0)
+		draw_colored_polygon(PackedVector2Array([Vector2(16.0, 0.0), Vector2(8.0, -4.0), Vector2(8.0, 4.0)]), tip)
+		draw_line(Vector2(-14.0, 0.0), Vector2(-19.0, -4.0), Color(0.85, 0.85, 0.85), 1.2)
+		draw_line(Vector2(-14.0, 0.0), Vector2(-19.0, 4.0), Color(0.85, 0.85, 0.85), 1.2)
 	elif is_dart:
 		# 飞镖：菱形，Neon Orange
 		var color := Color(1.0, 0.53, 0.0)

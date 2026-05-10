@@ -23,7 +23,46 @@ const SHOOT_BULLET_SPEED := 300.0
 const KEEP_DISTANCE_MIN := 150.0
 const KEEP_DISTANCE_MAX := 200.0
 
-const TYPE_ANIMATIONS := {}
+const TYPE_ANIMATIONS := {
+	EnemyType.CHASER: {
+		"frame_size": 64,
+		"animations": {
+			"idle": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_idle_strip4.png", "frames": 4, "fps": 6.0, "loop": true},
+			"walk": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_move_strip6.png", "frames": 6, "fps": 10.0, "loop": true},
+			"shoot": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
+			"hit": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
+			"death": {"path": "res://assets/export/enemies/chaser/enemy_chaser_body_dead_strip4.png", "frames": 4, "fps": 8.0, "loop": false},
+		},
+	},
+	EnemyType.SHOOTER: {
+		"frame_size": 120,
+		"animations": {
+			"idle": {"path": "res://assets/export/enemies/shooter/enemy_shooter_snow_ape_idle_strip8.png", "frames": 8, "fps": 8.0, "loop": true},
+			"walk": {"path": "res://assets/export/enemies/shooter/enemy_shooter_snow_ape_walk_strip8.png", "frames": 8, "fps": 8.0, "loop": true},
+			"shoot": {"path": "res://assets/export/enemies/shooter/enemy_shooter_snow_ape_shoot_strip8.png", "frames": 8, "fps": 18.0, "loop": false},
+			"death": {"path": "res://assets/export/enemies/shooter/enemy_shooter_snow_ape_death_strip1.png", "frames": 1, "fps": 1.0, "loop": false},
+		},
+	},
+	EnemyType.TANK: {
+		"frame_size": 64,
+		"animations": {
+			"idle": {"path": "res://assets/export/enemies/tank/enemy_tank_body_idle_strip4.png", "frames": 4, "fps": 6.0, "loop": true},
+			"walk": {"path": "res://assets/export/enemies/tank/enemy_tank_body_move_strip6.png", "frames": 6, "fps": 8.0, "loop": true},
+			"shoot": {"path": "res://assets/export/enemies/tank/enemy_tank_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
+			"hit": {"path": "res://assets/export/enemies/tank/enemy_tank_body_hit_strip2.png", "frames": 2, "fps": 10.0, "loop": false},
+			"death": {"path": "res://assets/export/enemies/tank/enemy_tank_body_dead_strip4.png", "frames": 4, "fps": 7.0, "loop": false},
+		},
+	},
+	EnemyType.SWARM: {
+		"frame_size": 48,
+		"animations": {
+			"idle": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_idle_strip4.png", "frames": 4, "fps": 7.0, "loop": true},
+			"walk": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_move_strip6.png", "frames": 6, "fps": 12.0, "loop": true},
+			"shoot": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_move_strip6.png", "frames": 6, "fps": 16.0, "loop": false},
+			"death": {"path": "res://assets/export/enemies/swarm/enemy_swarm_body_dead_strip4.png", "frames": 4, "fps": 9.0, "loop": false},
+		},
+	},
+}
 
 var enemy_type: int = EnemyType.CHASER
 var max_hp := 20
@@ -39,9 +78,11 @@ var _contact_cooldown := 0.0
 var _dying := false
 var _spawn_invuln_timer := 0.0
 var _sprite: AnimatedSprite2D = null
+var _archer_facing := 1.0
 var _current_animation := ""
 var _moving_this_frame := false
 var _hit_timer := 0.0
+var _sprite_action_timer := 0.0
 
 # 射击
 var _shoot_timer := 0.0
@@ -93,6 +134,8 @@ func _physics_process(delta: float) -> void:
 
 	if _hit_timer > 0.0:
 		_hit_timer -= delta
+	if _sprite_action_timer > 0.0:
+		_sprite_action_timer -= delta
 
 	# 减速计时
 	if _slow_timer > 0.0:
@@ -177,6 +220,7 @@ func _update_shooting(delta: float) -> void:
 		if _shoot_tell_timer <= 0.0:
 			_fire_at_player()
 			_shooting = false
+			_sprite_action_timer = 0.18
 			_shoot_timer = randf_range(SHOOT_COOLDOWN_MIN, SHOOT_COOLDOWN_MAX)
 		else:
 			# "告诉" 期间闪烁
@@ -188,6 +232,7 @@ func _update_shooting(delta: float) -> void:
 	if _shoot_timer <= 0.0:
 		_shooting = true
 		_shoot_tell_timer = SHOOT_TELL_TIME
+		_sprite_action_timer = SHOOT_TELL_TIME
 
 
 func _fire_at_player() -> void:
@@ -195,11 +240,14 @@ func _fire_at_player() -> void:
 		return
 	var dir := (_player.global_position - global_position).normalized()
 	bullet_pool.spawn(
-		global_position + dir * (VS.ENEMY_STANDARD_DISPLAY_SIZE * 0.5),
+		global_position + dir * (_get_display_size() * 0.5),
 		dir,
 		SHOOT_BULLET_SPEED,
 		TYPE_STATS[EnemyType.SHOOTER].damage,
-		false
+		false,
+		false,
+		0.0,
+		"arrow"
 	)
 
 
@@ -221,12 +269,14 @@ func _apply_idle_modulate() -> void:
 func _update_animation() -> void:
 	if _sprite == null:
 		return
-	if _shooting and _has_animation("tell"):
-		_set_animation("tell")
+	if _dying:
+		_set_animation("death")
+	elif (_shooting or _sprite_action_timer > 0.0) and _has_animation("shoot"):
+		_set_animation("shoot")
 	elif _hit_timer > 0.0 and _has_animation("hit"):
 		_set_animation("hit")
-	elif _moving_this_frame and _has_animation("move"):
-		_set_animation("move")
+	elif _moving_this_frame and _has_animation("walk"):
+		_set_animation("walk")
 	else:
 		_set_animation("idle")
 
@@ -303,8 +353,13 @@ func _get_display_size() -> float:
 
 
 func _face_direction(dir: Vector2) -> void:
-	if _sprite != null and dir.length_squared() > 0.001:
-		_sprite.rotation = dir.angle()
+	if dir.length_squared() <= 0.001:
+		return
+	if absf(dir.x) > 0.05:
+		_archer_facing = 1.0 if dir.x >= 0.0 else -1.0
+	if _sprite != null:
+		_sprite.rotation = 0.0
+		_sprite.flip_h = _archer_facing < 0.0
 
 
 func _has_animation(animation_name: String) -> bool:
@@ -371,11 +426,11 @@ func add_freeze_stack(amount: float) -> void:
 func _die() -> void:
 	_dying = true
 	died.emit()
-	if _has_animation("dead"):
+	if _has_animation("death"):
 		modulate = _get_base_modulate()
-		_set_animation("dead", true)
+		_set_animation("death", true)
 		var tween := create_tween()
-		tween.tween_interval(_get_animation_duration("dead"))
+		tween.tween_interval(_get_animation_duration("death"))
 		tween.tween_property(self, "scale", Vector2.ZERO, 0.12).set_ease(Tween.EASE_IN)
 		tween.tween_callback(queue_free)
 		return
@@ -394,6 +449,9 @@ func _on_body_entered(body: Node2D) -> void:
 	if body.has_method("take_damage") and _contact_cooldown <= 0.0 and _spawn_invuln_timer <= 0.0:
 		var stats: Dictionary = TYPE_STATS[enemy_type]
 		body.take_damage(stats.damage)
+		_sprite_action_timer = 0.22
+		if _has_animation("shoot"):
+			_set_animation("shoot", true)
 		_contact_cooldown = CONTACT_COOLDOWN
 
 
@@ -418,7 +476,11 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, radius, 0, TAU, 24, Color.WHITE, 1.5)
 	if _slow_factor < 1.0 and not _frozen:
 		draw_arc(Vector2.ZERO, radius + 3.0, 0, TAU * _slow_factor, 16, Color(0.3, 0.7, 1.0, 0.5), 2.0)
-	# 射击 "告诉" 指示器
+	# 射击读条
 	if _shooting:
 		var tell_ratio := _shoot_tell_timer / SHOOT_TELL_TIME
-		draw_arc(Vector2.ZERO, radius + 5.0, 0, TAU * tell_ratio, 16, Color(1.0, 0.3, 0.3, 0.8), 2.0)
+		var bar_size := Vector2(40.0, 5.0)
+		var bar_pos := Vector2(-bar_size.x * 0.5, -radius - 13.0)
+		draw_rect(Rect2(bar_pos, bar_size), Color(0.08, 0.08, 0.08, 0.75), true)
+		draw_rect(Rect2(bar_pos, Vector2(bar_size.x * (1.0 - tell_ratio), bar_size.y)), Color(1.0, 0.25, 0.18, 0.95), true)
+		draw_rect(Rect2(bar_pos, bar_size), Color(1.0, 0.9, 0.75, 0.9), false, 1.0)

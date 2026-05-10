@@ -3,8 +3,10 @@ extends Node2D
 ## 练习生基地 — 游戏大厅
 
 const VS := preload("res://scripts/visual_spec.gd")
+const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
 
 const LOBBY_MUSIC_PATH := "res://assets/music/鸡你太美.wav"
+const BLUE_SHOCKWAVE_SHEET := "res://assets/export/characters/shockwave_blue_sheet.png"
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
 const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
 const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
@@ -154,6 +156,25 @@ func _create_player() -> void:
 	_player.add_child(cam)
 
 	add_child(_player)
+	_play_player_spawn_warning(_player)
+
+
+func _play_player_spawn_warning(player: CharacterBody2D) -> void:
+	player.visible = false
+	player.set_physics_process(false)
+	player.set_process_input(false)
+	var effect = SHOCKWAVE_EFFECT.new()
+	effect.global_position = player.global_position
+	add_child(effect)
+	effect.setup(BLUE_SHOCKWAVE_SHEET, Color(0.25, 0.65, 1.0, 0.9), 150.0, Callable(self, "_finish_player_spawn_warning").bind(player))
+
+
+func _finish_player_spawn_warning(player: CharacterBody2D) -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	player.visible = true
+	player.set_physics_process(true)
+	player.set_process_input(true)
 
 
 func _create_npcs() -> void:

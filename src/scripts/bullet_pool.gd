@@ -94,6 +94,7 @@ func _activate_bullet(bullet: Area2D, pos: Vector2, dir: Vector2, speed: float,
 	bullet.set_meta("max_distance", max_distance)
 	bullet.set_meta("traveled", 0.0)
 	bullet.set_meta("returning", false)
+	bullet.rotation = dir.angle()
 	bullet.visible = true
 	bullet.monitoring = true
 	bullet.monitorable = false
@@ -158,6 +159,7 @@ func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
 			# 开始返回
 			bullet.set_meta("returning", true)
 			bullet.set_meta("direction", -dir)
+			bullet.rotation = (-dir).angle()
 		elif bullet.get_meta("returning"):
 			# 检查是否回到玩家附近
 			var player_nodes := get_tree().get_nodes_in_group("player")

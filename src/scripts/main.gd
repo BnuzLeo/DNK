@@ -3,6 +3,7 @@ extends Node2D
 ## 主场景控制器 - 走廊式房间制地牢 + HUD + 小地图
 
 const VS := preload("res://scripts/visual_spec.gd")
+const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
 const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
 const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
@@ -19,6 +20,8 @@ const ACTION_K_X := 786.0
 const ACTION_L_X := 856.0
 const ACTION_KEY_Y := 55.0
 const ACTION_KEY_COLOR := Color(0.78, 0.88, 0.94)
+const BLUE_SHOCKWAVE_SHEET := "res://assets/export/characters/shockwave_blue_sheet.png"
+const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/characters/shockwave_yellow_sheet.png"
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 
@@ -145,6 +148,7 @@ func _ready() -> void:
 
 	# 初始摄像机边界
 	_update_camera_bounds(CENTER)
+	_play_player_spawn_warning($Player)
 
 
 # ── 地牢生成 ──────────────────────────────────────────
@@ -459,9 +463,43 @@ func _start_spawn_warning(pos: Vector2i) -> void:
 			if p.distance_to(center) < 80:
 				p = center + offset.normalized() * 120
 			_spawn_warning_positions.append(p)
+		var bonus := _get_floor_enemy_bonus()
+		for i in bonus:
+			var offset := Vector2(randf_range(-200, 200), randf_range(-120, 120))
+			var p := center + offset
+			if p.distance_to(center) < 80:
+				p = center + offset.normalized() * 120
+			_spawn_warning_positions.append(p)
 
 	_spawn_warning_timer = 1.0
+	for warning_pos in _spawn_warning_positions:
+		_play_spawn_warning_effect(warning_pos)
 	queue_redraw()
+
+
+func _play_spawn_warning_effect(pos: Vector2) -> void:
+	var effect = SHOCKWAVE_EFFECT.new()
+	effect.global_position = pos
+	add_child(effect)
+	effect.setup(YELLOW_SHOCKWAVE_SHEET, Color(1.0, 0.78, 0.1, 0.9), 120.0)
+
+
+func _play_player_spawn_warning(player: CharacterBody2D) -> void:
+	player.visible = false
+	player.set_physics_process(false)
+	player.set_process_input(false)
+	var effect = SHOCKWAVE_EFFECT.new()
+	effect.global_position = player.global_position
+	add_child(effect)
+	effect.setup(BLUE_SHOCKWAVE_SHEET, Color(0.25, 0.65, 1.0, 0.9), 150.0, Callable(self, "_finish_player_spawn_warning").bind(player))
+
+
+func _finish_player_spawn_warning(player: CharacterBody2D) -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	player.visible = true
+	player.set_physics_process(true)
+	player.set_process_input(true)
 
 
 # ── 敌人生成 ──────────────────────────────────────────
@@ -501,15 +539,6 @@ func _spawn_enemies_with_positions(room_pos: Vector2i) -> void:
 	else:
 		for pos in _spawn_warning_positions:
 			_spawn_enemy(pos, room, bounds, _random_enemy_type())
-		# 楼层额外敌人
-		var bonus := _get_floor_enemy_bonus()
-		var center := Vector2(room_pos.x * CELL_W + CELL_W / 2, room_pos.y * CELL_H + CELL_H / 2)
-		for i in bonus:
-			var offset := Vector2(randf_range(-200, 200), randf_range(-120, 120))
-			var extra_pos := center + offset
-			if extra_pos.distance_to(center) < 80:
-				extra_pos = center + offset.normalized() * 120
-			_spawn_enemy(extra_pos, room, bounds, _random_enemy_type())
 
 
 func _spawn_enemy(pos: Vector2, room: RoomData, bounds: Rect2, type: int = 0) -> void:
@@ -1414,6 +1443,7 @@ func _do_revive() -> void:
 		room.spawned = false
 		room.state = RoomState.INACTIVE
 	GameManager.change_state(GameManager.GameState.PLAYING)
+	_play_player_spawn_warning($Player)
 	_show_hint("已复活！", Color(1.0, 0.84, 0.0))
 
 
@@ -1796,12 +1826,4 @@ func _draw() -> void:
 		draw_circle(_portal_pos, portal_radius, Color(0.0, 0.898, 1.0, 0.3))
 		draw_arc(_portal_pos, portal_radius, 0, TAU, 24, Color(0.0, 0.898, 1.0), 3.0)
 
-	# 怪物出生预警
-	if _spawn_warning_timer > 0.0:
-		var alpha := clampf(_spawn_warning_timer / 1.0, 0.0, 1.0)
-		var flash := sin(_spawn_warning_timer * 12.0) * 0.5 + 0.5
-		var warning_radius := VS.SPAWN_WARNING_DISPLAY_SIZE * 0.5
-		for wpos in _spawn_warning_positions:
-			var c := Color(1.0, 0.2, 0.2, 0.4 * alpha * flash)
-			draw_circle(wpos, warning_radius, c)
-			draw_arc(wpos, warning_radius, 0, TAU, 16, Color(1.0, 0.3, 0.3, 0.8 * alpha), 2.0)
+	# 怪物出生预警由黄色震荡波节点播放。
