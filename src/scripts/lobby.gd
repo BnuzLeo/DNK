@@ -32,6 +32,7 @@ var _player: CharacterBody2D
 var _bullet_pool: Node2D
 var _portal_pos := Vector2(480, 120)
 var _portal_near := false
+var _portal_sprite: TransferPortal
 var _anim_timer := 0.0
 var _lobby_music: AudioStreamPlayer
 
@@ -76,6 +77,7 @@ func _ready() -> void:
 	_create_bullet_pool()
 	_create_player()
 	_create_npcs()
+	_create_lobby_portal()
 	_create_hud()
 
 
@@ -105,6 +107,15 @@ func _load_audio_stream(path: String) -> AudioStream:
 	if FileAccess.file_exists(absolute_path):
 		return AudioStreamWAV.load_from_file(absolute_path)
 	return null
+
+
+func _create_lobby_portal() -> void:
+	_portal_sprite = TransferPortal.new()
+	_portal_sprite.name = "LobbyPortal"
+	_portal_sprite.position = _portal_pos
+	_portal_sprite.z_index = 5
+	_portal_sprite.setup(VS.PORTAL_LOBBY_DISPLAY_SIZE * 2.5)
+	add_child(_portal_sprite)
 
 
 func _create_walls() -> void:
@@ -906,19 +917,7 @@ func _draw() -> void:
 	draw_rect(Rect2(0, 0, WALL_T, ROOM_H), Color(0.25, 0.22, 0.18))
 	draw_rect(Rect2(ROOM_W - WALL_T, 0, WALL_T, ROOM_H), Color(0.25, 0.22, 0.18))
 
-	# 传送门
 	var pulse := sin(_anim_timer * 3.0) * 0.15 + 0.85
-	var portal_radius := VS.PORTAL_LOBBY_DISPLAY_SIZE * 0.5
-	draw_circle(_portal_pos, portal_radius, Color(0.0, 0.7, 1.0, 0.3 * pulse))
-	draw_arc(_portal_pos, portal_radius, 0, TAU, 32, Color(0.0, 0.85, 1.0, 0.8 * pulse), 3.0)
-	draw_arc(_portal_pos, portal_radius * 0.72, 0, TAU, 32, Color(0.3, 0.9, 1.0, 0.5 * pulse), 2.0)
-	draw_arc(_portal_pos, portal_radius * 0.4, 0, TAU, 24, Color(0.6, 1.0, 1.0, 0.6 * pulse), 1.5)
-
-	# 传送门文字
-	draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-30, 45), "副本入口",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.0, 0.85, 1.0, pulse))
-
-	# 靠近提示
 	if _portal_near and not _map_select_open:
-		draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-52, 65), "靠近后打开副本选择",
+		draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-34, -76), "按 E 交互",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))

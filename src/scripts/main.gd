@@ -22,6 +22,7 @@ const ACTION_KEY_Y := 55.0
 const ACTION_KEY_COLOR := Color(0.78, 0.88, 0.94)
 const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
 const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_yellow_sheet.png"
+const DUNGEON_PORTAL_INTERACT_RADIUS := 58.0
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 
@@ -63,6 +64,10 @@ var _boss_pos: Vector2i = CENTER
 var _boss_entry_pos: Vector2i = CENTER
 var _portal_active := false
 var _portal_pos := Vector2.ZERO
+var _start_portal_pos := Vector2.ZERO
+var _start_portal_sprite: TransferPortal
+var _boss_portal_sprite: TransferPortal
+var _return_portal_near := false
 var _doors: Dictionary = {}
 var _wall_bodies: Array[StaticBody2D] = []
 var _spawn_warning_positions: Array[Vector2] = []
@@ -140,6 +145,7 @@ func _ready() -> void:
 
 	var start_center := Vector2(CENTER.x * CELL_W + CELL_W / 2, CENTER.y * CELL_H + CELL_H / 2)
 	$Player.position = start_center
+	_create_start_portal(start_center)
 
 	_current_room = CENTER
 	var room: RoomData = _rooms[CENTER]
@@ -151,6 +157,29 @@ func _ready() -> void:
 	_play_player_spawn_warning($Player)
 
 
+func _create_transfer_portal(pos: Vector2, display_size: float, node_name: String) -> TransferPortal:
+	var portal: TransferPortal = TransferPortal.new()
+	portal.name = node_name
+	portal.position = pos
+	portal.z_index = 5
+	portal.setup(display_size)
+	add_child(portal)
+	return portal
+
+
+func _create_start_portal(start_center: Vector2) -> void:
+	_start_portal_pos = start_center + Vector2(0, -92)
+	_start_portal_sprite = _create_transfer_portal(_start_portal_pos, VS.PORTAL_DUNGEON_DISPLAY_SIZE * 2.5, "StartReturnPortal")
+
+
+func _show_boss_return_portal(pos: Vector2) -> void:
+	_portal_pos = pos
+	_portal_active = true
+	if _boss_portal_sprite != null and is_instance_valid(_boss_portal_sprite):
+		_boss_portal_sprite.queue_free()
+	_boss_portal_sprite = _create_transfer_portal(_portal_pos, VS.PORTAL_DUNGEON_DISPLAY_SIZE * 2.5, "BossReturnPortal")
+
+
 # ── 地牢生成 ──────────────────────────────────────────
 
 func _generate_floor() -> void:
@@ -158,6 +187,7 @@ func _generate_floor() -> void:
 	_doors.clear()
 	_boss_defeated = false
 	_portal_active = false
+	_return_portal_near = false
 	_spawn_warning_positions.clear()
 	_spawn_warning_timer = 0.0
 
@@ -597,8 +627,7 @@ func _on_boss_died(room: RoomData) -> void:
 	if room.enemies.is_empty():
 		_room_cleared(room)
 	# 在 boss 房间生成传送门
-	_portal_active = true
-	_portal_pos = Vector2(_boss_pos.x * CELL_W + CELL_W / 2, _boss_pos.y * CELL_H + CELL_H / 2)
+	_show_boss_return_portal(Vector2(_boss_pos.x * CELL_W + CELL_W / 2, _boss_pos.y * CELL_H + CELL_H / 2))
 	queue_redraw()
 	_show_hint("Boss 已击败！按 E 返回基地", Color(0.0, 0.898, 1.0))
 
@@ -1287,6 +1316,13 @@ func _process(delta: float) -> void:
 	if state != GameManager.GameState.PLAYING:
 		return
 
+	var near_return_portal: bool = $Player.global_position.distance_to(_start_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS
+	if _portal_active:
+		near_return_portal = near_return_portal or $Player.global_position.distance_to(_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS
+	if near_return_portal != _return_portal_near:
+		_return_portal_near = near_return_portal
+		queue_redraw()
+
 	# 怪物预警倒计时
 	if _spawn_warning_timer > 0.0:
 		_spawn_warning_timer -= delta
@@ -1482,13 +1518,18 @@ func _input(event: InputEvent) -> void:
 		GameManager.restore_lobby_weapons()
 		GameManager.return_to_lobby()
 
-	# E 键进入传送门（通关）
-	if _portal_active and event is InputEventKey and event.pressed and event.keycode == KEY_E:
-		if $Player.global_position.distance_to(_portal_pos) < 40.0:
+	# E 键进入传送门
+	if GameManager.state == GameManager.GameState.PLAYING and event.is_action_pressed("interact"):
+		if $Player.global_position.distance_to(_start_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
+			GameManager.restore_lobby_weapons()
+			GameManager.return_to_lobby()
+			return
+		if _portal_active and $Player.global_position.distance_to(_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
 			_portal_active = false
 			GameManager.restore_lobby_weapons()
 			GameManager.add_dungeon_clear()
 			GameManager.return_to_lobby()
+			return
 
 
 # ── 暂停菜单 ──────────────────────────────────────────
@@ -1820,10 +1861,11 @@ func _draw() -> void:
 
 	_draw_locked_doors()
 
-	# 传送门
-	if _portal_active:
-		var portal_radius := VS.PORTAL_DUNGEON_DISPLAY_SIZE * 0.5
-		draw_circle(_portal_pos, portal_radius, Color(0.0, 0.898, 1.0, 0.3))
-		draw_arc(_portal_pos, portal_radius, 0, TAU, 24, Color(0.0, 0.898, 1.0), 3.0)
+	# 传送门提示
+	if is_instance_valid($Player):
+		if $Player.global_position.distance_to(_start_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
+			draw_string(ThemeDB.fallback_font, _start_portal_pos + Vector2(-34, -100), "按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
+		if _portal_active and $Player.global_position.distance_to(_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
+			draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-34, -100), "按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
 
 	# 怪物出生预警由黄色震荡波节点播放。
