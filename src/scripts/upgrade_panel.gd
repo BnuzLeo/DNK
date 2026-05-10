@@ -1,6 +1,6 @@
 extends Node
 
-## 坤坤经纪人 — 属性升级面板
+## 尖叫鸡 — 属性升级面板
 
 var _canvas: CanvasLayer
 var _player: Node
@@ -45,7 +45,7 @@ func _build_ui() -> void:
 
 	# 标题
 	var title := Label.new()
-	title.text = "坤坤经纪人 - 属性升级"
+	title.text = "尖叫鸡 - 属性升级"
 	title.position = Vector2(200, 95)
 	title.add_theme_font_size_override("font_size", 22)
 	title.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))

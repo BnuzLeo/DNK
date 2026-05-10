@@ -4,7 +4,20 @@ extends Area2D
 
 const VS := preload("res://scripts/visual_spec.gd")
 
-const NPC_TEXTURES := {}
+const NPC_ANIMATIONS := {
+	"broker": {
+		"path": "res://assets/export/characters/npc/尖叫鸡_sheet.png",
+		"frames": 7,
+		"fps": 20.0,
+		"frame_size": Vector2i(96, 96),
+	},
+	"smith": {
+		"path": "res://assets/export/characters/npc/卡皮巴拉_sheet.png",
+		"frames": 8,
+		"fps": 16.0,
+		"frame_size": Vector2i(96, 96),
+	},
+}
 
 var npc_type: String = ""
 var display_name: String = ""
@@ -13,7 +26,7 @@ var _player_in_range := false
 var _panel_open := false
 var _prompt_alpha := 0.0
 var _panel_node: Node = null
-var _sprite: Sprite2D = null
+var _sprite: AnimatedSprite2D = null
 var _sprite_type := ""
 
 
@@ -82,29 +95,46 @@ func _on_panel_closed() -> void:
 
 
 func _setup_sprite() -> void:
-	var path: String = NPC_TEXTURES.get(npc_type, "")
-	if path.is_empty():
+	var config: Dictionary = NPC_ANIMATIONS.get(npc_type, {})
+	if config.is_empty():
 		if _sprite != null:
 			_sprite.queue_free()
 			_sprite = null
 		_sprite_type = npc_type
 		return
-	var texture := _load_texture(path)
+	var texture := _load_texture(config.get("path", ""))
 	if texture == null:
 		return
 	if _sprite == null:
-		_sprite = Sprite2D.new()
+		_sprite = AnimatedSprite2D.new()
 		_sprite.centered = true
 		_sprite.z_index = 1
 		add_child(_sprite)
 	_sprite_type = npc_type
-	_sprite.texture = texture
-	var texture_size := texture.get_size()
-	if texture_size.y > 0.0:
-		var scale_factor: float = VS.NPC_DISPLAY_HEIGHT / texture_size.y
+	_sprite.sprite_frames = _build_sprite_frames(texture, config)
+	_sprite.play("idle")
+	var frame_size: Vector2i = config.get("frame_size", Vector2i(96, 96))
+	if frame_size.y > 0:
+		var scale_factor: float = VS.NPC_DISPLAY_HEIGHT / float(frame_size.y)
 		_sprite.scale = Vector2(scale_factor, scale_factor)
 		# Keep the existing interaction text positions below the NPC feet.
 		_sprite.position = Vector2(0.0, -18.0)
+
+
+func _build_sprite_frames(texture: Texture2D, config: Dictionary) -> SpriteFrames:
+	var sprite_frames := SpriteFrames.new()
+	sprite_frames.remove_animation("default")
+	sprite_frames.add_animation("idle")
+	sprite_frames.set_animation_speed("idle", float(config.get("fps", 12.0)))
+	sprite_frames.set_animation_loop("idle", true)
+	var frame_size: Vector2i = config.get("frame_size", Vector2i(96, 96))
+	var frame_count := int(config.get("frames", 1))
+	for frame_index in frame_count:
+		var atlas := AtlasTexture.new()
+		atlas.atlas = texture
+		atlas.region = Rect2(frame_index * frame_size.x, 0, frame_size.x, frame_size.y)
+		sprite_frames.add_frame("idle", atlas)
+	return sprite_frames
 
 
 func _load_texture(path: String) -> Texture2D:

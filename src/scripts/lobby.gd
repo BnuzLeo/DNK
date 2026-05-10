@@ -4,6 +4,15 @@ extends Node2D
 
 const VS := preload("res://scripts/visual_spec.gd")
 
+const LOBBY_MUSIC_PATH := "res://assets/music/鸡你太美.wav"
+const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
+const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
+const GUI_SWITCH_FRAME := preload("res://assets/export/gui/换武器框.png")
+const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
+const STATUS_SCALE := 2.6
+const STATUS_FILL_W := 59.0 * STATUS_SCALE
+const STATUS_FILL_H := 5.5 * STATUS_SCALE
+
 const ROOM_W := int(VS.VIEWPORT_SIZE.x)
 const ROOM_H := int(VS.VIEWPORT_SIZE.y)
 const WALL_T := int(VS.WALL_THICKNESS)
@@ -13,6 +22,7 @@ var _bullet_pool: Node2D
 var _portal_pos := Vector2(480, 120)
 var _portal_near := false
 var _anim_timer := 0.0
+var _lobby_music: AudioStreamPlayer
 
 # HUD
 var _practice_label: Label
@@ -50,11 +60,40 @@ var _map_cards: Array[Control] = []
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameManager.change_state(GameManager.GameState.LOBBY)
+	_start_lobby_music()
 	_create_walls()
 	_create_bullet_pool()
 	_create_player()
 	_create_npcs()
 	_create_hud()
+
+
+func _start_lobby_music() -> void:
+	var stream := _load_audio_stream(LOBBY_MUSIC_PATH)
+	if stream == null:
+		return
+	_lobby_music = AudioStreamPlayer.new()
+	_lobby_music.bus = "Master"
+	_lobby_music.volume_db = -4.0
+	_lobby_music.stream = stream
+	_lobby_music.finished.connect(_replay_lobby_music)
+	add_child(_lobby_music)
+	_lobby_music.play()
+
+
+func _replay_lobby_music() -> void:
+	if _lobby_music != null and is_instance_valid(_lobby_music):
+		_lobby_music.play()
+
+
+func _load_audio_stream(path: String) -> AudioStream:
+	var stream := load(path) as AudioStream
+	if stream != null:
+		return stream
+	var absolute_path := ProjectSettings.globalize_path(path)
+	if FileAccess.file_exists(absolute_path):
+		return AudioStreamWAV.load_from_file(absolute_path)
+	return null
 
 
 func _create_walls() -> void:
@@ -111,7 +150,7 @@ func _create_player() -> void:
 func _create_npcs() -> void:
 	var npc_script := load("res://scripts/npc.gd")
 
-	# 坤坤经纪人（天赋树）— 左侧
+	# 尖叫鸡（天赋树）— 左侧
 	var broker := Area2D.new()
 	broker.position = Vector2(240, 320)
 	broker.set_script(npc_script)
@@ -122,10 +161,10 @@ func _create_npcs() -> void:
 	broker.add_child(broker_col)
 	add_child(broker)
 	broker.npc_type = "broker"
-	broker.display_name = "坤坤经纪人"
+	broker.display_name = "尖叫鸡"
 	broker.npc_color = Color(0.9, 0.7, 0.2)
 
-	# 鸡哥铁匠（武器商店）— 右侧
+	# 卡皮巴拉（武器商店）— 右侧
 	var smith := Area2D.new()
 	smith.position = Vector2(720, 320)
 	smith.set_script(npc_script)
@@ -136,7 +175,7 @@ func _create_npcs() -> void:
 	smith.add_child(smith_col)
 	add_child(smith)
 	smith.npc_type = "smith"
-	smith.display_name = "一个真正的man"
+	smith.display_name = "卡皮巴拉"
 	smith.npc_color = Color(0.5, 0.6, 0.8)
 
 var _hud_canvas: CanvasLayer
@@ -159,54 +198,54 @@ func _create_hud() -> void:
 
 	_hud_frame = Control.new()
 	_hud_frame.position = Vector2(12, 4)
-	_hud_frame.size = Vector2(206, 96)
+	_hud_frame.size = Vector2(79, 39) * STATUS_SCALE
 	_hud_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud_frame.draw.connect(_draw_stats_frame)
 	_hud_canvas.add_child(_hud_frame)
 
 	_hp_bar_bg = ColorRect.new()
-	_hp_bar_bg.position = Vector2(48, 20)
-	_hp_bar_bg.size = Vector2(140, 16)
-	_hp_bar_bg.color = Color(0.13, 0.08, 0.07)
+	_hp_bar_bg.position = Vector2(12, 4) + Vector2(15, 4) * STATUS_SCALE
+	_hp_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
+	_hp_bar_bg.color = Color(0.08, 0.04, 0.03, 0.55)
 	_hud_canvas.add_child(_hp_bar_bg)
 
 	_hp_bar = ColorRect.new()
-	_hp_bar.position = Vector2(50, 22)
-	_hp_bar.size = Vector2(136, 12)
+	_hp_bar.position = _hp_bar_bg.position
+	_hp_bar.size = _hp_bar_bg.size
 	_hp_bar.color = Color(0.88, 0.07, 0.15)
 	_hud_canvas.add_child(_hp_bar)
 
-	_hp_text = _make_hud_value_label(Vector2(96, 14), Color.WHITE)
+	_hp_text = _make_hud_value_label(Vector2(72, 7), Color.WHITE)
 	_hud_canvas.add_child(_hp_text)
 
 	_shield_bar_bg = ColorRect.new()
-	_shield_bar_bg.position = Vector2(48, 39)
-	_shield_bar_bg.size = Vector2(140, 16)
-	_shield_bar_bg.color = Color(0.11, 0.12, 0.13)
+	_shield_bar_bg.position = Vector2(12, 4) + Vector2(15, 16) * STATUS_SCALE
+	_shield_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
+	_shield_bar_bg.color = Color(0.06, 0.07, 0.08, 0.55)
 	_hud_canvas.add_child(_shield_bar_bg)
 
 	_shield_bar = ColorRect.new()
-	_shield_bar.position = Vector2(50, 41)
-	_shield_bar.size = Vector2(136, 12)
+	_shield_bar.position = _shield_bar_bg.position
+	_shield_bar.size = _shield_bar_bg.size
 	_shield_bar.color = Color(0.78, 0.85, 0.9)
 	_hud_canvas.add_child(_shield_bar)
 
-	_shield_text = _make_hud_value_label(Vector2(96, 33), Color.WHITE)
+	_shield_text = _make_hud_value_label(Vector2(72, 38), Color.WHITE)
 	_hud_canvas.add_child(_shield_text)
 
 	_mana_bar_bg = ColorRect.new()
-	_mana_bar_bg.position = Vector2(48, 58)
-	_mana_bar_bg.size = Vector2(140, 16)
-	_mana_bar_bg.color = Color(0.08, 0.09, 0.18)
+	_mana_bar_bg.position = Vector2(12, 4) + Vector2(15, 28) * STATUS_SCALE
+	_mana_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
+	_mana_bar_bg.color = Color(0.04, 0.05, 0.12, 0.55)
 	_hud_canvas.add_child(_mana_bar_bg)
 
 	_mana_bar = ColorRect.new()
-	_mana_bar.position = Vector2(50, 60)
-	_mana_bar.size = Vector2(136, 12)
+	_mana_bar.position = _mana_bar_bg.position
+	_mana_bar.size = _mana_bar_bg.size
 	_mana_bar.color = Color(0.22, 0.33, 0.9)
 	_hud_canvas.add_child(_mana_bar)
 
-	_mana_text = _make_hud_value_label(Vector2(96, 52), Color.WHITE)
+	_mana_text = _make_hud_value_label(Vector2(72, 69), Color.WHITE)
 	_hud_canvas.add_child(_mana_text)
 
 	_weapon_label = Label.new()
@@ -252,24 +291,24 @@ func _create_hud() -> void:
 	_hud_canvas.add_child(_bag_button)
 
 	_attack_icon = Control.new()
-	_attack_icon.position = Vector2(796, 504)
-	_attack_icon.size = Vector2(112, 112)
+	_attack_icon.position = Vector2(814, 522)
+	_attack_icon.size = Vector2(76, 76)
 	_attack_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_attack_icon.draw.connect(_draw_attack_icon)
 	_attack_icon.gui_input.connect(_on_action_button_input.bind("shoot"))
 	_hud_canvas.add_child(_attack_icon)
 
 	_switch_icon = Control.new()
-	_switch_icon.position = Vector2(814, 356)
-	_switch_icon.size = Vector2(86, 86)
+	_switch_icon.position = Vector2(813, 359)
+	_switch_icon.size = Vector2(88, 80)
 	_switch_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_switch_icon.draw.connect(_draw_switch_icon)
 	_switch_icon.gui_input.connect(_on_action_button_input.bind("switch_weapon"))
 	_hud_canvas.add_child(_switch_icon)
 
 	_dash_icon = Control.new()
-	_dash_icon.position = Vector2(664, 370)
-	_dash_icon.size = Vector2(56, 56)
+	_dash_icon.position = Vector2(654, 360)
+	_dash_icon.size = Vector2(76, 76)
 	_dash_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_dash_icon.draw.connect(_draw_dash_icon)
 	_dash_icon.gui_input.connect(_on_action_button_input.bind("dash"))
@@ -299,12 +338,12 @@ func _process(delta: float) -> void:
 		_mana_text.text = "%d/%d" % [int(_player.mana), int(_player.MAX_MANA)]
 
 		var mana_ratio: float = _player.mana / _player.MAX_MANA
-		_mana_bar.size.x = 136.0 * clampf(mana_ratio, 0.0, 1.0)
+		_mana_bar.size.x = STATUS_FILL_W * clampf(mana_ratio, 0.0, 1.0)
 		var hp_ratio: float = float(_player.hp) / float(_player.MAX_HP)
-		_hp_bar.size.x = 136.0 * clampf(hp_ratio, 0.0, 1.0)
+		_hp_bar.size.x = STATUS_FILL_W * clampf(hp_ratio, 0.0, 1.0)
 		_hp_bar.color = Color(0.88, 0.07, 0.15)
 		var armor_ratio := 0.0 if _player.max_armor <= 0 else float(_player.armor) / float(_player.max_armor)
-		_shield_bar.size.x = 136.0 * clampf(armor_ratio, 0.0, 1.0)
+		_shield_bar.size.x = STATUS_FILL_W * clampf(armor_ratio, 0.0, 1.0)
 		_shield_bar.visible = _player.max_armor > 0
 		_shield_bar_bg.visible = _player.max_armor > 0
 		_shield_text.visible = _player.max_armor > 0
@@ -339,9 +378,9 @@ func _process(delta: float) -> void:
 func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
 	var label := Label.new()
 	label.position = pos
-	label.size = Vector2(108, 18)
+	label.size = Vector2(96, 16)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_font_size_override("font_size", 12)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_shadow_color", Color.BLACK)
 	label.add_theme_constant_override("shadow_offset_x", 1)
@@ -350,28 +389,7 @@ func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
 
 
 func _draw_stats_frame() -> void:
-	var r := Rect2(Vector2.ZERO, _hud_frame.size)
-	_hud_frame.draw_rect(r, Color(0.58, 0.42, 0.24))
-	_hud_frame.draw_rect(r.grow(-3), Color(0.78, 0.62, 0.38))
-	_hud_frame.draw_rect(Rect2(10, 10, 34, 20), Color(0.18, 0.13, 0.09))
-	_hud_frame.draw_rect(Rect2(10, 31, 34, 20), Color(0.18, 0.13, 0.09))
-	_hud_frame.draw_rect(Rect2(10, 52, 34, 20), Color(0.18, 0.13, 0.09))
-	_hud_frame.draw_rect(Rect2(50, 15, 136, 16), Color.BLACK, false, 2.0)
-	_hud_frame.draw_rect(Rect2(50, 36, 136, 16), Color.BLACK, false, 2.0)
-	_hud_frame.draw_rect(Rect2(50, 57, 136, 16), Color.BLACK, false, 2.0)
-
-	var heart := PackedVector2Array([
-		Vector2(25, 28), Vector2(12, 16), Vector2(13, 10), Vector2(19, 8),
-		Vector2(25, 14), Vector2(31, 8), Vector2(37, 10), Vector2(38, 16),
-	])
-	_hud_frame.draw_colored_polygon(heart, Color(0.95, 0.13, 0.28))
-	_hud_frame.draw_polyline(heart + PackedVector2Array([heart[0]]), Color.BLACK, 2.0)
-	_hud_frame.draw_rect(Rect2(17, 31, 22, 16), Color(0.82, 0.9, 0.94))
-	_hud_frame.draw_rect(Rect2(19, 30, 18, 18), Color(0.78, 0.85, 0.9), false, 2.0)
-	_hud_frame.draw_line(Vector2(28, 31), Vector2(28, 48), Color(0.35, 0.45, 0.52), 1.0)
-	var gem := PackedVector2Array([Vector2(27, 52), Vector2(41, 63), Vector2(27, 76), Vector2(13, 63)])
-	_hud_frame.draw_colored_polygon(gem, Color(0.34, 0.64, 1.0))
-	_hud_frame.draw_polyline(gem + PackedVector2Array([gem[0]]), Color.BLACK, 2.0)
+	_hud_frame.draw_texture_rect(GUI_STATUS_BAR, Rect2(Vector2.ZERO, _hud_frame.size), false)
 
 
 func _draw_practice_panel() -> void:
@@ -402,45 +420,32 @@ func _draw_bag_button() -> void:
 
 func _draw_button_key(ctrl: Control, key: String, color: Color = Color.WHITE) -> void:
 	var font := ThemeDB.fallback_font
-	var font_size := 18
+	var font_size := 16
 	var text_size := font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	var pos := (ctrl.size - text_size) / 2.0
 	ctrl.draw_string(font, pos + Vector2(0, text_size.y), key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 
 func _draw_attack_icon() -> void:
-	var c := _attack_icon.size / 2.0
-	_attack_icon.draw_circle(c, 53.0, Color(0.63, 0.72, 0.78, 0.42))
-	_attack_icon.draw_circle(c, 38.0, Color(0.35, 0.45, 0.52, 0.42))
-	_attack_icon.draw_circle(c, 15.0, Color(0.35, 0.45, 0.52, 0.35))
-	_attack_icon.draw_arc(c, 34.0, 0, TAU, 36, Color(0.85, 0.93, 0.96, 0.7), 4.0)
-	_attack_icon.draw_line(c + Vector2(-36, 0), c + Vector2(-22, 0), Color(0.85, 0.93, 0.96, 0.75), 3.0)
-	_attack_icon.draw_line(c + Vector2(22, 0), c + Vector2(36, 0), Color(0.85, 0.93, 0.96, 0.75), 3.0)
-	_attack_icon.draw_line(c + Vector2(0, -36), c + Vector2(0, -22), Color(0.85, 0.93, 0.96, 0.75), 3.0)
-	_attack_icon.draw_line(c + Vector2(0, 22), c + Vector2(0, 36), Color(0.85, 0.93, 0.96, 0.75), 3.0)
+	_attack_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, _attack_icon.size), false)
+	var logo_size := _attack_icon.size * 0.48
+	var logo_rect := Rect2((_attack_icon.size - logo_size) * 0.5 + Vector2(0, -3), logo_size)
+	_attack_icon.draw_texture_rect(GUI_ATTACK_LOGO, logo_rect, false)
 	_draw_button_key(_attack_icon, "J", Color(0.95, 0.25, 0.2))
 
 
 func _draw_switch_icon() -> void:
-	var c := _switch_icon.size / 2.0
-	_switch_icon.draw_circle(c, 42.0, Color(0.40, 0.54, 0.62, 0.45))
-	_switch_icon.draw_arc(c, 39.0, -0.8, TAU - 0.8, 34, Color(0.17, 0.27, 0.32, 0.75), 9.0)
-	_switch_icon.draw_arc(c, 38.0, PI * 0.7, PI * 1.7, 18, Color(0.55, 0.70, 0.77, 0.55), 7.0)
+	_switch_icon.draw_texture_rect(GUI_SWITCH_FRAME, Rect2(Vector2.ZERO, _switch_icon.size), false)
 	_draw_button_key(_switch_icon, "Q", Color(0.78, 0.88, 0.94))
 
 
 func _draw_dash_icon() -> void:
 	var center := _dash_icon.size / 2.0
-	_dash_icon.draw_circle(center, 26.0, Color(0.58, 0.68, 0.75, 0.5))
-	_dash_icon.draw_circle(center, 19.0, Color(0.12, 0.18, 0.21, 0.75))
-	_dash_icon.draw_circle(center, 6.0, Color(0.78, 0.86, 0.89, 0.78))
-	_dash_icon.draw_circle(center + Vector2(-8, -5), 3.0, Color(0.78, 0.86, 0.89, 0.65))
-	_dash_icon.draw_circle(center + Vector2(8, -5), 3.0, Color(0.78, 0.86, 0.89, 0.65))
-	_dash_icon.draw_line(center + Vector2(-7, 7), center + Vector2(7, 7), Color(0.78, 0.86, 0.89, 0.65), 2.0)
+	_dash_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, _dash_icon.size), false)
 	var dash_cd: float = _player._dash_cooldown
 	if dash_cd > 0.0:
 		var cd_ratio: float = clampf(dash_cd / _player.DASH_COOLDOWN, 0.0, 1.0)
-		var radius := 26.0
+		var radius := _dash_icon.size.x * 0.36
 		var points := PackedVector2Array()
 		points.append(center)
 		var segments := 24
@@ -456,8 +461,7 @@ func _draw_dash_icon() -> void:
 func _draw_berserk_icon() -> void:
 	var active: bool = _player.has_method("is_berserk_active") and _player.is_berserk_active()
 	var c := _berserk_icon.size / 2.0
-	_berserk_icon.draw_circle(c, 36.0, Color(0.48, 0.57, 0.61, 0.48))
-	_berserk_icon.draw_circle(c, 29.0, Color(0.10, 0.14, 0.16, 0.8))
+	_berserk_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, _berserk_icon.size), false)
 	var glow := Color(1.0, 0.33, 0.06, 0.35 if active else 0.18)
 	var flame := PackedVector2Array([
 		c + Vector2(-20, 12), c + Vector2(-12, -2), c + Vector2(-4, -22),

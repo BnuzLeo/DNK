@@ -1,6 +1,6 @@
 extends Node
 
-## 鸡哥铁匠 — 武器商店面板
+## 卡皮巴拉 — 武器商店面板
 
 const VS := preload("res://scripts/visual_spec.gd")
 
@@ -40,7 +40,7 @@ func _build_ui() -> void:
 
 	# 标题
 	var title := Label.new()
-	title.text = "鸡哥铁匠 - 武器商店"
+	title.text = "卡皮巴拉 - 武器商店"
 	title.position = Vector2(160, 75)
 	title.add_theme_font_size_override("font_size", 22)
 	title.add_theme_color_override("font_color", Color(0.5, 0.6, 0.8))
