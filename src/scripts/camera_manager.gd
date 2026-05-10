@@ -17,6 +17,7 @@ var _shake_exponential := false
 func setup(camera: Camera2D, base_offset: Vector2 = VS.CAMERA_MAIN_BASE_OFFSET) -> void:
 	_camera = camera
 	_base_offset = base_offset
+	_camera.process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
 	_camera.position_smoothing_enabled = true
 	_camera.position_smoothing_speed = VS.CAMERA_SMOOTH_SPEED
 	_camera.offset = _base_offset

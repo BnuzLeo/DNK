@@ -96,6 +96,7 @@ func _create_player() -> void:
 
 	var cam := Camera2D.new()
 	cam.offset = VS.CAMERA_LOBBY_BASE_OFFSET
+	cam.process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
 	cam.position_smoothing_enabled = true
 	cam.position_smoothing_speed = VS.CAMERA_SMOOTH_SPEED
 	cam.limit_left = 0
