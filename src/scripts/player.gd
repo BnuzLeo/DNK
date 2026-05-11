@@ -662,7 +662,10 @@ func _get_man_targets(weapon: Dictionary) -> Array[Area2D]:
 		if dist < closest_dist:
 			closest_dist = dist
 			closest = enemy
-	return [] if closest == null else [closest]
+	var targets: Array[Area2D] = []
+	if closest != null:
+		targets.append(closest)
+	return targets
 
 
 func _get_alive_enemies() -> Array[Area2D]:
