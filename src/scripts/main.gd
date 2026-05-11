@@ -12,6 +12,8 @@ const BASKETBALL_HEAD_NORMAL_2_PATH := "res://assets/export/weapon/weapon_01/3.p
 const BASKETBALL_HEAD_BERSERK_PATH := "res://assets/export/weapon/weapon_01/dunk.png"
 const BASKETBALL_HIT_EFFECT := preload("res://scripts/basketball_hit_effect.gd")
 const BASKETBALL_BERSERK_HIT_EFFECT := preload("res://scripts/basketball_berserk_hit_effect.gd")
+const MAN_NORMAL_HIT_EFFECT := preload("res://scripts/man_normal_hit_effect.gd")
+const MAN_BERSERK_EXPLOSION_PATH := "res://assets/export/weapon/weapon_02/狂暴模式爆炸.png"
 const EXPLOSION_EFFECT_SCRIPT := preload("res://scripts/explosion_effect.gd")
 const ICE_FLOOR_TILES := [
 	preload("res://assets/export/map/冰封篮球场/地砖_01.png"),
@@ -1745,6 +1747,10 @@ func _on_bullet_hit_feedback(pos: Vector2, damage: int, is_kill: bool, is_boss: 
 		trigger_hit_stop(5, 14.0, 0.32)
 		spawn_damage_number(pos, damage, Color(1.0, 0.26, 0.08), 18)
 		return
+	elif projectile_type == "man_bullet":
+		_spawn_man_hit_fx(pos, false)
+	elif projectile_type == "man_bullet_berserk":
+		_spawn_man_hit_fx(pos, true)
 	if is_kill:
 		trigger_hit_stop(3, 1.0, 0.05)
 		spawn_damage_number(pos, damage, Color(1.0, 0.53, 0.0), 16)
@@ -1803,6 +1809,43 @@ func _spawn_basketball_berserk_hit_fx(pos: Vector2) -> void:
 	add_child(fallback)
 	fallback.global_position = pos
 	fallback.setup(0.34, 54.0)
+
+
+func _spawn_man_hit_fx(pos: Vector2, is_berserk: bool) -> void:
+	if is_berserk:
+		var texture := _load_basketball_texture(MAN_BERSERK_EXPLOSION_PATH)
+		if texture != null:
+			var sprite := Sprite2D.new()
+			sprite.texture = texture
+			sprite.centered = true
+			sprite.global_position = pos
+			sprite.z_index = 98
+			var max_dim := maxf(float(texture.get_width()), float(texture.get_height()))
+			if max_dim > 0.0:
+				sprite.scale = Vector2.ONE * (54.0 / max_dim)
+			add_child(sprite)
+			var tween := sprite.create_tween()
+			tween.set_parallel(true)
+			tween.tween_property(sprite, "scale", sprite.scale * 1.35, 0.24)
+			tween.tween_property(sprite, "modulate:a", 0.0, 0.24)
+			tween.tween_callback(sprite.queue_free)
+			return
+		var fallback := EXPLOSION_EFFECT_SCRIPT.new()
+		add_child(fallback)
+		fallback.global_position = pos
+		fallback.setup(0.28, 58.0)
+		return
+	var effect := MAN_NORMAL_HIT_EFFECT.new()
+	add_child(effect)
+	effect.global_position = pos
+	effect.setup(46.0)
+	if effect.sprite_frames != null and effect.sprite_frames.get_frame_count("explode") > 0:
+		return
+	effect.queue_free()
+	var fallback := EXPLOSION_EFFECT_SCRIPT.new()
+	add_child(fallback)
+	fallback.global_position = pos
+	fallback.setup(0.24, 38.0)
 
 
 func _load_basketball_texture(path: String) -> Texture2D:

@@ -10,6 +10,34 @@ const PLAYER_SPRITE_PATH := "res://assets/export/effects/sprite.webp"
 const PLAYER_SPRITE_FRAME_SIZE := Vector2i(192, 208)
 const PLAYER_SPRITE_FRAME_COUNTS := [6, 8, 8, 4, 5, 8, 6, 6, 6]
 const PLAYER_SPRITE_DISPLAY_HEIGHT := 88.0
+const MAN_GUN_NORMAL_FRAME_PATHS: Array[String] = [
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_00.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_01.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_02.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_03.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_04.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_05.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_06.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_07.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_08.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_09.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_10.png",
+	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_11.png",
+]
+const MAN_GUN_BERSERK_FRAME_PATHS: Array[String] = [
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_00.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_01.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_02.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_03.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_04.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_05.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_06.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_07.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_08.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_09.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_10.png",
+	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_11.png",
+]
 
 enum PlayerSpriteAnim { IDLE, RUN_RIGHT, RUN_LEFT, WAVE, JUMP, FAIL, WAIT, DANCE, INSPECT }
 
@@ -55,10 +83,11 @@ const WEAPONS := {
 		"berserk_cooldown": 9.0
 	},
 	"chicken_foot": {
-		"cooldown": 1.0, "damage": 8, "count": 1, "mana": 0,
-		"name": "漏出鸡脚", "type": "rooster", "speed": 320.0, "lifetime": 6.0,
-		"monitor_range": 180.0,
-		"berserk_count": 10, "berserk_cooldown": 3.0
+		"cooldown": 1.0, "damage": 8, "mana": 0,
+		"name": "真正的MAN", "type": "man_gun", "speed": 780.0,
+		"lock_range": 430.0, "aoe_radius": 76.0, "aoe_damage": 5,
+		"berserk_cooldown": 0.5, "berserk_damage": 9, "berserk_speed": 920.0,
+		"berserk_aoe_radius": 92.0, "berserk_aoe_damage": 6
 	},
 }
 
@@ -84,6 +113,9 @@ var _sprite_timer := 0.0
 var _sprite_idle_timer := 0.0
 var _sprite_action_timer := 0.0
 var _last_move_input := Vector2.ZERO
+var _weapon_sprite: AnimatedSprite2D = null
+var _weapon_anim_mode := ""
+var _weapon_aim_dir := Vector2.RIGHT
 
 # 闪避状态
 var _dash_timer := 0.0
@@ -191,6 +223,7 @@ func _ready() -> void:
 	bullet_pool = get_node_or_null("../BulletPool")
 	_load_from_game_manager()
 	_setup_sprite()
+	_setup_carried_weapon_sprite()
 
 
 func _physics_process(delta: float) -> void:
@@ -231,6 +264,7 @@ func _physics_process(delta: float) -> void:
 		_last_move_input = _dash_dir
 		_update_sprite_animation(delta)
 		_update_dash_afterimages(delta)
+		_update_carried_weapon_visual()
 		modulate = Color.WHITE
 		queue_redraw()
 		return
@@ -267,6 +301,7 @@ func _physics_process(delta: float) -> void:
 		_dash_invuln_visual_timer = DASH_INVULN
 		_spawn_dash_afterimage()
 		_update_sprite_animation(delta)
+		_update_carried_weapon_visual()
 		return
 
 	# 移动 - 8方向
@@ -284,6 +319,7 @@ func _physics_process(delta: float) -> void:
 	# 面朝方向 = 最后移动方向
 	if input.length() > 0.1:
 		_facing = input.normalized()
+	_weapon_aim_dir = _get_preview_weapon_aim_dir()
 
 	# 武器切换
 	if _pending_weapon_switch:
@@ -310,6 +346,7 @@ func _physics_process(delta: float) -> void:
 	if _berserk_flash_timer > 0.0:
 		_berserk_flash_timer -= delta
 	_update_sprite_animation(delta)
+	_update_carried_weapon_visual()
 	queue_redraw()
 
 
@@ -383,6 +420,8 @@ func _activate_weapon(weapon: Dictionary) -> void:
 			_start_room_blast(weapon)
 		"rooster":
 			_spawn_roosters(weapon)
+		"man_gun":
+			_shoot_man_gun(weapon)
 
 
 func _shoot_basketball(weapon: Dictionary) -> void:
@@ -581,6 +620,84 @@ func _spawn_roosters(weapon: Dictionary) -> void:
 		projectile.setup(spawn_pos, dir, damage, speed, lifetime, monitor_range, _berserk_active)
 
 
+func _shoot_man_gun(weapon: Dictionary) -> void:
+	if bullet_pool == null:
+		return
+	var muzzle_pos := _get_man_muzzle_position()
+	var targets: Array[Area2D] = _get_man_targets(weapon)
+	if targets.is_empty():
+		var dir := _weapon_aim_dir.normalized()
+		if dir == Vector2.ZERO:
+			dir = _facing
+		_weapon_aim_dir = dir
+		_spawn_man_bullet(muzzle_pos, dir, weapon)
+		return
+	for enemy in targets:
+		if enemy == null or not is_instance_valid(enemy):
+			continue
+		var dir := (enemy.global_position - muzzle_pos).normalized()
+		if dir == Vector2.ZERO:
+			dir = _facing
+		_weapon_aim_dir = dir
+		_spawn_man_bullet(muzzle_pos, dir, weapon)
+
+
+func _spawn_man_bullet(muzzle_pos: Vector2, dir: Vector2, weapon: Dictionary) -> void:
+	var damage: int = (weapon.get("berserk_damage", weapon.damage) if _berserk_active else weapon.damage) + damage_bonus
+	var speed: float = weapon.get("berserk_speed", weapon.speed) if _berserk_active else weapon.speed
+	var radius: float = weapon.get("berserk_aoe_radius", weapon.aoe_radius) if _berserk_active else weapon.aoe_radius
+	var aoe_damage: int = (weapon.get("berserk_aoe_damage", weapon.aoe_damage) if _berserk_active else weapon.aoe_damage) + damage_bonus
+	bullet_pool.call("spawn_man_bullet", muzzle_pos, dir, speed, damage, _berserk_active, radius, aoe_damage)
+
+
+func _get_man_targets(weapon: Dictionary) -> Array[Area2D]:
+	var enemies := _get_alive_enemies()
+	if _berserk_active:
+		return enemies
+	var closest: Area2D = null
+	var lock_range: float = weapon.get("lock_range", 430.0)
+	var closest_dist := lock_range * lock_range
+	for enemy in enemies:
+		var dist := global_position.distance_squared_to(enemy.global_position)
+		if dist < closest_dist:
+			closest_dist = dist
+			closest = enemy
+	return [] if closest == null else [closest]
+
+
+func _get_alive_enemies() -> Array[Area2D]:
+	var enemies: Array[Area2D] = []
+	for enemy in get_tree().get_nodes_in_group("enemy"):
+		var enemy_area := enemy as Area2D
+		if enemy_area == null or not is_instance_valid(enemy_area):
+			continue
+		if not enemy_area.has_method("take_damage"):
+			continue
+		if "_dying" in enemy_area and enemy_area._dying:
+			continue
+		enemies.append(enemy_area)
+	return enemies
+
+
+func _get_preview_weapon_aim_dir() -> Vector2:
+	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
+	if weapon.get("type", "") != "man_gun":
+		return _facing
+	var targets := _get_man_targets(weapon)
+	if targets.is_empty():
+		return _facing
+	var muzzle_pos := _get_man_muzzle_position()
+	var dir := (targets[0].global_position - muzzle_pos).normalized()
+	return dir if dir != Vector2.ZERO else _facing
+
+
+func _get_man_muzzle_position() -> Vector2:
+	var dir := _weapon_aim_dir.normalized()
+	if dir == Vector2.ZERO:
+		dir = _facing
+	return global_position + dir * 36.0 + Vector2(0.0, 2.0)
+
+
 func take_damage(amount: int) -> void:
 	if _test_invincible or _invuln_timer > 0.0 or amount <= 0:
 		return
@@ -635,6 +752,51 @@ func _setup_sprite() -> void:
 	_sprite.scale = Vector2(sprite_scale, sprite_scale)
 	add_child(_sprite)
 	_apply_sprite_frame()
+
+
+func _setup_carried_weapon_sprite() -> void:
+	_weapon_sprite = AnimatedSprite2D.new()
+	_weapon_sprite.centered = true
+	_weapon_sprite.z_index = 4
+	_weapon_sprite.visible = false
+	add_child(_weapon_sprite)
+	_update_carried_weapon_visual()
+
+
+func _update_carried_weapon_visual() -> void:
+	if _weapon_sprite == null:
+		return
+	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
+	if weapon.get("type", "") != "man_gun":
+		_weapon_sprite.visible = false
+		return
+	var mode := "man_berserk" if _berserk_active else "man_normal"
+	if _weapon_anim_mode != mode:
+		_weapon_anim_mode = mode
+		_weapon_sprite.sprite_frames = _build_man_gun_frames(MAN_GUN_BERSERK_FRAME_PATHS if _berserk_active else MAN_GUN_NORMAL_FRAME_PATHS, mode)
+		_weapon_sprite.animation = mode
+		_weapon_sprite.play(mode)
+	_weapon_sprite.visible = true
+	var dir := _weapon_aim_dir.normalized()
+	if dir == Vector2.ZERO:
+		dir = _facing
+	_weapon_sprite.position = dir * 23.0 + Vector2(0.0, 3.0)
+	_weapon_sprite.rotation = dir.angle()
+	_weapon_sprite.scale = Vector2.ONE * (0.46 if _berserk_active else 0.42)
+
+
+func _build_man_gun_frames(paths: Array[String], anim_name: String) -> SpriteFrames:
+	var frames := SpriteFrames.new()
+	if frames.has_animation("default"):
+		frames.remove_animation("default")
+	frames.add_animation(anim_name)
+	frames.set_animation_loop(anim_name, true)
+	frames.set_animation_speed(anim_name, 12.0)
+	for path in paths:
+		var texture := load(path) as Texture2D
+		if texture != null:
+			frames.add_frame(anim_name, texture)
+	return frames
 
 
 func _update_sprite_animation(delta: float) -> void:

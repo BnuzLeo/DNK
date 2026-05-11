@@ -6,9 +6,13 @@ const BOSS_BIG_SNOWBALL_TEXTURE := preload("res://assets/export/enemies/boss/雪
 const BOSS_SMALL_SNOWBALL_TEXTURE := preload("res://assets/export/enemies/boss/雪人武器-雪球.png")
 const BASKETBALL_NORMAL_PATH := "res://assets/export/weapon/weapon_01/普通模式.png"
 const BASKETBALL_BERSERK_PATH := "res://assets/export/weapon/weapon_01/狂暴模式.png"
+const MAN_BULLET_NORMAL_PATH := "res://assets/export/weapon/weapon_02/普通模型子弹.png"
+const MAN_BULLET_BERSERK_PATH := "res://assets/export/weapon/weapon_02/狂暴模式子弹.png"
 
 var _basketball_normal_texture: Texture2D = null
 var _basketball_berserk_texture: Texture2D = null
+var _man_bullet_normal_texture: Texture2D = null
+var _man_bullet_berserk_texture: Texture2D = null
 
 func _draw() -> void:
 	if not visible:
@@ -25,6 +29,10 @@ func _draw() -> void:
 		var visual_y := -sin(progress * PI) * lob_height
 		draw_circle(Vector2(0.0, 6.0), 5.5, Color(0.0, 0.0, 0.0, 0.22))
 		_draw_basketball(_get_basketball_berserk_texture(), Vector2(28.0, 28.0), Color(1.0, 0.24, 0.08, 0.30), Color(1.0, 0.58, 0.18, 0.34), Vector2(0.0, visual_y))
+	elif projectile_type == "man_bullet":
+		_draw_man_bullet(_get_man_bullet_normal_texture(), Vector2(30.0, 30.0), Color(0.25, 0.85, 1.0, 0.24))
+	elif projectile_type == "man_bullet_berserk":
+		_draw_man_bullet(_get_man_bullet_berserk_texture(), Vector2(38.0, 38.0), Color(1.0, 0.28, 0.08, 0.34))
 	elif projectile_type == "arrow":
 		var shaft := Color(0.72, 0.48, 0.25)
 		var tip := Color(0.9, 0.9, 0.82)
@@ -64,6 +72,13 @@ func _draw_basketball(texture: Texture2D, size: Vector2, glow: Color, trail: Col
 		draw_texture_rect(texture, Rect2(offset - size * 0.5, size), false)
 
 
+func _draw_man_bullet(texture: Texture2D, size: Vector2, glow: Color) -> void:
+	draw_line(Vector2(-22.0, 0.0), Vector2(-8.0, 0.0), glow, 4.0)
+	draw_circle(Vector2.ZERO, maxf(size.x, size.y) * 0.46, glow)
+	if texture != null:
+		draw_texture_rect(texture, Rect2(-size * 0.5, size), false)
+
+
 func _get_basketball_normal_texture() -> Texture2D:
 	if _basketball_normal_texture == null:
 		_basketball_normal_texture = load(BASKETBALL_NORMAL_PATH) as Texture2D
@@ -74,3 +89,15 @@ func _get_basketball_berserk_texture() -> Texture2D:
 	if _basketball_berserk_texture == null:
 		_basketball_berserk_texture = load(BASKETBALL_BERSERK_PATH) as Texture2D
 	return _basketball_berserk_texture
+
+
+func _get_man_bullet_normal_texture() -> Texture2D:
+	if _man_bullet_normal_texture == null:
+		_man_bullet_normal_texture = load(MAN_BULLET_NORMAL_PATH) as Texture2D
+	return _man_bullet_normal_texture
+
+
+func _get_man_bullet_berserk_texture() -> Texture2D:
+	if _man_bullet_berserk_texture == null:
+		_man_bullet_berserk_texture = load(MAN_BULLET_BERSERK_PATH) as Texture2D
+	return _man_bullet_berserk_texture

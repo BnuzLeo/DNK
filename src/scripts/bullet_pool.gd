@@ -62,6 +62,8 @@ func _create_bullet(is_player: bool) -> Area2D:
 	bullet.set_meta("visual_lob_height", 0.0)
 	bullet.set_meta("visual_lob_progress", 0.0)
 	bullet.set_meta("spin_speed", 0.0)
+	bullet.set_meta("aoe_radius", 0.0)
+	bullet.set_meta("aoe_damage", 0)
 
 	bullet.area_entered.connect(_on_bullet_hit.bind(bullet))
 	bullet.body_entered.connect(_on_bullet_body_hit.bind(bullet))
@@ -108,6 +110,22 @@ func spawn_targeted_basketball(pos: Vector2, target: Area2D, target_position: Ve
 		break
 
 
+func spawn_man_bullet(pos: Vector2, dir: Vector2, speed: float, damage: int,
+		berserk: bool, aoe_radius: float, aoe_damage: int) -> void:
+	var projectile_type := "man_bullet_berserk" if berserk else "man_bullet"
+	var pool := _player_bullets
+	if _active_player >= pool.size():
+		return
+	for bullet in pool:
+		if bullet.get_meta("active", false):
+			continue
+		_activate_bullet(bullet, pos, dir.normalized(), speed, damage, true, false, 0.0, projectile_type)
+		bullet.set_meta("aoe_radius", aoe_radius)
+		bullet.set_meta("aoe_damage", aoe_damage)
+		_active_player += 1
+		break
+
+
 func spawn_basketball_slam(target: Area2D, target_position: Vector2, damage: int) -> void:
 	var parent := get_tree().current_scene
 	if parent == null:
@@ -144,6 +162,8 @@ func _activate_bullet(bullet: Area2D, pos: Vector2, dir: Vector2, speed: float,
 	bullet.set_meta("visual_lob_height", 0.0)
 	bullet.set_meta("visual_lob_progress", 0.0)
 	bullet.set_meta("spin_speed", 0.0)
+	bullet.set_meta("aoe_radius", 0.0)
+	bullet.set_meta("aoe_damage", 0)
 	bullet.rotation = dir.angle()
 	_apply_projectile_collision_radius(bullet, projectile_type)
 	bullet.visible = true
@@ -166,6 +186,10 @@ func _apply_projectile_collision_radius(bullet: Area2D, projectile_type: String)
 			circle.radius = 7.0
 		"basketball_berserk":
 			circle.radius = 8.0
+		"man_bullet":
+			circle.radius = 8.0
+		"man_bullet_berserk":
+			circle.radius = 10.0
 		_:
 			circle.radius = 4.0
 
@@ -181,6 +205,8 @@ func _recycle_bullet(bullet: Area2D, is_player: bool) -> void:
 	bullet.set_meta("visual_lob_height", 0.0)
 	bullet.set_meta("visual_lob_progress", 0.0)
 	bullet.set_meta("spin_speed", 0.0)
+	bullet.set_meta("aoe_radius", 0.0)
+	bullet.set_meta("aoe_damage", 0)
 	if is_player:
 		_active_player -= 1
 	else:
@@ -356,7 +382,11 @@ func _on_bullet_hit(area: Area2D, bullet: Area2D) -> void:
 			area.take_damage(damage)
 			var is_kill: bool = not was_dying and area.hp <= 0
 			var is_boss: bool = area.max_hp > 50
-			hit_occurred.emit(area.global_position, damage, is_kill, is_boss, bullet.get_meta("projectile_type", ""))
+			var projectile_type: String = bullet.get_meta("projectile_type", "")
+			var hit_pos: Vector2 = area.global_position
+			if projectile_type == "man_bullet" or projectile_type == "man_bullet_berserk":
+				_apply_man_aoe_damage(hit_pos, area, int(bullet.get_meta("aoe_damage", damage)), float(bullet.get_meta("aoe_radius", 0.0)))
+			hit_occurred.emit(hit_pos, damage, is_kill, is_boss, projectile_type)
 			if is_kill:
 				GameManager.add_kill()
 		# 飞镖命中后不回收，继续返回
@@ -365,6 +395,26 @@ func _on_bullet_hit(area: Area2D, bullet: Area2D) -> void:
 	else:
 		_handle_boss_big_snowball_split(bullet, bullet.global_position)
 		_recycle_bullet(bullet, false)
+
+
+func _apply_man_aoe_damage(center: Vector2, primary: Area2D, amount: int, radius: float) -> void:
+	if radius <= 0.0 or amount <= 0:
+		return
+	var radius_sq := radius * radius
+	for enemy in get_tree().get_nodes_in_group("enemy"):
+		var enemy_area := enemy as Area2D
+		if enemy_area == null or enemy_area == primary or not is_instance_valid(enemy_area):
+			continue
+		if not enemy_area.has_method("take_damage"):
+			continue
+		if "_dying" in enemy_area and enemy_area._dying:
+			continue
+		if center.distance_squared_to(enemy_area.global_position) > radius_sq:
+			continue
+		var was_dying: bool = "_dying" in enemy_area and enemy_area._dying
+		enemy_area.take_damage(amount)
+		if not was_dying and "hp" in enemy_area and enemy_area.hp <= 0:
+			GameManager.add_kill()
 
 
 func _handle_boss_big_snowball_split(bullet: Area2D, hit_position: Vector2) -> void:

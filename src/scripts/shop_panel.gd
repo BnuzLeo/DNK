@@ -96,6 +96,7 @@ func _create_weapon_row(key: String, y: float) -> void:
 		"basketball": type_text = "投射"
 		"room_blast": type_text = "全屏"
 		"rooster": type_text = "追击"
+		"man_gun": type_text = "锁定枪械"
 		_: type_text = "武器"
 	var type_label := Label.new()
 	type_label.text = "[%s]" % type_text
@@ -163,6 +164,8 @@ func _get_weapon_stats_text(weapon: Dictionary) -> String:
 			return "全房间伤害:%d  CD:%.1fs  狂暴:3次/%.1fs" % [weapon.damage, weapon.cooldown, weapon.berserk_interval]
 		"rooster":
 			return "伤害:%d  CD:%.1fs  狂暴:%d只/CD%.1fs" % [weapon.damage, weapon.cooldown, weapon.berserk_count, weapon.berserk_cooldown]
+		"man_gun":
+			return "伤害:%d  CD:%.1fs  狂暴:全体锁定/CD%.1fs" % [weapon.damage, weapon.cooldown, weapon.berserk_cooldown]
 	return "伤害:%d" % weapon.damage
 
 

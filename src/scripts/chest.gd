@@ -257,6 +257,8 @@ func _get_weapon_type_text(weapon: Dictionary) -> String:
 			return "全屏"
 		"rooster":
 			return "追击"
+		"man_gun":
+			return "锁定枪械"
 	return "武器"
 
 
@@ -281,6 +283,13 @@ func _get_weapon_stats(weapon: Dictionary) -> Array[String]:
 				"伤害: %d" % weapon.damage,
 				"普通: 1只 CD%.1fs" % weapon.cooldown,
 				"狂暴: %d只 CD%.1fs" % [weapon.berserk_count, weapon.berserk_cooldown],
+				"蓝耗: 0",
+			]
+		"man_gun":
+			return [
+				"伤害: %d / 范围%d" % [weapon.damage, weapon.aoe_damage],
+				"普通: 最近锁定 CD%.1fs" % weapon.cooldown,
+				"狂暴: 全体锁定 CD%.1fs" % weapon.berserk_cooldown,
 				"蓝耗: 0",
 			]
 	return ["伤害: %d" % weapon.damage]
