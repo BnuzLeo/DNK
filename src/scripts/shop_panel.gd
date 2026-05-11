@@ -97,6 +97,7 @@ func _create_weapon_row(key: String, y: float) -> void:
 		"room_blast": type_text = "全屏"
 		"rooster": type_text = "追击"
 		"man_gun": type_text = "锁定枪械"
+		"laser_gun": type_text = "持续激光"
 		_: type_text = "武器"
 	var type_label := Label.new()
 	type_label.text = "[%s]" % type_text
@@ -166,6 +167,8 @@ func _get_weapon_stats_text(weapon: Dictionary) -> String:
 			return "伤害:%d  CD:%.1fs  狂暴:%d只/CD%.1fs" % [weapon.damage, weapon.cooldown, weapon.berserk_count, weapon.berserk_cooldown]
 		"man_gun":
 			return "伤害:%d  CD:%.1fs  狂暴:全体锁定/CD%.1fs" % [weapon.damage, weapon.cooldown, weapon.berserk_cooldown]
+		"laser_gun":
+			return "伤害:%d/跳  按住持续激光  狂暴:墙体折射2次" % weapon.damage
 	return "伤害:%d" % weapon.damage
 
 

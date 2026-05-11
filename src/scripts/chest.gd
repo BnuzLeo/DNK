@@ -259,6 +259,8 @@ func _get_weapon_type_text(weapon: Dictionary) -> String:
 			return "追击"
 		"man_gun":
 			return "锁定枪械"
+		"laser_gun":
+			return "持续激光"
 	return "武器"
 
 
@@ -290,6 +292,13 @@ func _get_weapon_stats(weapon: Dictionary) -> Array[String]:
 				"伤害: %d / 范围%d" % [weapon.damage, weapon.aoe_damage],
 				"普通: 最近锁定 CD%.1fs" % weapon.cooldown,
 				"狂暴: 全体锁定 CD%.1fs" % weapon.berserk_cooldown,
+				"蓝耗: 0",
+			]
+		"laser_gun":
+			return [
+				"伤害: %d / 跳" % weapon.damage,
+				"普通: 按住直线持续激光",
+				"狂暴: 折射2次",
 				"蓝耗: 0",
 			]
 	return ["伤害: %d" % weapon.damage]

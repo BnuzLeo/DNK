@@ -6,6 +6,7 @@ extends CharacterBody2D
 const VS := preload("res://scripts/visual_spec.gd")
 const ROOSTER_PROJECTILE := preload("res://scripts/rooster_projectile.gd")
 const BERSERK_AWAKENING_FX := preload("res://scripts/berserk_awakening_fx.gd")
+const LASER_VISUAL_SCRIPT := preload("res://scripts/laser_visual.gd")
 const PLAYER_SPRITE_PATH := "res://assets/export/effects/sprite.webp"
 const PLAYER_SPRITE_FRAME_SIZE := Vector2i(192, 208)
 const PLAYER_SPRITE_FRAME_COUNTS := [6, 8, 8, 4, 5, 8, 6, 6, 6]
@@ -13,6 +14,11 @@ const PLAYER_SPRITE_DISPLAY_HEIGHT := 88.0
 const MAN_GUN_TEXTURE_PATH := "res://assets/export/weapon/weapon_02/瓦克恩冲锋枪.png"
 const MAN_GUN_NORMAL_FRAME_PATHS: Array[String] = [MAN_GUN_TEXTURE_PATH]
 const MAN_GUN_BERSERK_FRAME_PATHS: Array[String] = [MAN_GUN_TEXTURE_PATH]
+const LASER_GUN_TEXTURE_PATH := "res://assets/export/weapon/weapon_03/飞熊军激光炮.png"
+const LASER_GUN_NORMAL_FRAME_PATHS: Array[String] = [LASER_GUN_TEXTURE_PATH]
+const LASER_GUN_BERSERK_FRAME_PATHS: Array[String] = [LASER_GUN_TEXTURE_PATH]
+const LASER_NORMAL_PATH := "res://assets/export/weapon/weapon_03/飞熊军激光炮·默认激光.png"
+const LASER_BERSERK_PATH := "res://assets/export/weapon/weapon_03/飞熊军激光炮·黯星激光.png"
 
 enum PlayerSpriteAnim { IDLE, RUN_RIGHT, RUN_LEFT, WAVE, JUMP, FAIL, WAIT, DANCE, INSPECT }
 
@@ -52,6 +58,16 @@ const MAN_GUN_CENTER_X_OFFSET := 9.0
 const MAN_GUN_CENTER_Y_OFFSET := PLAYER_SPRITE_DISPLAY_HEIGHT / 3.0
 const MAN_GUN_TEXTURE_CENTER_X := 60.0
 const MAN_GUN_MUZZLE_SOURCE_X := 109.0
+const LASER_GUN_SCALE := 0.86
+const LASER_GUN_TEXTURE_CENTER_X := 44.0
+const LASER_GUN_MUZZLE_SOURCE_X := 82.0
+const LASER_MAX_DISTANCE := 900.0
+const LASER_WIDTH := 32.0
+const LASER_DAMAGE_WIDTH := 42.0
+const LASER_DAMAGE_INTERVAL := 0.12
+const LASER_WALL_MASK := 16
+const LASER_MIN_HIT_DISTANCE := 6.0
+const LASER_REFLECT_ANGLE := PI / 3.0
 
 const WEAPONS := {
 	"basketball": {
@@ -60,9 +76,8 @@ const WEAPONS := {
 		"berserk_cooldown": 0.0, "berserk_damage": 9
 	},
 	"jntm": {
-		"cooldown": 3.0, "damage": 18, "mana": 0, "name": "鸡你太美",
-		"type": "room_blast", "berserk_hits": 3, "berserk_interval": 3.0,
-		"berserk_cooldown": 9.0
+		"cooldown": 0.0, "damage": 2, "mana": 0, "name": "大族激光",
+		"type": "laser_gun", "berserk_damage": 3, "berserk_cooldown": 0.0
 	},
 	"chicken_foot": {
 		"cooldown": 0.5, "damage": 8, "mana": 0,
@@ -98,6 +113,11 @@ var _last_move_input := Vector2.ZERO
 var _weapon_sprite: AnimatedSprite2D = null
 var _weapon_anim_mode := ""
 var _weapon_aim_dir := Vector2.RIGHT
+var _laser_visual: Node2D = null
+var _laser_segments: Array[Dictionary] = []
+var _laser_damage_timer := 0.0
+var _laser_normal_texture: Texture2D = null
+var _laser_berserk_texture: Texture2D = null
 
 # 闪避状态
 var _dash_timer := 0.0
@@ -238,6 +258,8 @@ func _physics_process(delta: float) -> void:
 
 	# 闪避中 —— 高速移动 + 无敌，不接受其他输入
 	if _dash_timer > 0.0:
+		if _weapon_keys[_weapon_index] in WEAPONS and WEAPONS[_weapon_keys[_weapon_index]].get("type", "") == "laser_gun":
+			_clear_laser_visual()
 		_dash_timer -= delta
 		velocity = _dash_dir * DASH_SPEED
 		_invuln_timer = max(_invuln_timer, DASH_INVULN)
@@ -302,6 +324,7 @@ func _physics_process(delta: float) -> void:
 	# 面朝方向只跟随左右输入，纯上下移动不改变朝向
 	_update_facing_from_input(input)
 	_weapon_aim_dir = _get_preview_weapon_aim_dir()
+	_update_laser_gun(delta)
 
 	# 武器切换
 	if _pending_weapon_switch:
@@ -322,6 +345,8 @@ func _physics_process(delta: float) -> void:
 	if _is_basketball_tap_berserk(weapon):
 		if Input.is_action_just_pressed("shoot"):
 			_fire_weapon(weapon, true)
+	elif weapon.get("type", "") == "laser_gun":
+		pass
 	elif Input.is_action_pressed("shoot") and _fire_cooldown <= 0.0:
 		_fire_weapon(weapon)
 
@@ -346,8 +371,12 @@ func _input(event: InputEvent) -> void:
 func _cycle_weapon() -> void:
 	if _weapon_keys.size() <= 1:
 		return
+	var previous_type: String = WEAPONS[_weapon_keys[_weapon_index]].get("type", "")
 	_weapon_index = (_weapon_index + 1) % _weapon_keys.size()
 	GameManager.player_data.weapon_index = _weapon_index
+	var next_type: String = WEAPONS[_weapon_keys[_weapon_index]].get("type", "")
+	if previous_type == "laser_gun" and next_type != "laser_gun":
+		_clear_laser_visual()
 
 
 func _trigger_berserk() -> void:
@@ -415,6 +444,8 @@ func _activate_weapon(weapon: Dictionary) -> void:
 			_spawn_roosters(weapon)
 		"man_gun":
 			_shoot_man_gun(weapon)
+		"laser_gun":
+			pass
 
 
 func _shoot_basketball(weapon: Dictionary) -> void:
@@ -644,6 +675,130 @@ func _spawn_man_bullet(muzzle_pos: Vector2, dir: Vector2, weapon: Dictionary) ->
 	bullet_pool.call("spawn_man_bullet", muzzle_pos, dir, speed, damage, _berserk_active, radius, aoe_damage)
 
 
+func _update_laser_gun(delta: float) -> void:
+	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
+	if weapon.get("type", "") != "laser_gun" or not Input.is_action_pressed("shoot"):
+		_clear_laser_visual()
+		_laser_damage_timer = 0.0
+		return
+	var dir := _snap_man_gun_dir(_weapon_aim_dir)
+	if dir == Vector2.ZERO:
+		dir = _facing
+	_weapon_aim_dir = dir
+	_laser_segments = _build_laser_segments(_get_laser_muzzle_position(), dir, 2 if _berserk_active else 0)
+	_update_laser_visual()
+	_laser_damage_timer -= delta
+	if _laser_damage_timer <= 0.0:
+		_laser_damage_timer += LASER_DAMAGE_INTERVAL
+		_apply_laser_damage(weapon)
+
+
+func _build_laser_segments(origin: Vector2, dir: Vector2, bounces: int) -> Array[Dictionary]:
+	var segments: Array[Dictionary] = []
+	var start := origin
+	var current_dir := dir.normalized()
+	var remaining := LASER_MAX_DISTANCE
+	var space := get_world_2d().direct_space_state
+	var query_params := PhysicsRayQueryParameters2D.new()
+	query_params.collision_mask = LASER_WALL_MASK
+	query_params.collide_with_areas = false
+	query_params.collide_with_bodies = true
+	var excluded_rids: Array[RID] = [get_rid()]
+	query_params.exclude = excluded_rids
+
+	var reflections := 0
+	var safety_casts := 0
+	while reflections <= bounces and safety_casts < bounces + 8:
+		safety_casts += 1
+		if remaining <= 1.0 or current_dir == Vector2.ZERO:
+			break
+		var ray_end := start + current_dir * remaining
+		query_params.from = start
+		query_params.to = ray_end
+		var hit := space.intersect_ray(query_params)
+		if not hit.is_empty():
+			var hit_pos: Vector2 = hit.get("position", ray_end)
+			var hit_distance := start.distance_to(hit_pos)
+			if hit_distance < LASER_MIN_HIT_DISTANCE:
+				start = hit_pos + current_dir * LASER_MIN_HIT_DISTANCE
+				remaining -= LASER_MIN_HIT_DISTANCE
+				continue
+			segments.append({"from": start, "to": hit_pos})
+			remaining -= hit_distance
+			if reflections >= bounces:
+				break
+			var normal: Vector2 = hit.get("normal", Vector2.ZERO)
+			if normal == Vector2.ZERO:
+				break
+			current_dir = _get_laser_reflect_dir(current_dir, normal)
+			start = hit_pos + current_dir * 3.0
+			reflections += 1
+		else:
+			segments.append({"from": start, "to": ray_end})
+			break
+	return segments
+
+
+func _get_laser_reflect_dir(incoming_dir: Vector2, normal: Vector2) -> Vector2:
+	var safe_normal := normal.normalized()
+	if safe_normal == Vector2.ZERO:
+		return incoming_dir.bounce(normal).normalized()
+	var tangent := Vector2(-safe_normal.y, safe_normal.x)
+	var side := 1.0 if incoming_dir.dot(tangent) >= 0.0 else -1.0
+	return safe_normal.rotated(side * LASER_REFLECT_ANGLE).normalized()
+
+
+func _apply_laser_damage(weapon: Dictionary) -> void:
+	if _laser_segments.is_empty():
+		return
+	var damage: int = (weapon.get("berserk_damage", weapon.damage) if _berserk_active else weapon.damage) + damage_bonus
+	var hit_enemies: Array[Area2D] = []
+	for enemy in _get_alive_enemies():
+		for segment in _laser_segments:
+			var a: Vector2 = segment["from"]
+			var b: Vector2 = segment["to"]
+			if _distance_to_laser_segment(enemy.global_position, a, b) <= LASER_DAMAGE_WIDTH * 0.5:
+				hit_enemies.append(enemy)
+				break
+	for enemy in hit_enemies:
+		_deal_damage_to_enemy(enemy, damage)
+
+
+func _distance_to_laser_segment(point: Vector2, a: Vector2, b: Vector2) -> float:
+	var ab := b - a
+	var len_sq := ab.length_squared()
+	if len_sq <= 0.0001:
+		return point.distance_to(a)
+	var t := clampf((point - a).dot(ab) / len_sq, 0.0, 1.0)
+	return point.distance_to(a + ab * t)
+
+
+func _update_laser_visual() -> void:
+	_ensure_laser_visual()
+	if _laser_visual == null or not is_instance_valid(_laser_visual):
+		return
+	var color := Color(0.72, 0.95, 1.0, 0.76) if not _berserk_active else Color(0.72, 0.2, 1.0, 0.82)
+	_laser_visual.call("setup", _laser_segments, _get_laser_texture(), LASER_WIDTH, color)
+
+
+func _clear_laser_visual() -> void:
+	if _laser_segments.is_empty() and (_laser_visual == null or not _laser_visual.visible):
+		return
+	_laser_segments.clear()
+	if _laser_visual != null:
+		_laser_visual.call("clear")
+
+
+func _get_laser_texture() -> Texture2D:
+	if _berserk_active:
+		if _laser_berserk_texture == null:
+			_laser_berserk_texture = load(LASER_BERSERK_PATH) as Texture2D
+		return _laser_berserk_texture
+	if _laser_normal_texture == null:
+		_laser_normal_texture = load(LASER_NORMAL_PATH) as Texture2D
+	return _laser_normal_texture
+
+
 func _get_man_targets(weapon: Dictionary) -> Array[Area2D]:
 	var enemies := _get_alive_enemies()
 	if _berserk_active:
@@ -678,8 +833,11 @@ func _get_alive_enemies() -> Array[Area2D]:
 
 func _get_preview_weapon_aim_dir() -> Vector2:
 	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
-	if weapon.get("type", "") != "man_gun":
+	var weapon_type: String = weapon.get("type", "")
+	if weapon_type != "man_gun" and weapon_type != "laser_gun":
 		return _facing
+	if weapon_type == "laser_gun":
+		return _snap_man_gun_dir(_facing)
 	var targets := _get_man_targets(weapon)
 	if targets.is_empty():
 		return _snap_man_gun_dir(_facing)
@@ -723,6 +881,17 @@ func _get_man_gun_center_offset(dir: Vector2) -> Vector2:
 	elif dir.x < -0.1:
 		horizontal = -MAN_GUN_CENTER_X_OFFSET
 	return Vector2(horizontal, MAN_GUN_CENTER_Y_OFFSET)
+
+
+func _get_laser_muzzle_position() -> Vector2:
+	var dir := _snap_man_gun_dir(_weapon_aim_dir)
+	if dir == Vector2.ZERO:
+		dir = _facing
+	return global_position + _get_man_gun_center_offset(dir) + dir * _get_laser_gun_muzzle_distance()
+
+
+func _get_laser_gun_muzzle_distance() -> float:
+	return (LASER_GUN_MUZZLE_SOURCE_X - LASER_GUN_TEXTURE_CENTER_X) * LASER_GUN_SCALE
 
 
 func take_damage(amount: int) -> void:
@@ -788,20 +957,43 @@ func _setup_carried_weapon_sprite() -> void:
 	_weapon_sprite.z_index = 4
 	_weapon_sprite.visible = false
 	add_child(_weapon_sprite)
+	_ensure_laser_visual()
 	_update_carried_weapon_visual()
+
+
+func _ensure_laser_visual() -> void:
+	if _laser_visual == null or not is_instance_valid(_laser_visual):
+		_laser_visual = LASER_VISUAL_SCRIPT.new()
+		_laser_visual.name = "LaserVisual"
+		_laser_visual.visible = false
+	var target_parent: Node = get_tree().current_scene
+	if target_parent == null:
+		target_parent = get_parent()
+	if target_parent == null:
+		return
+	if _laser_visual.get_parent() != target_parent:
+		var old_parent := _laser_visual.get_parent()
+		if old_parent != null:
+			old_parent.remove_child(_laser_visual)
+		target_parent.add_child(_laser_visual)
+	_laser_visual.set_as_top_level(false)
+	_laser_visual.position = Vector2.ZERO
+	_laser_visual.z_as_relative = false
+	_laser_visual.z_index = 30
 
 
 func _update_carried_weapon_visual() -> void:
 	if _weapon_sprite == null:
 		return
 	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
-	if weapon.get("type", "") != "man_gun":
+	var weapon_type: String = weapon.get("type", "")
+	if weapon_type != "man_gun" and weapon_type != "laser_gun":
 		_weapon_sprite.visible = false
 		return
-	var mode := "man_berserk" if _berserk_active else "man_normal"
+	var mode := _get_carried_weapon_anim_mode(weapon_type)
 	if _weapon_anim_mode != mode:
 		_weapon_anim_mode = mode
-		_weapon_sprite.sprite_frames = _build_man_gun_frames(MAN_GUN_BERSERK_FRAME_PATHS if _berserk_active else MAN_GUN_NORMAL_FRAME_PATHS, mode)
+		_weapon_sprite.sprite_frames = _build_carried_weapon_frames(_get_carried_weapon_frame_paths(weapon_type), mode)
 		_weapon_sprite.animation = mode
 		_weapon_sprite.play(mode)
 	_weapon_sprite.visible = true
@@ -812,10 +1004,28 @@ func _update_carried_weapon_visual() -> void:
 	var angle := dir.angle()
 	_weapon_sprite.flip_h = dir.x < 0.0
 	_weapon_sprite.rotation = angle - PI if _weapon_sprite.flip_h else angle
-	_weapon_sprite.scale = Vector2.ONE * (MAN_GUN_SCALE_BERSERK if _berserk_active else MAN_GUN_SCALE_NORMAL)
+	_weapon_sprite.scale = Vector2.ONE * _get_carried_weapon_scale(weapon_type)
 
 
-func _build_man_gun_frames(paths: Array[String], anim_name: String) -> SpriteFrames:
+func _get_carried_weapon_anim_mode(weapon_type: String) -> String:
+	if weapon_type == "laser_gun":
+		return "laser_berserk" if _berserk_active else "laser_normal"
+	return "man_berserk" if _berserk_active else "man_normal"
+
+
+func _get_carried_weapon_frame_paths(weapon_type: String) -> Array[String]:
+	if weapon_type == "laser_gun":
+		return LASER_GUN_BERSERK_FRAME_PATHS if _berserk_active else LASER_GUN_NORMAL_FRAME_PATHS
+	return MAN_GUN_BERSERK_FRAME_PATHS if _berserk_active else MAN_GUN_NORMAL_FRAME_PATHS
+
+
+func _get_carried_weapon_scale(weapon_type: String) -> float:
+	if weapon_type == "laser_gun":
+		return LASER_GUN_SCALE
+	return MAN_GUN_SCALE_BERSERK if _berserk_active else MAN_GUN_SCALE_NORMAL
+
+
+func _build_carried_weapon_frames(paths: Array[String], anim_name: String) -> SpriteFrames:
 	var frames := SpriteFrames.new()
 	if frames.has_animation("default"):
 		frames.remove_animation("default")
