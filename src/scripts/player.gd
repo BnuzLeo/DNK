@@ -48,6 +48,10 @@ const BASKETBALL_AUTO_J_INTERVAL := 0.2
 const MAN_GUN_DIRECTION_STEP := PI / 4.0
 const MAN_GUN_SCALE_NORMAL := 0.42 * 1.5
 const MAN_GUN_SCALE_BERSERK := 0.46 * 1.5
+const MAN_GUN_CENTER_X_OFFSET := 9.0
+const MAN_GUN_CENTER_Y_OFFSET := PLAYER_SPRITE_DISPLAY_HEIGHT / 3.0
+const MAN_GUN_TEXTURE_CENTER_X := 60.0
+const MAN_GUN_MUZZLE_SOURCE_X := 109.0
 
 const WEAPONS := {
 	"basketball": {
@@ -61,10 +65,10 @@ const WEAPONS := {
 		"berserk_cooldown": 9.0
 	},
 	"chicken_foot": {
-		"cooldown": 1.0, "damage": 8, "mana": 0,
+		"cooldown": 0.5, "damage": 8, "mana": 0,
 		"name": "真正的MAN", "type": "man_gun", "speed": 780.0,
 		"lock_range": 430.0, "aoe_radius": 76.0, "aoe_damage": 5,
-		"berserk_cooldown": 0.5, "berserk_damage": 9, "berserk_speed": 920.0,
+		"berserk_cooldown": 0.3, "berserk_damage": 9, "berserk_speed": 920.0,
 		"berserk_aoe_radius": 92.0, "berserk_aoe_damage": 6
 	},
 }
@@ -378,6 +382,16 @@ func _get_weapon_cooldown(weapon: Dictionary) -> float:
 	return weapon.cooldown
 
 
+func get_fire_cooldown_ratio() -> float:
+	if _weapon_keys.is_empty():
+		return 0.0
+	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
+	var max_cooldown := _get_weapon_cooldown(weapon)
+	if max_cooldown <= 0.0 or _fire_cooldown <= 0.0:
+		return 0.0
+	return clampf(_fire_cooldown / max_cooldown, 0.0, 1.0)
+
+
 func _fire_weapon(weapon: Dictionary, ignore_cooldown: bool = false) -> void:
 	var mana_cost: float = weapon.get("mana", 0)
 	if mana < mana_cost:
@@ -386,7 +400,8 @@ func _fire_weapon(weapon: Dictionary, ignore_cooldown: bool = false) -> void:
 		return
 	mana -= mana_cost
 	_activate_weapon(weapon)
-	_sprite_action_timer = 0.22
+	if weapon.get("type", "") != "man_gun":
+		_sprite_action_timer = 0.22
 	_fire_cooldown = 0.0 if ignore_cooldown else _get_weapon_cooldown(weapon)
 
 
@@ -693,7 +708,21 @@ func _get_man_muzzle_position() -> Vector2:
 	var dir := _snap_man_gun_dir(_weapon_aim_dir)
 	if dir == Vector2.ZERO:
 		dir = _facing
-	return global_position + dir * 36.0 + Vector2(0.0, 2.0)
+	return global_position + _get_man_gun_center_offset(dir) + dir * _get_man_gun_muzzle_distance()
+
+
+func _get_man_gun_muzzle_distance() -> float:
+	var scale_factor := MAN_GUN_SCALE_BERSERK if _berserk_active else MAN_GUN_SCALE_NORMAL
+	return (MAN_GUN_MUZZLE_SOURCE_X - MAN_GUN_TEXTURE_CENTER_X) * scale_factor
+
+
+func _get_man_gun_center_offset(dir: Vector2) -> Vector2:
+	var horizontal := 0.0
+	if dir.x > 0.1:
+		horizontal = MAN_GUN_CENTER_X_OFFSET
+	elif dir.x < -0.1:
+		horizontal = -MAN_GUN_CENTER_X_OFFSET
+	return Vector2(horizontal, MAN_GUN_CENTER_Y_OFFSET)
 
 
 func take_damage(amount: int) -> void:
@@ -779,7 +808,7 @@ func _update_carried_weapon_visual() -> void:
 	var dir := _snap_man_gun_dir(_weapon_aim_dir)
 	if dir == Vector2.ZERO:
 		dir = _facing
-	_weapon_sprite.position = dir * 23.0 + Vector2(0.0, 3.0)
+	_weapon_sprite.position = _get_man_gun_center_offset(dir)
 	var angle := dir.angle()
 	_weapon_sprite.flip_h = dir.x < 0.0
 	_weapon_sprite.rotation = angle - PI if _weapon_sprite.flip_h else angle

@@ -4,6 +4,8 @@ enum GameState { MAIN_MENU, LOBBY, PLAYING, PAUSED, DEAD, REVIVING, GAME_OVER }
 
 signal state_changed(old_state: GameState, new_state: GameState)
 
+const LOBBY_TEST_WEAPONS := ["basketball", "jntm", "chicken_foot"]
+
 var _state: GameState = GameState.MAIN_MENU
 var state: GameState:
 	get: return _state
@@ -58,6 +60,7 @@ func change_state(new_state: GameState) -> void:
 		GameState.LOBBY:
 			get_tree().paused = false
 			Engine.time_scale = 1.0
+			_prepare_lobby_test_weapons()
 		GameState.PLAYING:
 			Engine.time_scale = 1.0
 			get_tree().paused = false
@@ -96,6 +99,14 @@ func return_to_lobby() -> void:
 	Engine.time_scale = 1.0
 	change_state(GameState.LOBBY)
 	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
+
+
+func _prepare_lobby_test_weapons() -> void:
+	player_data.owned_weapons = LOBBY_TEST_WEAPONS.duplicate()
+	player_data.equipped_weapons = LOBBY_TEST_WEAPONS.duplicate()
+	player_data._lobby_equipped = LOBBY_TEST_WEAPONS.duplicate()
+	player_data.max_weapon_slots = maxi(int(player_data.get("max_weapon_slots", 3)), LOBBY_TEST_WEAPONS.size())
+	player_data.weapon_index = clampi(int(player_data.get("weapon_index", 0)), 0, LOBBY_TEST_WEAPONS.size() - 1)
 
 
 func add_kill() -> void:

@@ -1165,10 +1165,14 @@ func _draw_action_key(ctrl: Control, key: String, color: Color = Color.WHITE) ->
 
 func _draw_attack_icon() -> void:
 	var player := $Player
+	var center: Vector2 = ACTION_FRAME_SIZE / 2.0
 	_attack_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
 	var logo_size: Vector2 = Vector2(28, 28)
 	var logo_rect: Rect2 = Rect2((ACTION_FRAME_SIZE - logo_size) * 0.5, logo_size)
 	_attack_icon.draw_texture_rect(GUI_ATTACK_LOGO, logo_rect, false)
+	var attack_cd_ratio: float = float(player.call("get_fire_cooldown_ratio"))
+	if attack_cd_ratio > 0.0:
+		_draw_action_cooldown_overlay(_attack_icon, center, attack_cd_ratio)
 	var prompt_active: bool = bool(player.call("should_show_attack_tap_prompt")) and bool(player.call("is_berserk_active"))
 	if prompt_active:
 		_draw_basketball_tap_prompt(_attack_icon, float(player.call("get_attack_tap_prompt_flash_ratio")))
@@ -1186,17 +1190,21 @@ func _draw_dash_icon() -> void:
 	var dash_cd: float = $Player._dash_cooldown
 	if dash_cd > 0.0:
 		var cd_ratio: float = clampf(dash_cd / $Player.DASH_COOLDOWN, 0.0, 1.0)
-		var radius: float = ACTION_FRAME_SIZE.x * 0.36
-		var points := PackedVector2Array()
-		points.append(center)
-		var segments := 24
-		var sweep: float = TAU * cd_ratio
-		for i in segments + 1:
-			var angle: float = -PI / 2 + sweep * i / segments
-			points.append(center + Vector2(cos(angle), sin(angle)) * radius)
-		if points.size() >= 3:
-			_dash_icon.draw_colored_polygon(points, Color(0, 0, 0, 0.55))
+		_draw_action_cooldown_overlay(_dash_icon, center, cd_ratio)
 	_draw_action_key(_dash_icon, "K", ACTION_KEY_COLOR)
+
+
+func _draw_action_cooldown_overlay(ctrl: Control, center: Vector2, cd_ratio: float) -> void:
+	var radius: float = ACTION_FRAME_SIZE.x * 0.36
+	var points := PackedVector2Array()
+	points.append(center)
+	var segments := 24
+	var sweep: float = TAU * cd_ratio
+	for i in segments + 1:
+		var angle: float = -PI / 2 + sweep * i / segments
+		points.append(center + Vector2(cos(angle), sin(angle)) * radius)
+	if points.size() >= 3:
+		ctrl.draw_colored_polygon(points, Color(0, 0, 0, 0.55))
 
 
 func _draw_berserk_icon() -> void:
