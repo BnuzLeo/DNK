@@ -296,6 +296,7 @@ func _physics_process(delta: float) -> void:
 			Input.get_axis("move_up", "move_down")
 		)
 		_dash_dir = dash_input.normalized() if dash_input.length() > 0.1 else _facing
+		_update_facing_from_input(dash_input)
 		_last_move_input = _dash_dir
 		_dash_afterimage_timer = 0.0
 		_dash_invuln_visual_timer = DASH_INVULN
@@ -316,9 +317,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_last_move_input = input
 
-	# 面朝方向 = 最后移动方向
-	if input.length() > 0.1:
-		_facing = input.normalized()
+	# 面朝方向只跟随左右输入，纯上下移动不改变朝向
+	_update_facing_from_input(input)
 	_weapon_aim_dir = _get_preview_weapon_aim_dir()
 
 	# 武器切换
@@ -694,6 +694,12 @@ func _get_preview_weapon_aim_dir() -> Vector2:
 	return dir if dir != Vector2.ZERO else _facing
 
 
+func _update_facing_from_input(input: Vector2) -> void:
+	if absf(input.x) <= 0.1:
+		return
+	_facing = Vector2.RIGHT if input.x > 0.0 else Vector2.LEFT
+
+
 func _get_man_muzzle_position() -> Vector2:
 	var dir := _weapon_aim_dir.normalized()
 	if dir == Vector2.ZERO:
@@ -755,6 +761,7 @@ func _setup_sprite() -> void:
 	_sprite.scale = Vector2(sprite_scale, sprite_scale)
 	add_child(_sprite)
 	_apply_sprite_frame()
+	_sync_sprite_flip()
 
 
 func _setup_carried_weapon_sprite() -> void:
@@ -872,6 +879,17 @@ func _apply_sprite_frame() -> void:
 		Vector2(_sprite_frame * PLAYER_SPRITE_FRAME_SIZE.x, _sprite_anim * PLAYER_SPRITE_FRAME_SIZE.y),
 		Vector2(PLAYER_SPRITE_FRAME_SIZE)
 	)
+	_sync_sprite_flip()
+
+
+func _sync_sprite_flip() -> void:
+	if _sprite == null:
+		return
+	# 跑步左右帧本身已经分开；只有站立/非方向性动作需要按朝向镜像。
+	if _sprite_anim == PlayerSpriteAnim.RUN_LEFT or _sprite_anim == PlayerSpriteAnim.RUN_RIGHT:
+		_sprite.flip_h = false
+	else:
+		_sprite.flip_h = _facing.x < 0.0
 
 
 func _update_dash_afterimages(delta: float) -> void:
@@ -893,6 +911,7 @@ func _spawn_dash_afterimage() -> void:
 	ghost.region_enabled = true
 	ghost.region_rect = _sprite.region_rect
 	ghost.centered = true
+	ghost.flip_h = _sprite.flip_h
 	ghost.global_position = global_position
 	ghost.global_rotation = _sprite.global_rotation
 	ghost.scale = _sprite.global_scale
