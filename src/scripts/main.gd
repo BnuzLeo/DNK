@@ -130,6 +130,7 @@ var _hud_frame: Control
 var _coin_panel: Control
 var _pause_button: Control
 var _bag_button: Control
+var _invincible_test_button: Button
 var _equipment_panel: Node = null
 
 # 提示消息系统
@@ -612,7 +613,7 @@ func _spawn_boss(pos: Vector2, room: RoomData, bounds: Rect2) -> void:
 	var boss_scene: PackedScene = preload("res://scenes/Boss.tscn")
 	var boss: Area2D = boss_scene.instantiate()
 	boss.global_position = pos
-	boss.setup($Player, $BulletPool)
+	boss.setup($Player, $BulletPool, room)
 	# 楼层血量倍率
 	var hp_mult := _get_floor_hp_multiplier()
 	boss.max_hp = int(boss.max_hp * hp_mult)
@@ -1025,6 +1026,24 @@ func _create_hud() -> void:
 	_bag_button.gui_input.connect(_on_bag_button_input)
 	canvas.add_child(_bag_button)
 
+	_invincible_test_button = Button.new()
+	_invincible_test_button.text = "无敌测试"
+	_invincible_test_button.position = Vector2(410, 16)
+	_invincible_test_button.size = Vector2(88, 30)
+	_invincible_test_button.focus_mode = Control.FOCUS_NONE
+	_invincible_test_button.add_theme_font_size_override("font_size", 15)
+	_invincible_test_button.pressed.connect(_on_invincible_test_pressed)
+	canvas.add_child(_invincible_test_button)
+
+	var boss_test_button := Button.new()
+	boss_test_button.text = "Boss测试"
+	boss_test_button.position = Vector2(514, 16)
+	boss_test_button.size = Vector2(88, 30)
+	boss_test_button.focus_mode = Control.FOCUS_NONE
+	boss_test_button.add_theme_font_size_override("font_size", 15)
+	boss_test_button.pressed.connect(_on_boss_test_pressed)
+	canvas.add_child(boss_test_button)
+
 	_attack_icon = Control.new()
 	_attack_icon.position = Vector2(ACTION_J_X, ACTION_ROW_Y)
 	_attack_icon.size = ACTION_CONTROL_SIZE
@@ -1221,6 +1240,70 @@ func _on_bag_button_input(event: InputEvent) -> void:
 		_open_equipment_panel()
 	elif event is InputEventScreenTouch and event.pressed:
 		_open_equipment_panel()
+
+
+func _on_invincible_test_pressed() -> void:
+	var enabled := not bool($Player.call("is_test_invincible"))
+	$Player.call("set_test_invincible", enabled)
+	if _invincible_test_button != null:
+		_invincible_test_button.text = "无敌ON" if enabled else "无敌测试"
+	_show_hint("测试无敌：开启" if enabled else "测试无敌：关闭", Color(0.45, 0.9, 1.0))
+
+
+func _on_boss_test_pressed() -> void:
+	if GameManager.state == GameManager.GameState.PAUSED:
+		_hide_pause_menu()
+		GameManager.change_state(GameManager.GameState.PLAYING)
+	if GameManager.state != GameManager.GameState.PLAYING:
+		return
+	_jump_to_boss_room_for_test()
+
+
+func _jump_to_boss_room_for_test() -> void:
+	if _boss_pos not in _rooms:
+		return
+	$BulletPool.clear_all()
+	_clear_non_boss_test_enemies()
+	_open_all_doors_for_test()
+
+	_current_room = _boss_pos
+	var boss_room: RoomData = _rooms[_boss_pos]
+	boss_room.explored = true
+	_mark_adjacent_explored(_boss_pos)
+
+	var boss_center := Vector2(_boss_pos.x * CELL_W + CELL_W / 2, _boss_pos.y * CELL_H + CELL_H / 2)
+	$Player.global_position = boss_center + Vector2(0.0, 120.0)
+	$Player.visible = true
+	$Player.set_physics_process(true)
+	$Player.set_process_input(true)
+
+	_update_camera_bounds(_boss_pos)
+	_on_player_entered_room(_boss_pos)
+	_show_hint("测试：已进入 Boss 房间", Color(1.0, 0.84, 0.0))
+	queue_redraw()
+	if _minimap:
+		_minimap.queue_redraw()
+
+
+func _clear_non_boss_test_enemies() -> void:
+	for room_pos in _rooms:
+		if room_pos == _boss_pos:
+			continue
+		var room: RoomData = _rooms[room_pos]
+		for enemy in room.enemies:
+			if is_instance_valid(enemy):
+				enemy.queue_free()
+		room.enemies.clear()
+		if room.state == RoomState.ACTIVE:
+			room.state = RoomState.CLEARED
+
+
+func _open_all_doors_for_test() -> void:
+	for room_pos in _doors:
+		for key in _doors[room_pos]:
+			var door: StaticBody2D = _doors[room_pos][key]
+			if is_instance_valid(door):
+				_set_door_locked(door, false)
 
 
 func _toggle_pause_from_hud() -> void:

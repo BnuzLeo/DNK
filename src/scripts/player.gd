@@ -64,6 +64,7 @@ var _facing := Vector2.RIGHT
 var _weapon_index := 0
 var _weapon_keys := ["basketball"]
 var _invuln_timer := 0.0
+var _test_invincible := false
 var _berserk_active := false
 var _berserk_timer := 0.0
 var _berserk_flash_timer := 0.0
@@ -188,7 +189,9 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# 无敌时间
-	if _invuln_timer > 0.0:
+	if _test_invincible:
+		_invuln_timer = max(_invuln_timer, 999999.0)
+	elif _invuln_timer > 0.0:
 		_invuln_timer -= delta
 
 	# 闪避冷却
@@ -222,6 +225,9 @@ func _physics_process(delta: float) -> void:
 	if _dash_invuln_visual_timer > 0.0:
 		_dash_invuln_visual_timer -= delta
 		modulate = Color.WHITE
+	elif _test_invincible:
+		var pulse := sin(Time.get_ticks_msec() * 0.012) * 0.18 + 0.82
+		modulate = Color(0.65, 0.95, 1.0, pulse)
 	elif _invuln_timer > 0.0:
 		var blink := sin(_invuln_timer * 20.0) * 0.4 + 0.6
 		modulate = Color(1, 1, 1, blink)
@@ -498,7 +504,7 @@ func _spawn_roosters(weapon: Dictionary) -> void:
 
 
 func take_damage(amount: int) -> void:
-	if _invuln_timer > 0.0 or amount <= 0:
+	if _test_invincible or _invuln_timer > 0.0 or amount <= 0:
 		return
 	var remaining := amount
 	if armor > 0:
@@ -512,6 +518,21 @@ func take_damage(amount: int) -> void:
 	_invuln_timer = 0.5
 	if hp <= 0:
 		player_died.emit()
+
+
+func set_test_invincible(enabled: bool) -> void:
+	_test_invincible = enabled
+	if enabled:
+		_invuln_timer = max(_invuln_timer, 999999.0)
+	else:
+		if _invuln_timer > 10.0:
+			_invuln_timer = 0.0
+		modulate = Color.WHITE
+	queue_redraw()
+
+
+func is_test_invincible() -> bool:
+	return _test_invincible
 
 
 func get_weapon_name() -> String:

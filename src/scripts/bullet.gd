@@ -2,6 +2,8 @@ extends Area2D
 
 const VS := preload("res://scripts/visual_spec.gd")
 const SNOWBALL_TEXTURE := preload("res://assets/export/projectiles/snowball.png")
+const BOSS_BIG_SNOWBALL_TEXTURE := preload("res://assets/export/enemies/boss/雪人武器-大型雪球.png")
+const BOSS_SMALL_SNOWBALL_TEXTURE := preload("res://assets/export/enemies/boss/雪人武器-雪球.png")
 
 func _draw() -> void:
 	if not visible:
@@ -28,6 +30,12 @@ func _draw() -> void:
 	elif projectile_type == "snowball":
 		var snowball_size := Vector2(18.0, 18.0)
 		draw_texture_rect(SNOWBALL_TEXTURE, Rect2(-snowball_size * 0.5, snowball_size), false)
+	elif projectile_type == "boss_big_snowball":
+		var big_size := Vector2(30.0, 28.0)
+		draw_texture_rect(BOSS_BIG_SNOWBALL_TEXTURE, Rect2(-big_size * 0.5, big_size), false)
+	elif projectile_type == "boss_small_snowball":
+		var small_size := Vector2(18.0, 20.0)
+		draw_texture_rect(BOSS_SMALL_SNOWBALL_TEXTURE, Rect2(-small_size * 0.5, small_size), false)
 	elif is_dart:
 		# 飞镖：菱形，Neon Orange
 		var color := Color(1.0, 0.53, 0.0)

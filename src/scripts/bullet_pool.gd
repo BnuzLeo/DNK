@@ -1,7 +1,7 @@
 extends Node2D
 
 const POOL_SIZE_PLAYER := 150
-const POOL_SIZE_ENEMY := 100
+const POOL_SIZE_ENEMY := 260
 const BULLET_LIFETIME := 2.0
 
 var _player_bullets: Array[Area2D] = []
@@ -54,6 +54,8 @@ func _create_bullet(is_player: bool) -> Area2D:
 	bullet.set_meta("max_distance", 0.0)
 	bullet.set_meta("traveled", 0.0)
 	bullet.set_meta("returning", false)
+	bullet.set_meta("boss_split_on_hit", false)
+	bullet.set_meta("boss_has_split", false)
 
 	bullet.area_entered.connect(_on_bullet_hit.bind(bullet))
 	bullet.body_entered.connect(_on_bullet_body_hit.bind(bullet))
@@ -94,17 +96,36 @@ func _activate_bullet(bullet: Area2D, pos: Vector2, dir: Vector2, speed: float,
 	bullet.set_meta("max_distance", max_distance)
 	bullet.set_meta("traveled", 0.0)
 	bullet.set_meta("returning", false)
+	bullet.set_meta("boss_split_on_hit", false)
+	bullet.set_meta("boss_has_split", false)
 	bullet.rotation = dir.angle()
+	_apply_projectile_collision_radius(bullet, projectile_type)
 	bullet.visible = true
 	bullet.monitoring = true
 	bullet.monitorable = false
 	bullet.queue_redraw()
 
 
+func _apply_projectile_collision_radius(bullet: Area2D, projectile_type: String) -> void:
+	var shape_node := bullet.get_child(0) as CollisionShape2D
+	if shape_node == null or not (shape_node.shape is CircleShape2D):
+		return
+	var circle := shape_node.shape as CircleShape2D
+	match projectile_type:
+		"boss_big_snowball":
+			circle.radius = 11.0
+		"boss_small_snowball", "snowball":
+			circle.radius = 6.0
+		_:
+			circle.radius = 4.0
+
+
 func _recycle_bullet(bullet: Area2D, is_player: bool) -> void:
 	bullet.set_meta("active", false)
 	bullet.visible = false
 	bullet.monitoring = false
+	bullet.set_meta("boss_split_on_hit", false)
+	bullet.set_meta("boss_has_split", false)
 	if is_player:
 		_active_player -= 1
 	else:
@@ -137,6 +158,9 @@ func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
 	var result := space.intersect_ray(query)
 	if result:
 		var collider: Object = result.get("collider")
+		if not is_player:
+			var hit_position: Vector2 = result.get("position", bullet.global_position)
+			_handle_boss_big_snowball_split(bullet, hit_position)
 		if collider and collider.has_method("take_damage"):
 			var damage: int = bullet.get_meta("damage")
 			collider.take_damage(damage)
@@ -192,6 +216,7 @@ func _on_bullet_body_hit(body: Node2D, bullet: Area2D) -> void:
 		return
 
 	# 敌人子弹击中玩家或障碍物
+	_handle_boss_big_snowball_split(bullet, bullet.global_position)
 	if body.has_method("take_damage"):
 		body.take_damage(damage)
 	_recycle_bullet(bullet, false)
@@ -215,7 +240,21 @@ func _on_bullet_hit(area: Area2D, bullet: Area2D) -> void:
 		if not is_dart:
 			_recycle_bullet(bullet, true)
 	else:
+		_handle_boss_big_snowball_split(bullet, bullet.global_position)
 		_recycle_bullet(bullet, false)
+
+
+func _handle_boss_big_snowball_split(bullet: Area2D, hit_position: Vector2) -> void:
+	if not bullet.get_meta("boss_split_on_hit", false) or bullet.get_meta("boss_has_split", false):
+		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	var boss_node := parent.get_node_or_null("Boss")
+	if boss_node == null or not boss_node.has_method("split_big_snowball_at"):
+		return
+	bullet.set_meta("boss_has_split", true)
+	boss_node.call("split_big_snowball_at", hit_position)
 
 
 func clear_all() -> void:

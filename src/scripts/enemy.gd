@@ -5,6 +5,12 @@ extends Area2D
 const VS := preload("res://scripts/visual_spec.gd")
 const CHASER_WEAPON_TEXTURE := preload("res://assets/export/enemies/chaser/电能矿工电棍.png")
 const TANK_WEAPON_TEXTURE := preload("res://assets/export/enemies/tank/矿工电钻.png")
+const CHASER_ATTACK_EFFECT_TEXTURES := [
+	preload("res://assets/export/enemies/chaser/attack/01.png"),
+	preload("res://assets/export/enemies/chaser/attack/02.png"),
+	preload("res://assets/export/enemies/chaser/attack/03.png"),
+	preload("res://assets/export/enemies/chaser/attack/04.png"),
+]
 
 signal died
 
@@ -35,6 +41,10 @@ const TANK_CHARGE_SPEED := 520.0
 const TANK_RECOVER_TIME := 0.35
 const TANK_CHARGE_COOLDOWN := 2.2
 const TANK_AFTERIMAGE_INTERVAL := 0.045
+const ENEMY_SEPARATION_FACTOR := 0.9
+const CHASER_ATTACK_EFFECT_SCALE := 0.52
+const CHASER_ATTACK_EFFECT_CENTER_OFFSET := Vector2(0.0, -23.0)
+const WEAPON_TIP_MARGIN := 2.0
 
 const TYPE_ANIMATIONS := {
 	EnemyType.CHASER: {
@@ -85,6 +95,7 @@ var _dying := false
 var _spawn_invuln_timer := 0.0
 var _sprite: AnimatedSprite2D = null
 var _weapon_sprite: Sprite2D = null
+var _attack_effect_sprite: Sprite2D = null
 var _archer_facing := 1.0
 var _current_animation := ""
 var _moving_this_frame := false
@@ -188,6 +199,9 @@ func _physics_process(delta: float) -> void:
 
 	# 移动
 	_update_movement(delta)
+	var separation_offset := _resolve_enemy_overlap()
+	if separation_offset.length_squared() > 0.01:
+		_moving_this_frame = true
 
 	# 边界限制
 	if room_bounds.size != Vector2.ZERO:
@@ -226,8 +240,6 @@ func _start_melee_attack() -> void:
 	_melee_attack_hit_done = false
 	_melee_attack_cooldown = CHASER_ATTACK_COOLDOWN
 	_sprite_action_timer = CHASER_ATTACK_TIME
-	if _has_animation("shoot"):
-		_set_animation("shoot", true)
 
 
 func _update_movement(delta: float) -> void:
@@ -323,6 +335,67 @@ func _update_shooting(delta: float) -> void:
 		_sprite_action_timer = SHOOT_TELL_TIME
 
 
+func _resolve_enemy_overlap() -> Vector2:
+	var tree := get_tree()
+	if tree == null:
+		return Vector2.ZERO
+
+	var self_radius := _get_separation_radius()
+	var separation := Vector2.ZERO
+	var overlaps := 0
+
+	for other in tree.get_nodes_in_group("enemy"):
+		if other == self or not (other is Area2D):
+			continue
+		if not is_instance_valid(other):
+			continue
+		var other_enemy := other as Area2D
+		if other_enemy == null:
+			continue
+		if not other.has_method("get_separation_radius"):
+			continue
+		if other.has_method("is_dying") and bool(other.call("is_dying")):
+			continue
+
+		var offset: Vector2 = global_position - other_enemy.global_position
+		var other_radius := float(other_enemy.call("get_separation_radius"))
+		var min_distance: float = (self_radius + other_radius) * ENEMY_SEPARATION_FACTOR
+		var dist_sq := offset.length_squared()
+		if dist_sq >= min_distance * min_distance:
+			continue
+
+		var dist := sqrt(dist_sq)
+		var normal := offset / dist if dist > 0.001 else _get_fallback_separation_dir(other_enemy)
+		var penetration := min_distance - dist
+		separation += normal * (penetration * 0.5)
+		overlaps += 1
+
+	if overlaps > 0:
+		var applied := separation / float(overlaps)
+		global_position += applied
+		return applied
+	return Vector2.ZERO
+
+
+func get_separation_radius() -> float:
+	return _get_separation_radius()
+
+
+func is_dying() -> bool:
+	return _dying
+
+
+func _get_separation_radius() -> float:
+	return _get_display_size() * 0.34
+
+
+func _get_fallback_separation_dir(other: Node) -> Vector2:
+	var self_bias := float(get_instance_id() & 1) * 2.0 - 1.0
+	var other_bias := float(other.get_instance_id() & 1) * 2.0 - 1.0
+	var dir := Vector2(self_bias, other_bias).normalized()
+	return dir if dir.length_squared() > 0.0 else Vector2.RIGHT
+
+
 func _fire_at_player() -> void:
 	if bullet_pool == null or _player == null:
 		return
@@ -361,7 +434,7 @@ func _update_animation() -> void:
 		_set_animation("death")
 	elif enemy_type == EnemyType.TANK and _tank_state == TankState.CHARGE and _has_animation("walk"):
 		_set_animation("walk")
-	elif (_shooting or _sprite_action_timer > 0.0) and _has_animation("shoot"):
+	elif enemy_type == EnemyType.SHOOTER and (_shooting or _sprite_action_timer > 0.0) and _has_animation("shoot"):
 		_set_animation("shoot")
 	elif _hit_timer > 0.0 and _has_animation("hit"):
 		_set_animation("hit")
@@ -394,6 +467,7 @@ func _setup_sprite() -> void:
 		var scale_factor: float = display_size / frame_size
 		_sprite.scale = Vector2(scale_factor, scale_factor)
 	_setup_weapon_sprite()
+	_setup_attack_effect_sprite()
 	_set_animation("idle", true)
 	_apply_idle_modulate()
 	_update_weapon_visual()
@@ -421,11 +495,29 @@ func _setup_weapon_sprite() -> void:
 	_weapon_sprite.texture = texture
 
 
+func _setup_attack_effect_sprite() -> void:
+	if enemy_type != EnemyType.CHASER:
+		if _attack_effect_sprite != null:
+			_attack_effect_sprite.queue_free()
+			_attack_effect_sprite = null
+		return
+	if _attack_effect_sprite == null:
+		_attack_effect_sprite = Sprite2D.new()
+		_attack_effect_sprite.centered = true
+		_attack_effect_sprite.z_index = 4
+		add_child(_attack_effect_sprite)
+	_attack_effect_sprite.texture = CHASER_ATTACK_EFFECT_TEXTURES[0] as Texture2D
+	_attack_effect_sprite.scale = Vector2(CHASER_ATTACK_EFFECT_SCALE, CHASER_ATTACK_EFFECT_SCALE)
+	_attack_effect_sprite.visible = false
+
+
 func _update_weapon_visual() -> void:
 	if _weapon_sprite == null:
+		_update_attack_effect_visual()
 		return
 	_weapon_sprite.visible = not _dying and not _frozen
 	if not _weapon_sprite.visible:
+		_update_attack_effect_visual()
 		return
 	var facing := _archer_facing
 	_weapon_sprite.flip_h = facing < 0.0
@@ -435,8 +527,8 @@ func _update_weapon_visual() -> void:
 			if _melee_attack_timer > 0.0:
 				swing = clampf(1.0 - _melee_attack_timer / CHASER_ATTACK_TIME, 0.0, 1.0)
 			_weapon_sprite.scale = Vector2(0.36, 0.36)
-			_weapon_sprite.position = Vector2(facing * (23.0 + 8.0 * swing), 5.0 - 5.0 * sin(swing * PI))
-			_weapon_sprite.rotation = facing * lerpf(-0.62, 0.92, swing)
+			_weapon_sprite.position = Vector2(0.0, 12.0 - 2.0 * sin(swing * PI))
+			_weapon_sprite.rotation = -PI / 4.0 + lerpf(-0.62, 0.92, swing)
 
 		EnemyType.TANK:
 			var thrust := 0.0
@@ -450,6 +542,44 @@ func _update_weapon_visual() -> void:
 
 		_:
 			_weapon_sprite.visible = false
+	_update_attack_effect_visual()
+
+
+func _update_attack_effect_visual() -> void:
+	if _attack_effect_sprite == null:
+		return
+	if enemy_type != EnemyType.CHASER or _weapon_sprite == null or not _weapon_sprite.visible:
+		_attack_effect_sprite.visible = false
+		return
+	if _dying or _frozen or _melee_attack_timer <= 0.0 or CHASER_ATTACK_EFFECT_TEXTURES.is_empty():
+		_attack_effect_sprite.visible = false
+		return
+
+	var progress: float = clampf(1.0 - _melee_attack_timer / CHASER_ATTACK_TIME, 0.0, 0.999)
+	var frame_index: int = int(mini(int(progress * CHASER_ATTACK_EFFECT_TEXTURES.size()), CHASER_ATTACK_EFFECT_TEXTURES.size() - 1))
+	var facing: float = -1.0 if _weapon_sprite.flip_h else 1.0
+	var tip_position: Vector2 = _get_weapon_tip_position()
+	var effect_offset: Vector2 = Vector2(CHASER_ATTACK_EFFECT_CENTER_OFFSET.x * facing, CHASER_ATTACK_EFFECT_CENTER_OFFSET.y).rotated(_weapon_sprite.rotation)
+
+	var current_effect_texture := CHASER_ATTACK_EFFECT_TEXTURES[frame_index] as Texture2D
+	if current_effect_texture == null:
+		_attack_effect_sprite.visible = false
+		return
+
+	_attack_effect_sprite.visible = true
+	_attack_effect_sprite.texture = current_effect_texture
+	_attack_effect_sprite.flip_h = _weapon_sprite.flip_h
+	_attack_effect_sprite.rotation = _weapon_sprite.rotation
+	_attack_effect_sprite.position = tip_position + effect_offset
+
+
+func _get_weapon_tip_position() -> Vector2:
+	if _weapon_sprite == null or _weapon_sprite.texture == null:
+		return Vector2.ZERO
+	var facing: float = -1.0 if _weapon_sprite.flip_h else 1.0
+	var half_width: float = _weapon_sprite.texture.get_width() * absf(_weapon_sprite.scale.x) * 0.5
+	var tip_local: Vector2 = Vector2((half_width - WEAPON_TIP_MARGIN) * facing, 0.0).rotated(_weapon_sprite.rotation)
+	return _weapon_sprite.position + tip_local
 
 
 func _spawn_tank_afterimage() -> void:
