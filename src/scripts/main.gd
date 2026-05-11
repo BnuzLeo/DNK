@@ -7,6 +7,12 @@ const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
 const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
 const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
+const BASKETBALL_HEAD_NORMAL_1_PATH := "res://assets/export/weapon/weapon_01/2.png"
+const BASKETBALL_HEAD_NORMAL_2_PATH := "res://assets/export/weapon/weapon_01/3.png"
+const BASKETBALL_HEAD_BERSERK_PATH := "res://assets/export/weapon/weapon_01/dunk.png"
+const BASKETBALL_HIT_EFFECT := preload("res://scripts/basketball_hit_effect.gd")
+const BASKETBALL_BERSERK_HIT_EFFECT := preload("res://scripts/basketball_berserk_hit_effect.gd")
+const EXPLOSION_EFFECT_SCRIPT := preload("res://scripts/explosion_effect.gd")
 const ICE_FLOOR_TILES := [
 	preload("res://assets/export/map/冰封篮球场/地砖_01.png"),
 	preload("res://assets/export/map/冰封篮球场/地砖_02.png"),
@@ -91,6 +97,7 @@ var _cam_mgr: CameraManager
 var _hit_stop_until := 0
 var _damage_numbers: Array[Dictionary] = []
 const MAX_DAMAGE_NUMBERS := 20
+var _basketball_texture_cache: Dictionary = {}
 
 # Boss 血条
 var _boss_hp_bar_bg: ColorRect
@@ -1155,11 +1162,15 @@ func _draw_action_key(ctrl: Control, key: String, color: Color = Color.WHITE) ->
 
 
 func _draw_attack_icon() -> void:
+	var player := $Player
 	_attack_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
 	var logo_size: Vector2 = Vector2(28, 28)
 	var logo_rect: Rect2 = Rect2((ACTION_FRAME_SIZE - logo_size) * 0.5, logo_size)
 	_attack_icon.draw_texture_rect(GUI_ATTACK_LOGO, logo_rect, false)
-	_draw_action_key(_attack_icon, "J", ACTION_KEY_COLOR)
+	var prompt_active: bool = bool(player.call("should_show_attack_tap_prompt")) and bool(player.call("is_berserk_active"))
+	if prompt_active:
+		_draw_basketball_tap_prompt(_attack_icon, float(player.call("get_attack_tap_prompt_flash_ratio")))
+	_draw_action_key(_attack_icon, "J", Color(1.0, 0.94, 0.62) if prompt_active else ACTION_KEY_COLOR)
 
 
 func _draw_switch_icon() -> void:
@@ -1189,6 +1200,19 @@ func _draw_dash_icon() -> void:
 func _draw_berserk_icon() -> void:
 	_berserk_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
 	_draw_action_key(_berserk_icon, "L", ACTION_KEY_COLOR)
+
+
+func _draw_basketball_tap_prompt(ctrl: Control, flash_ratio: float) -> void:
+	var center := ACTION_FRAME_SIZE * 0.5
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.014)
+	var alpha := 0.18 + 0.28 * pulse + 0.28 * flash_ratio
+	var radius := 18.0 + 3.0 * pulse + 6.0 * flash_ratio
+	ctrl.draw_arc(center, radius, 0.0, TAU, 32, Color(1.0, 0.34, 0.08, alpha), 2.8)
+	ctrl.draw_arc(center, radius - 4.0, 0.0, TAU, 28, Color(1.0, 0.86, 0.22, alpha * 0.7), 1.4)
+	ctrl.draw_circle(center + Vector2(0.0, -4.0), 9.0 + 3.0 * flash_ratio, Color(1.0, 0.38, 0.1, 0.16 + 0.12 * pulse))
+	ctrl.draw_line(center + Vector2(16.0, -7.0), center + Vector2(22.0, -12.0), Color(1.0, 0.82, 0.38, alpha), 2.0)
+	ctrl.draw_line(center + Vector2(22.0, -12.0), center + Vector2(19.0, -12.0), Color(1.0, 0.82, 0.38, alpha), 2.0)
+	ctrl.draw_line(center + Vector2(22.0, -12.0), center + Vector2(22.0, -9.0), Color(1.0, 0.82, 0.38, alpha), 2.0)
 
 
 func _draw_buff_bar() -> void:
@@ -1710,7 +1734,17 @@ func _on_pause_lobby_input(event: InputEvent) -> void:
 
 # ── 打击反馈 ──────────────────────────────────────────
 
-func _on_bullet_hit_feedback(pos: Vector2, damage: int, is_kill: bool, is_boss: bool) -> void:
+func _on_bullet_hit_feedback(pos: Vector2, damage: int, is_kill: bool, is_boss: bool, projectile_type: String) -> void:
+	if projectile_type == "basketball":
+		_spawn_basketball_hit_fx(pos)
+		var normal_path := BASKETBALL_HEAD_NORMAL_1_PATH if randi() % 2 == 0 else BASKETBALL_HEAD_NORMAL_2_PATH
+		_spawn_basketball_hit_icon(pos, _load_basketball_texture(normal_path), false)
+	elif projectile_type == "basketball_berserk":
+		_spawn_basketball_berserk_hit_fx(pos)
+		_spawn_basketball_hit_icon(pos, _load_basketball_texture(BASKETBALL_HEAD_BERSERK_PATH), true)
+		trigger_hit_stop(5, 14.0, 0.32)
+		spawn_damage_number(pos, damage, Color(1.0, 0.26, 0.08), 18)
+		return
 	if is_kill:
 		trigger_hit_stop(3, 1.0, 0.05)
 		spawn_damage_number(pos, damage, Color(1.0, 0.53, 0.0), 16)
@@ -1720,6 +1754,63 @@ func _on_bullet_hit_feedback(pos: Vector2, damage: int, is_kill: bool, is_boss: 
 	else:
 		trigger_hit_stop(1, 2.0, 0.1)
 		spawn_damage_number(pos, damage)
+
+
+func _spawn_basketball_hit_icon(pos: Vector2, texture: Texture2D, is_berserk: bool) -> void:
+	if texture == null:
+		return
+	var sprite := Sprite2D.new()
+	sprite.texture = texture
+	sprite.centered = true
+	sprite.global_position = pos + Vector2(0.0, -46.0)
+	sprite.z_index = 130
+	var display_size := 54.0 if is_berserk else 42.0
+	var max_dim := maxf(float(texture.get_width()), float(texture.get_height()))
+	if max_dim > 0.0:
+		sprite.scale = Vector2.ONE * (display_size / max_dim)
+	add_child(sprite)
+	var tween := sprite.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(sprite, "global_position:y", sprite.global_position.y - (20.0 if is_berserk else 12.0), 0.46)
+	tween.tween_property(sprite, "modulate:a", 0.0, 0.46)
+	tween.tween_property(sprite, "scale", sprite.scale * (1.22 if is_berserk else 1.08), 0.46)
+	tween.chain().tween_callback(sprite.queue_free)
+
+
+func _spawn_basketball_hit_fx(pos: Vector2) -> void:
+	var effect := BASKETBALL_HIT_EFFECT.new()
+	add_child(effect)
+	effect.global_position = pos
+	effect.setup(42.0)
+	if effect.sprite_frames != null and effect.sprite_frames.get_frame_count("explode") > 0:
+		return
+	effect.queue_free()
+	var fallback := EXPLOSION_EFFECT_SCRIPT.new()
+	add_child(fallback)
+	fallback.global_position = pos
+	fallback.setup(0.26, 26.0)
+
+
+func _spawn_basketball_berserk_hit_fx(pos: Vector2) -> void:
+	var effect := BASKETBALL_BERSERK_HIT_EFFECT.new()
+	add_child(effect)
+	effect.global_position = pos + Vector2(0.0, -24.0)
+	effect.setup(118.0)
+	if effect.sprite_frames != null and effect.sprite_frames.get_frame_count("explode") > 0:
+		return
+	effect.queue_free()
+	var fallback := EXPLOSION_EFFECT_SCRIPT.new()
+	add_child(fallback)
+	fallback.global_position = pos
+	fallback.setup(0.34, 54.0)
+
+
+func _load_basketball_texture(path: String) -> Texture2D:
+	if _basketball_texture_cache.has(path):
+		return _basketball_texture_cache[path]
+	var texture := load(path) as Texture2D
+	_basketball_texture_cache[path] = texture
+	return texture
 
 
 func trigger_hit_stop(frames: int, shake_intensity: float = 0.0, shake_duration: float = 0.0) -> void:

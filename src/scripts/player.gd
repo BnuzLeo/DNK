@@ -36,13 +36,18 @@ const DASH_COOLDOWN := 5.0
 const DASH_INVULN := 0.5
 const BERSERK_DURATION := 5.0
 const BERSERK_COLOR := Color(1.0, 0.25, 0.08)
+const HEAD_BANNER_DISPLAY_SIZE := 52.0
+const HEAD_BANNER_OFFSET := Vector2(0.0, -60.0)
+const HEAD_BANNER_DURATION := 0.42
+const BASKETBALL_PROMPT_FLASH_DURATION := 0.65
+const BASKETBALL_AUTO_J_COUNT := 5
+const BASKETBALL_AUTO_J_INTERVAL := 0.2
 
 const WEAPONS := {
 	"basketball": {
-		"cooldown": 0.18, "damage": 4, "count": 1, "spread": 0.0,
-		"speed": 620.0, "mana": 0, "name": "篮球", "type": "basketball",
-		"berserk_cooldown": 0.05, "berserk_damage": 2, "berserk_spread": 0.08,
-		"berserk_speed": 760.0
+		"cooldown": 0.42, "damage": 3, "count": 5, "spread": 0.52,
+		"speed": 690.0, "mana": 0, "name": "篮球", "type": "basketball",
+		"berserk_cooldown": 0.0, "berserk_damage": 9
 	},
 	"jntm": {
 		"cooldown": 3.0, "damage": 18, "mana": 0, "name": "鸡你太美",
@@ -86,6 +91,11 @@ var _dash_cooldown := 0.0
 var _dash_dir := Vector2.ZERO
 var _dash_afterimage_timer := 0.0
 var _dash_invuln_visual_timer := 0.0
+var _basketball_prompt_flash_timer := 0.0
+var _basketball_auto_j_remaining := 0
+var _basketball_auto_j_timer := 0.0
+var _head_banner_active: Sprite2D = null
+var _queued_head_banner: Texture2D = null
 
 # Buff 系统
 enum BuffType { MANA_REGEN, SPEED, REVIVE, BULLET }
@@ -206,6 +216,10 @@ func _physics_process(delta: float) -> void:
 		if _berserk_timer <= 0.0:
 			_berserk_active = false
 			_berserk_timer = 0.0
+	if _basketball_prompt_flash_timer > 0.0:
+		_basketball_prompt_flash_timer = maxf(_basketball_prompt_flash_timer - delta, 0.0)
+	if _basketball_auto_j_remaining > 0:
+		_update_basketball_auto_j(delta)
 
 	# 闪避中 —— 高速移动 + 无敌，不接受其他输入
 	if _dash_timer > 0.0:
@@ -287,14 +301,11 @@ func _physics_process(delta: float) -> void:
 	# 射击
 	_fire_cooldown -= delta
 	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
-
-	if Input.is_action_pressed("shoot") and _fire_cooldown <= 0.0:
-		var mana_cost: float = weapon.get("mana", 0)
-		if mana >= mana_cost:
-			mana -= mana_cost
-			_fire_cooldown = _get_weapon_cooldown(weapon)
-			_activate_weapon(weapon)
-			_sprite_action_timer = 0.22
+	if _is_basketball_tap_berserk(weapon):
+		if Input.is_action_just_pressed("shoot"):
+			_fire_weapon(weapon, true)
+	elif Input.is_action_pressed("shoot") and _fire_cooldown <= 0.0:
+		_fire_weapon(weapon)
 
 	if _berserk_flash_timer > 0.0:
 		_berserk_flash_timer -= delta
@@ -331,6 +342,8 @@ func _trigger_berserk() -> void:
 	_berserk_flash_timer = 0.25
 	if not was_active and _berserk_active:
 		_play_berserk_awakening_fx()
+	if _berserk_active and _weapon_keys[_weapon_index] == "basketball":
+		_start_basketball_auto_j()
 
 
 func _play_berserk_awakening_fx() -> void:
@@ -350,6 +363,18 @@ func _get_weapon_cooldown(weapon: Dictionary) -> float:
 	return weapon.cooldown
 
 
+func _fire_weapon(weapon: Dictionary, ignore_cooldown: bool = false) -> void:
+	var mana_cost: float = weapon.get("mana", 0)
+	if mana < mana_cost:
+		return
+	if not ignore_cooldown and _fire_cooldown > 0.0:
+		return
+	mana -= mana_cost
+	_activate_weapon(weapon)
+	_sprite_action_timer = 0.22
+	_fire_cooldown = 0.0 if ignore_cooldown else _get_weapon_cooldown(weapon)
+
+
 func _activate_weapon(weapon: Dictionary) -> void:
 	match weapon.type:
 		"basketball":
@@ -363,14 +388,13 @@ func _activate_weapon(weapon: Dictionary) -> void:
 func _shoot_basketball(weapon: Dictionary) -> void:
 	if bullet_pool == null:
 		return
+	if _is_basketball_tap_berserk(weapon):
+		_shoot_basketball_berserk(weapon)
+		return
 	var count: int = weapon.get("count", 1) + get_buff_stacks(BuffType.BULLET)
 	var spread: float = weapon.get("spread", 0.0)
 	var speed: float = weapon.get("speed", 620.0)
 	var damage: int = weapon.damage + damage_bonus
-	if _berserk_active:
-		spread = weapon.get("berserk_spread", spread)
-		speed = weapon.get("berserk_speed", speed)
-		damage = weapon.get("berserk_damage", weapon.damage) + damage_bonus
 	for i in count:
 		var angle_offset := 0.0
 		if count > 1:
@@ -386,6 +410,60 @@ func _shoot_basketball(weapon: Dictionary) -> void:
 			0.0,
 			"basketball"
 		)
+
+
+func _shoot_basketball_berserk(weapon: Dictionary) -> void:
+	if bullet_pool == null:
+		return
+	_trigger_basketball_prompt_flash()
+	var damage: int = weapon.get("berserk_damage", weapon.damage) + damage_bonus
+	var targets: Array[Area2D] = _get_basketball_berserk_targets()
+	if targets.is_empty():
+		return
+	var enemy: Area2D = targets[randi() % targets.size()]
+	bullet_pool.call("spawn_basketball_slam", enemy, enemy.global_position, damage)
+
+
+func _get_basketball_berserk_targets() -> Array[Area2D]:
+	var targets: Array[Area2D] = []
+	for enemy in get_tree().get_nodes_in_group("enemy"):
+		var enemy_area := enemy as Area2D
+		if enemy_area == null or not is_instance_valid(enemy_area):
+			continue
+		if not enemy_area.has_method("take_damage"):
+			continue
+		if "_dying" in enemy_area and enemy_area._dying:
+			continue
+		targets.append(enemy_area)
+	targets.sort_custom(func(a: Area2D, b: Area2D) -> bool:
+		return global_position.distance_squared_to(a.global_position) < global_position.distance_squared_to(b.global_position)
+	)
+	return targets
+
+
+func _is_basketball_tap_berserk(weapon: Dictionary) -> bool:
+	return weapon.get("type", "") == "basketball" and _berserk_active
+
+
+func _trigger_basketball_prompt_flash() -> void:
+	_basketball_prompt_flash_timer = BASKETBALL_PROMPT_FLASH_DURATION
+
+
+func _start_basketball_auto_j() -> void:
+	_basketball_auto_j_remaining = BASKETBALL_AUTO_J_COUNT
+	_basketball_auto_j_timer = 0.0
+	_update_basketball_auto_j(0.0)
+
+
+func _update_basketball_auto_j(delta: float) -> void:
+	if _weapon_keys[_weapon_index] != "basketball" or not _berserk_active:
+		_basketball_auto_j_remaining = 0
+		return
+	_basketball_auto_j_timer -= delta
+	while _basketball_auto_j_remaining > 0 and _basketball_auto_j_timer <= 0.0:
+		_fire_weapon(WEAPONS["basketball"], true)
+		_basketball_auto_j_remaining -= 1
+		_basketball_auto_j_timer += BASKETBALL_AUTO_J_INTERVAL
 
 
 func _start_room_blast(weapon: Dictionary) -> void:
@@ -704,8 +782,57 @@ func is_berserk_active() -> bool:
 	return _berserk_active
 
 
+func should_show_attack_tap_prompt() -> bool:
+	return _weapon_keys[_weapon_index] == "basketball" and _berserk_active
+
+
+func get_attack_tap_prompt_flash_ratio() -> float:
+	if BASKETBALL_PROMPT_FLASH_DURATION <= 0.0:
+		return 0.0
+	return clampf(_basketball_prompt_flash_timer / BASKETBALL_PROMPT_FLASH_DURATION, 0.0, 1.0)
+
+
 func get_all_weapon_keys() -> Array:
 	return WEAPONS.keys()
+
+
+func queue_head_banner(texture: Texture2D) -> void:
+	if texture == null:
+		return
+	if _head_banner_active != null and is_instance_valid(_head_banner_active):
+		_queued_head_banner = texture
+		return
+	_show_head_banner(texture)
+
+
+func _show_head_banner(texture: Texture2D) -> void:
+	var sprite := Sprite2D.new()
+	sprite.texture = texture
+	sprite.centered = true
+	sprite.position = HEAD_BANNER_OFFSET
+	sprite.z_index = 120
+	var max_dim := maxf(float(texture.get_width()), float(texture.get_height()))
+	if max_dim > 0.0:
+		sprite.scale = Vector2.ONE * (HEAD_BANNER_DISPLAY_SIZE / max_dim)
+	add_child(sprite)
+	_head_banner_active = sprite
+	var tween := sprite.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(sprite, "position:y", HEAD_BANNER_OFFSET.y - 14.0, HEAD_BANNER_DURATION)
+	tween.tween_property(sprite, "modulate:a", 0.0, HEAD_BANNER_DURATION)
+	tween.tween_property(sprite, "scale", sprite.scale * 1.05, HEAD_BANNER_DURATION)
+	tween.chain().tween_callback(Callable(self, "_finish_head_banner").bind(sprite))
+
+
+func _finish_head_banner(sprite: Sprite2D) -> void:
+	if sprite != null and is_instance_valid(sprite):
+		sprite.queue_free()
+	if _head_banner_active == sprite:
+		_head_banner_active = null
+	if _queued_head_banner != null:
+		var next_texture := _queued_head_banner
+		_queued_head_banner = null
+		_show_head_banner(next_texture)
 
 
 # ── Buff 系统 ──────────────────────────────────────────

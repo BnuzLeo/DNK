@@ -112,6 +112,7 @@ func _setup_sprite() -> void:
 		add_child(_sprite)
 	_sprite_type = npc_type
 	_sprite.sprite_frames = _build_sprite_frames(texture, config)
+	_sprite.flip_h = npc_type == "smith"
 	_sprite.play("idle")
 	var frame_size: Vector2i = config.get("frame_size", Vector2i(96, 96))
 	if frame_size.y > 0:

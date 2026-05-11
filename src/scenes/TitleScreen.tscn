@@ -1,8 +1,8 @@
-[gd_scene load_steps=5 format=3 uid="uid://d0wg7fq5r5cyb"]
+[gd_scene format=3 uid="uid://08d7qvyiau0n"]
 
-[ext_resource type="Script" path="res://scripts/title_screen.gd" id="1"]
-[ext_resource type="Texture2D" path="res://assets/export/start/background.png" id="2"]
-[ext_resource type="Texture2D" path="res://assets/export/start/kun.png" id="3"]
+[ext_resource type="Script" uid="uid://cr1t8wxhg6ggi" path="res://scripts/title_screen.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://dpoa7bqdxmy8r" path="res://assets/export/start/background.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://yxjsch4g2glg" path="res://assets/export/start/kun.png" id="3"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_start_btn"]
 bg_color = Color(0.09, 0.12, 0.11, 0.84)
@@ -18,27 +18,27 @@ corner_radius_bottom_left = 8
 shadow_color = Color(0, 0, 0, 0.3)
 shadow_size = 4
 
-[node name="TitleScreen" type="Node2D"]
+[node name="TitleScreen" type="Node2D" unique_id=1839049520]
 script = ExtResource("1")
 
-[node name="Background" type="TextureRect" parent="."]
+[node name="Background" type="TextureRect" parent="." unique_id=1843361180]
+offset_right = 960.0
+offset_bottom = 640.0
 texture = ExtResource("2")
-offset_right = 960.0
-offset_bottom = 640.0
 expand_mode = 1
 stretch_mode = 6
 
-[node name="KunParallax" type="TextureRect" parent="."]
+[node name="KunParallax" type="TextureRect" parent="." unique_id=1367551394]
+offset_right = 960.0
+offset_bottom = 640.0
 texture = ExtResource("3")
-offset_right = 960.0
-offset_bottom = 640.0
 expand_mode = 1
 stretch_mode = 6
 
-[node name="Overlay" type="CanvasLayer" parent="."]
+[node name="Overlay" type="CanvasLayer" parent="." unique_id=1603704867]
 layer = 10
 
-[node name="TitleRoot" type="Control" parent="Overlay"]
+[node name="TitleRoot" type="Control" parent="Overlay" unique_id=1092783486]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -47,19 +47,19 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="StartButton" type="Button" parent="Overlay/TitleRoot"]
+[node name="StartButton" type="Button" parent="Overlay/TitleRoot" unique_id=1125517939]
 layout_mode = 0
 offset_left = 370.0
-offset_top = 504.0
+offset_top = 443.0
 offset_right = 590.0
-offset_bottom = 560.0
+offset_bottom = 499.0
 theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxFlat_start_btn")
-theme_override_styles/hover = SubResource("StyleBoxFlat_start_btn")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_start_btn")
+theme_override_styles/hover = SubResource("StyleBoxFlat_start_btn")
 text = "开始游戏"
 
-[node name="LobbyTestButton" type="Button" parent="Overlay/TitleRoot"]
+[node name="LobbyTestButton" type="Button" parent="Overlay/TitleRoot" unique_id=1048634609]
 layout_mode = 0
 offset_left = 320.0
 offset_top = 572.0
@@ -67,11 +67,11 @@ offset_right = 470.0
 offset_bottom = 612.0
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_start_btn")
-theme_override_styles/hover = SubResource("StyleBoxFlat_start_btn")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_start_btn")
+theme_override_styles/hover = SubResource("StyleBoxFlat_start_btn")
 text = "直接进大厅"
 
-[node name="DungeonTestButton" type="Button" parent="Overlay/TitleRoot"]
+[node name="DungeonTestButton" type="Button" parent="Overlay/TitleRoot" unique_id=1818683501]
 layout_mode = 0
 offset_left = 490.0
 offset_top = 572.0
@@ -79,15 +79,15 @@ offset_right = 640.0
 offset_bottom = 612.0
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_start_btn")
-theme_override_styles/hover = SubResource("StyleBoxFlat_start_btn")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_start_btn")
+theme_override_styles/hover = SubResource("StyleBoxFlat_start_btn")
 text = "直接进副本"
 
-[node name="VideoOverlay" type="CanvasLayer" parent="."]
+[node name="VideoOverlay" type="CanvasLayer" parent="." unique_id=1686178654]
 layer = 30
 visible = false
 
-[node name="VideoRoot" type="Control" parent="VideoOverlay"]
+[node name="VideoRoot" type="Control" parent="VideoOverlay" unique_id=1265389415]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -96,7 +96,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="VideoPlayer" type="VideoStreamPlayer" parent="VideoOverlay/VideoRoot"]
+[node name="VideoPlayer" type="VideoStreamPlayer" parent="VideoOverlay/VideoRoot" unique_id=1549239929]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -106,17 +106,17 @@ grow_vertical = 2
 mouse_filter = 2
 expand = true
 
-[node name="SkipHint" type="Label" parent="VideoOverlay/VideoRoot"]
+[node name="SkipHint" type="Label" parent="VideoOverlay/VideoRoot" unique_id=392506669]
 layout_mode = 0
 offset_left = 324.0
 offset_top = 582.0
 offset_right = 638.0
 offset_bottom = 608.0
 theme_override_font_sizes/font_size = 16
-horizontal_alignment = 1
 text = "按住 空格 1s 跳过"
+horizontal_alignment = 1
 
-[node name="SkipBarBg" type="ColorRect" parent="VideoOverlay/VideoRoot"]
+[node name="SkipBarBg" type="ColorRect" parent="VideoOverlay/VideoRoot" unique_id=2092316232]
 layout_mode = 0
 offset_left = 326.0
 offset_top = 612.0
@@ -124,7 +124,7 @@ offset_right = 634.0
 offset_bottom = 622.0
 color = Color(0.04, 0.05, 0.06, 0.78)
 
-[node name="SkipBarFill" type="ColorRect" parent="VideoOverlay/VideoRoot"]
+[node name="SkipBarFill" type="ColorRect" parent="VideoOverlay/VideoRoot" unique_id=294430527]
 layout_mode = 0
 offset_left = 328.0
 offset_top = 614.0

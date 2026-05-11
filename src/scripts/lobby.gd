@@ -4,13 +4,15 @@ extends Node2D
 
 const VS := preload("res://scripts/visual_spec.gd")
 const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
+const LOBBY_MUSIC := preload("res://assets/music/dialogue/鸡你太美.wav")
+const BULLET_POOL_SCRIPT := preload("res://scripts/bullet_pool.gd")
+const PLAYER_SCRIPT := preload("res://scripts/player.gd")
+const EQUIPMENT_PANEL_SCRIPT := preload("res://scripts/equipment_panel.gd")
 
-const LOBBY_MUSIC_PATH := "res://assets/music/dialogue/鸡你太美.wav"
 const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
 const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
 const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
-const LOBBY_BACKGROUND := preload("res://assets/export/gui/大厅/底图.png")
 const STATUS_SCALE := 1.73
 const STATUS_POS := Vector2(24.0, 20.0)
 const STATUS_FILL_W := 59.0 * STATUS_SCALE
@@ -24,37 +26,7 @@ const ACTION_K_X := 786.0
 const ACTION_L_X := 856.0
 const ACTION_KEY_Y := 55.0
 const ACTION_KEY_COLOR := Color(0.78, 0.88, 0.94)
-const LOBBY_OBJECT_SCALE := 0.625
 const PLAYER_TOP_Z_INDEX := 1000
-const LOBBY_OBJECTS := [
-	{"file": "Group 1.png", "source_pos": Vector2(690.0, 418.0)},
-	{"file": "Groups-1.png", "source_pos": Vector2(1362.0, 514.0)},
-	{"file": "Groups-2.png", "source_pos": Vector2(1286.0, 286.0)},
-	{"file": "Groups.png", "source_pos": Vector2(254.0, 836.0)},
-	{"file": "Image-1.png", "source_pos": Vector2(978.0, 804.0)},
-	{"file": "Image-10.png", "source_pos": Vector2(296.0, 842.0)},
-	{"file": "Image-11.png", "source_pos": Vector2(686.0, 498.0)},
-	{"file": "Image-12.png", "source_pos": Vector2(190.0, 144.0)},
-	{"file": "Image-13.png", "source_pos": Vector2(356.0, 892.0)},
-	{"file": "Image-14.png", "source_pos": Vector2(916.0, 788.0)},
-	{"file": "Image-15.png", "source_pos": Vector2(104.0, 842.0)},
-	{"file": "Image-16.png", "source_pos": Vector2(280.0, 116.0)},
-	{"file": "Image-17.png", "source_pos": Vector2(342.0, 740.0)},
-	{"file": "Image-18.png", "source_pos": Vector2(74.0, 508.0)},
-	{"file": "Image-2.png", "source_pos": Vector2(570.0, 656.0)},
-	{"file": "Image-3.png", "source_pos": Vector2(878.0, 634.0)},
-	{"file": "Image-4.png", "source_pos": Vector2(356.0, 774.0)},
-	{"file": "Image-5.png", "source_pos": Vector2(344.0, 750.0)},
-	{"file": "Image-6.png", "source_pos": Vector2(158.0, 366.0)},
-	{"file": "Image-7.png", "source_pos": Vector2(860.0, 162.0)},
-	{"file": "Image-8.png", "source_pos": Vector2(176.0, 130.0)},
-	{"file": "Image-9.png", "source_pos": Vector2(178.0, 212.0)},
-	{"file": "Image.png", "source_pos": Vector2(1384.0, 362.0)},
-	{"file": "Object-1.png", "source_pos": Vector2(440.0, 774.0)},
-	{"file": "Object-2.png", "source_pos": Vector2(1096.0, 744.0)},
-	{"file": "Object-3.png", "source_pos": Vector2(52.0, 700.0)},
-	{"file": "Object.png", "source_pos": Vector2(576.0, 836.0)},
-]
 
 const ROOM_W := int(VS.VIEWPORT_SIZE.x)
 const ROOM_H := int(VS.VIEWPORT_SIZE.y)
@@ -106,22 +78,19 @@ func _ready() -> void:
 	GameManager.change_state(GameManager.GameState.LOBBY)
 	_start_lobby_music()
 	_create_walls()
-	_create_lobby_objects()
+	_setup_lobby_object_collisions()
 	_create_bullet_pool()
 	_create_player()
-	_create_npcs()
-	_create_lobby_portal()
+	_setup_npcs()
+	_setup_lobby_portal()
 	_create_hud()
 
 
 func _start_lobby_music() -> void:
-	var stream := _load_audio_stream(LOBBY_MUSIC_PATH)
-	if stream == null:
-		return
 	_lobby_music = AudioStreamPlayer.new()
 	_lobby_music.bus = "Master"
 	_lobby_music.volume_db = -4.0
-	_lobby_music.stream = stream
+	_lobby_music.stream = LOBBY_MUSIC
 	_lobby_music.finished.connect(_replay_lobby_music)
 	add_child(_lobby_music)
 	_lobby_music.play()
@@ -132,23 +101,16 @@ func _replay_lobby_music() -> void:
 		_lobby_music.play()
 
 
-func _load_audio_stream(path: String) -> AudioStream:
-	var stream := load(path) as AudioStream
-	if stream != null:
-		return stream
-	var absolute_path := ProjectSettings.globalize_path(path)
-	if FileAccess.file_exists(absolute_path):
-		return AudioStreamWAV.load_from_file(absolute_path)
-	return null
-
-
-func _create_lobby_portal() -> void:
-	_portal_sprite = TransferPortal.new()
-	_portal_sprite.name = "LobbyPortal"
-	_portal_sprite.position = _portal_pos
+func _setup_lobby_portal() -> void:
+	_portal_sprite = get_node_or_null("LobbyPortal") as TransferPortal
+	if _portal_sprite == null:
+		_portal_sprite = TransferPortal.new()
+		_portal_sprite.name = "LobbyPortal"
+		_portal_sprite.position = _portal_pos
+		add_child(_portal_sprite)
+	_portal_pos = _portal_sprite.position
 	_portal_sprite.z_index = 5
 	_portal_sprite.setup(VS.PORTAL_LOBBY_DISPLAY_SIZE * 2.5)
-	add_child(_portal_sprite)
 
 
 func _create_walls() -> void:
@@ -170,44 +132,59 @@ func _make_wall(pos: Vector2, size: Vector2) -> void:
 	add_child(wall)
 
 
-func _create_lobby_objects() -> void:
-	for object_data in LOBBY_OBJECTS:
-		var texture := load("res://assets/export/gui/大厅/objects/%s" % String(object_data.file)) as Texture2D
-		if texture == null:
+func _setup_lobby_object_collisions() -> void:
+	var objects_root: Node = get_node_or_null("LobbyObjects")
+	if objects_root == null:
+		return
+	var old_collisions_root: Node = get_node_or_null("GeneratedLobbyObjectCollisions")
+	if old_collisions_root != null:
+		remove_child(old_collisions_root)
+		old_collisions_root.queue_free()
+	var collisions_root: Node2D = Node2D.new()
+	collisions_root.name = "GeneratedLobbyObjectCollisions"
+	add_child(collisions_root)
+	for object_node in objects_root.get_children():
+		var sprite: Sprite2D = object_node as Sprite2D
+		if sprite == null or sprite.texture == null:
 			continue
-		var source_pos: Vector2 = object_data.source_pos
-		var display_size := texture.get_size() * LOBBY_OBJECT_SCALE
-		var top_left := source_pos * LOBBY_OBJECT_SCALE
+		var texture_size: Vector2 = Vector2(sprite.texture.get_size())
+		var scale_abs: Vector2 = Vector2(maxf(absf(sprite.scale.x), 0.001), maxf(absf(sprite.scale.y), 0.001))
+		var display_size: Vector2 = texture_size * scale_abs
+		var footprint_h: float = clampf(display_size.y * 0.22, 16.0, 50.0)
+		var footprint_w: float = clampf(display_size.x * 0.68, 20.0, maxf(20.0, display_size.x * 0.9))
+		var footprint_size: Vector2 = Vector2(footprint_w, footprint_h)
+		var offset: Vector2 = _get_lobby_object_collision_offset(sprite, display_size, footprint_h)
 
-		var sprite := Sprite2D.new()
-		sprite.name = "LobbyObject_%s" % String(object_data.file).get_basename()
-		sprite.texture = texture
-		sprite.centered = true
-		sprite.position = top_left + display_size * 0.5
-		sprite.scale = Vector2(LOBBY_OBJECT_SCALE, LOBBY_OBJECT_SCALE)
-		sprite.z_index = 1
-		add_child(sprite)
-
-		var body := StaticBody2D.new()
+		var body: StaticBody2D = StaticBody2D.new()
 		body.name = "%sCollision" % sprite.name
-		body.position = sprite.position
 		body.collision_layer = 16
 		body.collision_mask = 0
-		var shape := CollisionShape2D.new()
-		var rect := RectangleShape2D.new()
-		var footprint_h := clampf(display_size.y * 0.22, 16.0, 50.0)
-		var footprint_w := clampf(display_size.x * 0.68, 20.0, maxf(20.0, display_size.x * 0.9))
-		rect.size = Vector2(footprint_w, footprint_h)
-		shape.position = Vector2(0.0, display_size.y * 0.5 - footprint_h * 0.5)
+		var shape: CollisionShape2D = CollisionShape2D.new()
+		var rect: RectangleShape2D = RectangleShape2D.new()
+		rect.size = footprint_size
+		shape.position = offset
 		shape.shape = rect
 		body.add_child(shape)
-		add_child(body)
+		collisions_root.add_child(body)
+		body.global_position = sprite.global_position
+
+
+func _get_lobby_object_collision_offset(sprite: Sprite2D, texture_size: Vector2, footprint_h: float) -> Vector2:
+	if sprite.centered:
+		return Vector2(0.0, texture_size.y * 0.5 - footprint_h * 0.5)
+	return Vector2(texture_size.x * 0.5, texture_size.y - footprint_h * 0.5)
+
+
+func _get_portal_position() -> Vector2:
+	if _portal_sprite != null and is_instance_valid(_portal_sprite):
+		return _portal_sprite.global_position
+	return _portal_pos
 
 
 func _create_bullet_pool() -> void:
 	_bullet_pool = Node2D.new()
 	_bullet_pool.name = "BulletPool"
-	_bullet_pool.set_script(load("res://scripts/bullet_pool.gd"))
+	_bullet_pool.set_script(BULLET_POOL_SCRIPT)
 	add_child(_bullet_pool)
 
 
@@ -215,7 +192,7 @@ func _create_player() -> void:
 	_player = CharacterBody2D.new()
 	_player.position = Vector2(480, 450)
 	_player.z_index = PLAYER_TOP_Z_INDEX
-	_player.set_script(load("res://scripts/player.gd"))
+	_player.set_script(PLAYER_SCRIPT)
 
 	var col := CollisionShape2D.new()
 	var circle := CircleShape2D.new()
@@ -256,36 +233,24 @@ func _finish_player_spawn_warning(player: CharacterBody2D) -> void:
 	player.set_process_input(true)
 
 
-func _create_npcs() -> void:
-	var npc_script := load("res://scripts/npc.gd")
+func _setup_npcs() -> void:
+	_setup_npc(get_node_or_null("LobbyNPCs/Broker") as Area2D, "broker", "尖叫鸡", Color(0.9, 0.7, 0.2))
+	_setup_npc(get_node_or_null("LobbyNPCs/Smith") as Area2D, "smith", "卡皮巴拉", Color(0.5, 0.6, 0.8))
 
-	# 尖叫鸡（天赋树）— 左侧
-	var broker := Area2D.new()
-	broker.position = Vector2(240, 320)
-	broker.set_script(npc_script)
-	var broker_col := CollisionShape2D.new()
-	var broker_circle := CircleShape2D.new()
-	broker_circle.radius = 40.0
-	broker_col.shape = broker_circle
-	broker.add_child(broker_col)
-	add_child(broker)
-	broker.npc_type = "broker"
-	broker.display_name = "尖叫鸡"
-	broker.npc_color = Color(0.9, 0.7, 0.2)
 
-	# 卡皮巴拉（武器商店）— 右侧
-	var smith := Area2D.new()
-	smith.position = Vector2(720, 320)
-	smith.set_script(npc_script)
-	var smith_col := CollisionShape2D.new()
-	var smith_circle := CircleShape2D.new()
-	smith_circle.radius = 40.0
-	smith_col.shape = smith_circle
-	smith.add_child(smith_col)
-	add_child(smith)
-	smith.npc_type = "smith"
-	smith.display_name = "卡皮巴拉"
-	smith.npc_color = Color(0.5, 0.6, 0.8)
+func _setup_npc(npc: Area2D, type: String, label: String, color: Color) -> void:
+	if npc == null:
+		return
+	npc.set("npc_type", type)
+	npc.set("display_name", label)
+	npc.set("npc_color", color)
+	if npc.get_node_or_null("InteractionCollision") == null:
+		var collision: CollisionShape2D = CollisionShape2D.new()
+		collision.name = "InteractionCollision"
+		var circle: CircleShape2D = CircleShape2D.new()
+		circle.radius = 40.0
+		collision.shape = circle
+		npc.add_child(collision)
 
 var _hud_canvas: CanvasLayer
 var _equipment_panel: Node = null
@@ -466,7 +431,7 @@ func _process(delta: float) -> void:
 		_shield_bar.visible = _player.max_armor > 0
 		_shield_bar_bg.visible = _player.max_armor > 0
 		_shield_text.visible = _player.max_armor > 0
-		_portal_near = _player.global_position.distance_to(_portal_pos) < 50.0
+		_portal_near = _player.global_position.distance_to(_get_portal_position()) < 50.0
 
 		if _attack_icon:
 			_attack_icon.queue_redraw()
@@ -489,7 +454,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 	if _player and is_instance_valid(_player):
-		_portal_near = _player.global_position.distance_to(_portal_pos) < 50.0
+		_portal_near = _player.global_position.distance_to(_get_portal_position()) < 50.0
 
 	queue_redraw()
 
@@ -946,7 +911,7 @@ func _open_equipment_panel() -> void:
 	if _equipment_panel:
 		return
 	GameManager.change_state(GameManager.GameState.PAUSED)
-	_equipment_panel = load("res://scripts/equipment_panel.gd").new()
+	_equipment_panel = EQUIPMENT_PANEL_SCRIPT.new()
 	_equipment_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	_equipment_panel.tree_exiting.connect(func():
 		_equipment_panel = null
@@ -967,8 +932,6 @@ func _enter_dungeon() -> void:
 
 
 func _draw() -> void:
-	draw_texture_rect(LOBBY_BACKGROUND, Rect2(Vector2.ZERO, Vector2(ROOM_W, ROOM_H)), false)
-
 	if _portal_near and not _map_select_open:
-		draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-34, -76), "按 E 交互",
+		draw_string(ThemeDB.fallback_font, _get_portal_position() + Vector2(-34, -76), "按 E 交互",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))

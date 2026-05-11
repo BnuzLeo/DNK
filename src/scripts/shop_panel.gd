@@ -158,7 +158,7 @@ func _on_buy_input(event: InputEvent, key: String) -> void:
 func _get_weapon_stats_text(weapon: Dictionary) -> String:
 	match weapon.type:
 		"basketball":
-			return "伤害:%d  CD:%.2fs  狂暴CD:%.2fs" % [weapon.damage, weapon.cooldown, weapon.berserk_cooldown]
+			return "伤害:%d  普通:%d发散弹/%.2fs  狂暴:连点全场投篮" % [weapon.damage, weapon.count, weapon.cooldown]
 		"room_blast":
 			return "全房间伤害:%d  CD:%.1fs  狂暴:3次/%.1fs" % [weapon.damage, weapon.cooldown, weapon.berserk_interval]
 		"rooster":

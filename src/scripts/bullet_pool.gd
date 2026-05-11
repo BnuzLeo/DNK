@@ -1,6 +1,7 @@
 extends Node2D
 
-const POOL_SIZE_PLAYER := 150
+const BASKETBALL_SLAM_EFFECT := preload("res://scripts/basketball_slam_effect.gd")
+const POOL_SIZE_PLAYER := 220
 const POOL_SIZE_ENEMY := 260
 const BULLET_LIFETIME := 2.0
 
@@ -9,7 +10,7 @@ var _enemy_bullets: Array[Area2D] = []
 var _active_player := 0
 var _active_enemy := 0
 
-signal hit_occurred(pos: Vector2, damage: int, is_kill: bool, is_boss: bool)
+signal hit_occurred(pos: Vector2, damage: int, is_kill: bool, is_boss: bool, projectile_type: String)
 
 
 func _ready() -> void:
@@ -56,6 +57,11 @@ func _create_bullet(is_player: bool) -> Area2D:
 	bullet.set_meta("returning", false)
 	bullet.set_meta("boss_split_on_hit", false)
 	bullet.set_meta("boss_has_split", false)
+	bullet.set_meta("target_enemy", null)
+	bullet.set_meta("target_position", Vector2.ZERO)
+	bullet.set_meta("visual_lob_height", 0.0)
+	bullet.set_meta("visual_lob_progress", 0.0)
+	bullet.set_meta("spin_speed", 0.0)
 
 	bullet.area_entered.connect(_on_bullet_hit.bind(bullet))
 	bullet.body_entered.connect(_on_bullet_body_hit.bind(bullet))
@@ -81,6 +87,41 @@ func spawn(pos: Vector2, dir: Vector2, speed: float, damage: int,
 			break
 
 
+func spawn_targeted_basketball(pos: Vector2, target: Area2D, target_position: Vector2,
+		speed: float, damage: int, lob_height: float) -> void:
+	var pool := _player_bullets
+	if _active_player >= pool.size():
+		return
+	for bullet in pool:
+		if bullet.get_meta("active", false):
+			continue
+		var dir := (target_position - pos).normalized()
+		if dir == Vector2.ZERO:
+			dir = Vector2.RIGHT
+		_activate_bullet(bullet, pos, dir, speed, damage, true, false, 0.0, "basketball_berserk")
+		bullet.set_meta("target_enemy", target if is_instance_valid(target) else null)
+		bullet.set_meta("target_position", target_position)
+		bullet.set_meta("visual_lob_height", lob_height)
+		bullet.set_meta("visual_lob_progress", 0.0)
+		bullet.set_meta("spin_speed", 16.0)
+		_active_player += 1
+		break
+
+
+func spawn_basketball_slam(target: Area2D, target_position: Vector2, damage: int) -> void:
+	var parent := get_tree().current_scene
+	if parent == null:
+		parent = self
+	var slam := BASKETBALL_SLAM_EFFECT.new()
+	parent.add_child(slam)
+	slam.setup(target, target_position, damage)
+	slam.impact.connect(_on_basketball_slam_impact)
+
+
+func _on_basketball_slam_impact(pos: Vector2, damage: int, is_kill: bool, is_boss: bool, projectile_type: String) -> void:
+	hit_occurred.emit(pos, damage, is_kill, is_boss, projectile_type)
+
+
 func _activate_bullet(bullet: Area2D, pos: Vector2, dir: Vector2, speed: float,
 		damage: int, is_player: bool, is_dart: bool, max_distance: float,
 		projectile_type: String) -> void:
@@ -98,6 +139,11 @@ func _activate_bullet(bullet: Area2D, pos: Vector2, dir: Vector2, speed: float,
 	bullet.set_meta("returning", false)
 	bullet.set_meta("boss_split_on_hit", false)
 	bullet.set_meta("boss_has_split", false)
+	bullet.set_meta("target_enemy", null)
+	bullet.set_meta("target_position", Vector2.ZERO)
+	bullet.set_meta("visual_lob_height", 0.0)
+	bullet.set_meta("visual_lob_progress", 0.0)
+	bullet.set_meta("spin_speed", 0.0)
 	bullet.rotation = dir.angle()
 	_apply_projectile_collision_radius(bullet, projectile_type)
 	bullet.visible = true
@@ -116,6 +162,10 @@ func _apply_projectile_collision_radius(bullet: Area2D, projectile_type: String)
 			circle.radius = 11.0
 		"boss_small_snowball", "snowball":
 			circle.radius = 6.0
+		"basketball":
+			circle.radius = 7.0
+		"basketball_berserk":
+			circle.radius = 8.0
 		_:
 			circle.radius = 4.0
 
@@ -126,6 +176,11 @@ func _recycle_bullet(bullet: Area2D, is_player: bool) -> void:
 	bullet.monitoring = false
 	bullet.set_meta("boss_split_on_hit", false)
 	bullet.set_meta("boss_has_split", false)
+	bullet.set_meta("target_enemy", null)
+	bullet.set_meta("target_position", Vector2.ZERO)
+	bullet.set_meta("visual_lob_height", 0.0)
+	bullet.set_meta("visual_lob_progress", 0.0)
+	bullet.set_meta("spin_speed", 0.0)
 	if is_player:
 		_active_player -= 1
 	else:
@@ -145,6 +200,10 @@ func _physics_process(delta: float) -> void:
 
 
 func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
+	var projectile_type: String = bullet.get_meta("projectile_type", "")
+	if is_player and projectile_type == "basketball_berserk":
+		_update_basketball_berserk(bullet, delta)
+		return
 	var dir: Vector2 = bullet.get_meta("direction")
 	var speed: float = bullet.get_meta("speed")
 	var move_vec: Vector2 = dir * speed * delta
@@ -204,6 +263,70 @@ func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
 		_recycle_bullet(bullet, is_player)
 
 
+func _update_basketball_berserk(bullet: Area2D, delta: float) -> void:
+	var speed: float = bullet.get_meta("speed")
+	var old_pos: Vector2 = bullet.global_position
+	var target_pos: Vector2 = _resolve_basketball_target(bullet)
+	var dir: Vector2 = target_pos - old_pos
+	if dir.length_squared() < 0.0001:
+		dir = bullet.get_meta("direction", Vector2.RIGHT)
+	dir = dir.normalized()
+	var move_vec: Vector2 = dir * speed * delta
+	var new_pos := old_pos + move_vec
+	if new_pos.distance_squared_to(old_pos) > old_pos.distance_squared_to(target_pos):
+		new_pos = target_pos
+
+	var age: float = bullet.get_meta("age") + delta
+	bullet.set_meta("age", age)
+	var arc_progress := clampf(bullet.get_meta("visual_lob_progress", 0.0) + delta * 1.8, 0.0, 1.0)
+	bullet.set_meta("visual_lob_progress", arc_progress)
+	bullet.set_meta("direction", dir)
+	bullet.rotation = dir.angle() + age * float(bullet.get_meta("spin_speed", 0.0))
+	bullet.global_position = new_pos
+	bullet.queue_redraw()
+
+	if age >= BULLET_LIFETIME:
+		_recycle_bullet(bullet, true)
+		return
+
+	if bullet.global_position.distance_squared_to(target_pos) <= 16.0:
+		_recycle_bullet(bullet, true)
+
+
+func _resolve_basketball_target(bullet: Area2D) -> Vector2:
+	var target := bullet.get_meta("target_enemy", null) as Area2D
+	if target != null and is_instance_valid(target):
+		if "_dying" not in target or not target._dying:
+			var pos: Vector2 = target.global_position
+			bullet.set_meta("target_position", pos)
+			return pos
+	var fallback_target := _find_closest_enemy(bullet.global_position)
+	if fallback_target != null:
+		bullet.set_meta("target_enemy", fallback_target)
+		var pos: Vector2 = fallback_target.global_position
+		bullet.set_meta("target_position", pos)
+		return pos
+	return bullet.get_meta("target_position", bullet.global_position + bullet.get_meta("direction", Vector2.RIGHT) * 200.0)
+
+
+func _find_closest_enemy(origin: Vector2) -> Area2D:
+	var best_enemy: Area2D = null
+	var best_dist := INF
+	for enemy in get_tree().get_nodes_in_group("enemy"):
+		var enemy_area := enemy as Area2D
+		if enemy_area == null or not is_instance_valid(enemy_area):
+			continue
+		if not enemy_area.has_method("take_damage"):
+			continue
+		if "_dying" in enemy_area and enemy_area._dying:
+			continue
+		var dist := origin.distance_squared_to(enemy_area.global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best_enemy = enemy_area
+	return best_enemy
+
+
 func _on_bullet_body_hit(body: Node2D, bullet: Area2D) -> void:
 	var is_player_bullet: bool = bullet.get_meta("is_player")
 	var damage: int = bullet.get_meta("damage")
@@ -233,7 +356,7 @@ func _on_bullet_hit(area: Area2D, bullet: Area2D) -> void:
 			area.take_damage(damage)
 			var is_kill: bool = not was_dying and area.hp <= 0
 			var is_boss: bool = area.max_hp > 50
-			hit_occurred.emit(bullet.global_position, damage, is_kill, is_boss)
+			hit_occurred.emit(area.global_position, damage, is_kill, is_boss, bullet.get_meta("projectile_type", ""))
 			if is_kill:
 				GameManager.add_kill()
 		# 飞镖命中后不回收，继续返回

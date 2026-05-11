@@ -265,8 +265,8 @@ func _get_weapon_stats(weapon: Dictionary) -> Array[String]:
 		"basketball":
 			return [
 				"伤害: %d" % weapon.damage,
-				"普通: 单发 %.2fs" % weapon.cooldown,
-				"狂暴: 连射 %.2fs" % weapon.berserk_cooldown,
+				"普通: 散弹%d发 %.2fs" % [weapon.count, weapon.cooldown],
+				"狂暴: 连点全场投篮",
 				"蓝耗: 0",
 			]
 		"room_blast":

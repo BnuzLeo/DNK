@@ -4,6 +4,11 @@ const VS := preload("res://scripts/visual_spec.gd")
 const SNOWBALL_TEXTURE := preload("res://assets/export/projectiles/snowball.png")
 const BOSS_BIG_SNOWBALL_TEXTURE := preload("res://assets/export/enemies/boss/雪人武器-大型雪球.png")
 const BOSS_SMALL_SNOWBALL_TEXTURE := preload("res://assets/export/enemies/boss/雪人武器-雪球.png")
+const BASKETBALL_NORMAL_PATH := "res://assets/export/weapon/weapon_01/普通模式.png"
+const BASKETBALL_BERSERK_PATH := "res://assets/export/weapon/weapon_01/狂暴模式.png"
+
+var _basketball_normal_texture: Texture2D = null
+var _basketball_berserk_texture: Texture2D = null
 
 func _draw() -> void:
 	if not visible:
@@ -13,13 +18,13 @@ func _draw() -> void:
 	var projectile_type: String = get_meta("projectile_type", "")
 
 	if projectile_type == "basketball":
-		var radius := VS.PROJECTILE_DISPLAY_SIZE * 0.58
-		draw_circle(Vector2.ZERO, radius, Color(0.95, 0.45, 0.08))
-		draw_arc(Vector2.ZERO, radius, -PI * 0.45, PI * 0.45, 12, Color(0.18, 0.08, 0.03), 1.2)
-		draw_arc(Vector2.ZERO, radius, PI * 0.55, PI * 1.45, 12, Color(0.18, 0.08, 0.03), 1.2)
-		draw_line(Vector2(0, -radius), Vector2(0, radius), Color(0.18, 0.08, 0.03), 1.2)
-		draw_line(Vector2(-radius, 0), Vector2(radius, 0), Color(0.18, 0.08, 0.03), 1.2)
-		draw_circle(Vector2.ZERO, radius + 2.0, Color(1.0, 0.45, 0.05, 0.25))
+		_draw_basketball(_get_basketball_normal_texture(), Vector2(22.0, 22.0), Color(1.0, 0.72, 0.22, 0.25), Color(1.0, 0.48, 0.08, 0.25))
+	elif projectile_type == "basketball_berserk":
+		var lob_height: float = float(get_meta("visual_lob_height", 0.0))
+		var progress: float = clampf(float(get_meta("visual_lob_progress", 0.0)), 0.0, 1.0)
+		var visual_y := -sin(progress * PI) * lob_height
+		draw_circle(Vector2(0.0, 6.0), 5.5, Color(0.0, 0.0, 0.0, 0.22))
+		_draw_basketball(_get_basketball_berserk_texture(), Vector2(28.0, 28.0), Color(1.0, 0.24, 0.08, 0.30), Color(1.0, 0.58, 0.18, 0.34), Vector2(0.0, visual_y))
 	elif projectile_type == "arrow":
 		var shaft := Color(0.72, 0.48, 0.25)
 		var tip := Color(0.9, 0.9, 0.82)
@@ -50,3 +55,22 @@ func _draw() -> void:
 		var radius := VS.PROJECTILE_DISPLAY_SIZE * 0.5
 		draw_circle(Vector2.ZERO, radius, color)
 		draw_circle(Vector2.ZERO, radius + 2.0, Color(color.r, color.g, color.b, 0.3))
+
+
+func _draw_basketball(texture: Texture2D, size: Vector2, glow: Color, trail: Color, offset: Vector2 = Vector2.ZERO) -> void:
+	draw_circle(offset, maxf(size.x, size.y) * 0.52, trail)
+	draw_circle(offset, maxf(size.x, size.y) * 0.42, glow)
+	if texture != null:
+		draw_texture_rect(texture, Rect2(offset - size * 0.5, size), false)
+
+
+func _get_basketball_normal_texture() -> Texture2D:
+	if _basketball_normal_texture == null:
+		_basketball_normal_texture = load(BASKETBALL_NORMAL_PATH) as Texture2D
+	return _basketball_normal_texture
+
+
+func _get_basketball_berserk_texture() -> Texture2D:
+	if _basketball_berserk_texture == null:
+		_basketball_berserk_texture = load(BASKETBALL_BERSERK_PATH) as Texture2D
+	return _basketball_berserk_texture
