@@ -17,8 +17,6 @@ const MAN_GUN_BERSERK_FRAME_PATHS: Array[String] = [MAN_GUN_TEXTURE_PATH]
 const LASER_GUN_TEXTURE_PATH := "res://assets/export/weapon/weapon_03/飞熊军激光炮.png"
 const LASER_GUN_NORMAL_FRAME_PATHS: Array[String] = [LASER_GUN_TEXTURE_PATH]
 const LASER_GUN_BERSERK_FRAME_PATHS: Array[String] = [LASER_GUN_TEXTURE_PATH]
-const LASER_NORMAL_PATH := "res://assets/export/weapon/weapon_03/飞熊军激光炮·默认激光.png"
-const LASER_BERSERK_PATH := "res://assets/export/weapon/weapon_03/飞熊军激光炮·黯星激光.png"
 
 enum PlayerSpriteAnim { IDLE, RUN_RIGHT, RUN_LEFT, WAVE, JUMP, FAIL, WAIT, DANCE, INSPECT }
 
@@ -116,8 +114,6 @@ var _weapon_aim_dir := Vector2.RIGHT
 var _laser_visual: Node2D = null
 var _laser_segments: Array[Dictionary] = []
 var _laser_damage_timer := 0.0
-var _laser_normal_texture: Texture2D = null
-var _laser_berserk_texture: Texture2D = null
 
 # 闪避状态
 var _dash_timer := 0.0
@@ -777,8 +773,8 @@ func _update_laser_visual() -> void:
 	_ensure_laser_visual()
 	if _laser_visual == null or not is_instance_valid(_laser_visual):
 		return
-	var color := Color(0.72, 0.95, 1.0, 0.76) if not _berserk_active else Color(0.72, 0.2, 1.0, 0.82)
-	_laser_visual.call("setup", _laser_segments, _get_laser_texture(), LASER_WIDTH, color)
+	var color := Color(0.12, 0.92, 1.0, 0.95) if not _berserk_active else Color(0.86, 0.18, 1.0, 1.0)
+	_laser_visual.call("setup", _laser_segments, null, LASER_WIDTH, color)
 
 
 func _clear_laser_visual() -> void:
@@ -787,16 +783,6 @@ func _clear_laser_visual() -> void:
 	_laser_segments.clear()
 	if _laser_visual != null:
 		_laser_visual.call("clear")
-
-
-func _get_laser_texture() -> Texture2D:
-	if _berserk_active:
-		if _laser_berserk_texture == null:
-			_laser_berserk_texture = load(LASER_BERSERK_PATH) as Texture2D
-		return _laser_berserk_texture
-	if _laser_normal_texture == null:
-		_laser_normal_texture = load(LASER_NORMAL_PATH) as Texture2D
-	return _laser_normal_texture
 
 
 func _get_man_targets(weapon: Dictionary) -> Array[Area2D]:
