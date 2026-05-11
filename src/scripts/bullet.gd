@@ -30,9 +30,9 @@ func _draw() -> void:
 		draw_circle(Vector2(0.0, 6.0), 5.5, Color(0.0, 0.0, 0.0, 0.22))
 		_draw_basketball(_get_basketball_berserk_texture(), Vector2(28.0, 28.0), Color(1.0, 0.24, 0.08, 0.30), Color(1.0, 0.58, 0.18, 0.34), Vector2(0.0, visual_y))
 	elif projectile_type == "man_bullet":
-		_draw_man_bullet(_get_man_bullet_normal_texture(), Vector2(30.0, 30.0), Color(0.25, 0.85, 1.0, 0.24))
+		_draw_man_bullet(_get_man_bullet_normal_texture(), Vector2(60.0, 60.0), 52.0, 7.0)
 	elif projectile_type == "man_bullet_berserk":
-		_draw_man_bullet(_get_man_bullet_berserk_texture(), Vector2(38.0, 38.0), Color(1.0, 0.28, 0.08, 0.34))
+		_draw_man_bullet(_get_man_bullet_berserk_texture(), Vector2(76.0, 76.0), 68.0, 9.0)
 	elif projectile_type == "arrow":
 		var shaft := Color(0.72, 0.48, 0.25)
 		var tip := Color(0.9, 0.9, 0.82)
@@ -72,11 +72,18 @@ func _draw_basketball(texture: Texture2D, size: Vector2, glow: Color, trail: Col
 		draw_texture_rect(texture, Rect2(offset - size * 0.5, size), false)
 
 
-func _draw_man_bullet(texture: Texture2D, size: Vector2, glow: Color) -> void:
-	draw_line(Vector2(-22.0, 0.0), Vector2(-8.0, 0.0), glow, 4.0)
-	draw_circle(Vector2.ZERO, maxf(size.x, size.y) * 0.46, glow)
+func _draw_man_bullet(texture: Texture2D, size: Vector2, trail_length: float, trail_width: float) -> void:
+	_draw_man_bullet_trail(trail_length, trail_width)
 	if texture != null:
 		draw_texture_rect(texture, Rect2(-size * 0.5, size), false)
+
+
+func _draw_man_bullet_trail(length: float, width: float) -> void:
+	var color := Color(1.0, 0.08, 0.02, 0.40)
+	var outer := Color(color.r, color.g, color.b, color.a * 0.45)
+	var inner := Color(color.r, color.g, color.b, minf(color.a + 0.24, 1.0))
+	draw_line(Vector2(-length, 0.0), Vector2.ZERO, outer, width * 1.9)
+	draw_line(Vector2(-length * 0.72, 0.0), Vector2.ZERO, inner, width)
 
 
 func _get_basketball_normal_texture() -> Texture2D:

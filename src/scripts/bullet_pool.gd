@@ -187,9 +187,9 @@ func _apply_projectile_collision_radius(bullet: Area2D, projectile_type: String)
 		"basketball_berserk":
 			circle.radius = 8.0
 		"man_bullet":
-			circle.radius = 8.0
+			circle.radius = 16.0
 		"man_bullet_berserk":
-			circle.radius = 10.0
+			circle.radius = 20.0
 		_:
 			circle.radius = 4.0
 

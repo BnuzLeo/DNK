@@ -10,34 +10,9 @@ const PLAYER_SPRITE_PATH := "res://assets/export/effects/sprite.webp"
 const PLAYER_SPRITE_FRAME_SIZE := Vector2i(192, 208)
 const PLAYER_SPRITE_FRAME_COUNTS := [6, 8, 8, 4, 5, 8, 6, 6, 6]
 const PLAYER_SPRITE_DISPLAY_HEIGHT := 88.0
-const MAN_GUN_NORMAL_FRAME_PATHS: Array[String] = [
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_00.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_01.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_02.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_03.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_04.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_05.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_06.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_07.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_08.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_09.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_10.png",
-	"res://assets/export/weapon/weapon_02/normal_gun_frames/normal_gun_11.png",
-]
-const MAN_GUN_BERSERK_FRAME_PATHS: Array[String] = [
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_00.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_01.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_02.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_03.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_04.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_05.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_06.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_07.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_08.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_09.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_10.png",
-	"res://assets/export/weapon/weapon_02/berserk_gun_frames/berserk_gun_11.png",
-]
+const MAN_GUN_TEXTURE_PATH := "res://assets/export/weapon/weapon_02/瓦克恩冲锋枪.png"
+const MAN_GUN_NORMAL_FRAME_PATHS: Array[String] = [MAN_GUN_TEXTURE_PATH]
+const MAN_GUN_BERSERK_FRAME_PATHS: Array[String] = [MAN_GUN_TEXTURE_PATH]
 
 enum PlayerSpriteAnim { IDLE, RUN_RIGHT, RUN_LEFT, WAVE, JUMP, FAIL, WAIT, DANCE, INSPECT }
 
@@ -70,6 +45,9 @@ const HEAD_BANNER_DURATION := 0.42
 const BASKETBALL_PROMPT_FLASH_DURATION := 0.65
 const BASKETBALL_AUTO_J_COUNT := 5
 const BASKETBALL_AUTO_J_INTERVAL := 0.2
+const MAN_GUN_DIRECTION_STEP := PI / 4.0
+const MAN_GUN_SCALE_NORMAL := 0.42 * 1.5
+const MAN_GUN_SCALE_BERSERK := 0.46 * 1.5
 
 const WEAPONS := {
 	"basketball": {
@@ -623,22 +601,23 @@ func _spawn_roosters(weapon: Dictionary) -> void:
 func _shoot_man_gun(weapon: Dictionary) -> void:
 	if bullet_pool == null:
 		return
-	var muzzle_pos := _get_man_muzzle_position()
 	var targets: Array[Area2D] = _get_man_targets(weapon)
 	if targets.is_empty():
-		var dir := _weapon_aim_dir.normalized()
+		var dir := _snap_man_gun_dir(_weapon_aim_dir)
 		if dir == Vector2.ZERO:
 			dir = _facing
 		_weapon_aim_dir = dir
+		var muzzle_pos := _get_man_muzzle_position()
 		_spawn_man_bullet(muzzle_pos, dir, weapon)
 		return
 	for enemy in targets:
 		if enemy == null or not is_instance_valid(enemy):
 			continue
-		var dir := (enemy.global_position - muzzle_pos).normalized()
+		var dir := _snap_man_gun_dir(enemy.global_position - global_position)
 		if dir == Vector2.ZERO:
 			dir = _facing
 		_weapon_aim_dir = dir
+		var muzzle_pos := _get_man_muzzle_position()
 		_spawn_man_bullet(muzzle_pos, dir, weapon)
 
 
@@ -688,20 +667,30 @@ func _get_preview_weapon_aim_dir() -> Vector2:
 		return _facing
 	var targets := _get_man_targets(weapon)
 	if targets.is_empty():
-		return _facing
-	var muzzle_pos := _get_man_muzzle_position()
-	var dir := (targets[0].global_position - muzzle_pos).normalized()
-	return dir if dir != Vector2.ZERO else _facing
+		return _snap_man_gun_dir(_facing)
+	var dir := _snap_man_gun_dir(targets[0].global_position - global_position)
+	return dir if dir != Vector2.ZERO else _snap_man_gun_dir(_facing)
 
 
 func _update_facing_from_input(input: Vector2) -> void:
 	if absf(input.x) <= 0.1:
-		return
-	_facing = Vector2.RIGHT if input.x > 0.0 else Vector2.LEFT
+		if absf(input.y) <= 0.1:
+			return
+	var snapped_dir := _snap_man_gun_dir(input)
+	if snapped_dir != Vector2.ZERO:
+		_facing = snapped_dir
+
+
+func _snap_man_gun_dir(dir: Vector2) -> Vector2:
+	if dir.length_squared() <= 0.0001:
+		return Vector2.ZERO
+	var angle := dir.angle()
+	var snapped_angle: float = roundf(angle / MAN_GUN_DIRECTION_STEP) * MAN_GUN_DIRECTION_STEP
+	return Vector2.RIGHT.rotated(snapped_angle)
 
 
 func _get_man_muzzle_position() -> Vector2:
-	var dir := _weapon_aim_dir.normalized()
+	var dir := _snap_man_gun_dir(_weapon_aim_dir)
 	if dir == Vector2.ZERO:
 		dir = _facing
 	return global_position + dir * 36.0 + Vector2(0.0, 2.0)
@@ -787,12 +776,14 @@ func _update_carried_weapon_visual() -> void:
 		_weapon_sprite.animation = mode
 		_weapon_sprite.play(mode)
 	_weapon_sprite.visible = true
-	var dir := _weapon_aim_dir.normalized()
+	var dir := _snap_man_gun_dir(_weapon_aim_dir)
 	if dir == Vector2.ZERO:
 		dir = _facing
 	_weapon_sprite.position = dir * 23.0 + Vector2(0.0, 3.0)
-	_weapon_sprite.rotation = dir.angle()
-	_weapon_sprite.scale = Vector2.ONE * (0.46 if _berserk_active else 0.42)
+	var angle := dir.angle()
+	_weapon_sprite.flip_h = dir.x < 0.0
+	_weapon_sprite.rotation = angle - PI if _weapon_sprite.flip_h else angle
+	_weapon_sprite.scale = Vector2.ONE * (MAN_GUN_SCALE_BERSERK if _berserk_active else MAN_GUN_SCALE_NORMAL)
 
 
 func _build_man_gun_frames(paths: Array[String], anim_name: String) -> SpriteFrames:
