@@ -377,5 +377,6 @@ horizontal_scroll_mode = 0
 
 [node name="MessageList" type="VBoxContainer" parent="MessagePanel/MessageScroll" unique_id=954173747]
 layout_mode = 2
+custom_minimum_size = Vector2(182, 0)
 size_flags_horizontal = 3
 theme_override_constants/separation = 2

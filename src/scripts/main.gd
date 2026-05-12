@@ -1142,6 +1142,7 @@ func _create_hud() -> void:
 	_message_panel.draw.connect(_draw_message_panel)
 	_message_scroll = canvas.get_node("MessagePanel/MessageScroll") as ScrollContainer
 	_message_list = canvas.get_node("MessagePanel/MessageScroll/MessageList") as VBoxContainer
+	_setup_message_panel()
 
 
 func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
@@ -1200,6 +1201,23 @@ func _create_message_panel(canvas: CanvasLayer) -> void:
 	_message_list.add_theme_constant_override("separation", 2)
 	_message_scroll.add_child(_message_list)
 
+	if not GameManager.message_added.is_connected(_on_message_added):
+		GameManager.message_added.connect(_on_message_added)
+	for entry in GameManager.message_log:
+		_append_message_label(String(entry.get("text", "")), entry.get("color", Color.WHITE), false)
+	_scroll_messages_to_bottom()
+
+
+func _setup_message_panel() -> void:
+	if _message_panel != null:
+		_message_panel.queue_redraw()
+	if _message_scroll != null:
+		_message_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_message_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	if _message_list != null:
+		_message_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_message_list.custom_minimum_size = Vector2(_message_scroll.size.x, 0.0) if _message_scroll != null else Vector2.ZERO
+		_message_list.add_theme_constant_override("separation", 2)
 	if not GameManager.message_added.is_connected(_on_message_added):
 		GameManager.message_added.connect(_on_message_added)
 	for entry in GameManager.message_log:
