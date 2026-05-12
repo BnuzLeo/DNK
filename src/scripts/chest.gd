@@ -1,9 +1,10 @@
 extends Area2D
 
-## 宝箱 — 触碰后打开，掉落武器或限时 Buff
+## 宝箱 — 普通宝箱被攻击打破后掉落药水；补给/武器宝箱保留交互逻辑
 ## is_weapon_choice = true 时为起始房间的 3 选 1 武器宝箱
 
 const VS := preload("res://scripts/visual_spec.gd")
+const PotionPickup := preload("res://scripts/potion_pickup.gd")
 
 signal opened(reward_type: String, reward_key: String)
 
@@ -25,14 +26,18 @@ const GOLD_CHEST_DISPLAY_SIZE := 58.0
 const GOLD_CHEST_FRAME_TIME := 0.12
 const NORMAL_CHEST_FRAME_DIRS := [
 	"res://assets/export/decoration/brown_chest_idle_frames",
-	"res://assets/export/decoration/white_chest_idle_frames",
+	"res://assets/export/decoration/blue_chest_idle_frames",
 ]
 const NORMAL_CHEST_DISPLAY_SIZE := 50.0
 const NORMAL_CHEST_FRAME_TIME := 0.08
+const NORMAL_CHEST_MAX_HP := 6
 
+var hp := NORMAL_CHEST_MAX_HP
+var max_hp := NORMAL_CHEST_MAX_HP
 var _opened := false
+var _dying := false
 var _bounce_timer := 0.0
-var _reward_type := ""  # "weapon" or "buff"
+var _reward_type := ""  # "weapon", "buff", or "potion"
 var _reward_key := ""
 var _reward_name := ""
 var _near_player: Node = null
@@ -61,29 +66,17 @@ func _ready() -> void:
 		_configure_start_supply_collision()
 		set_process_input(true)
 	elif not is_weapon_choice:
+		collision_layer = 34  # ENEMY + PICKUP，允许玩家子弹击中普通宝箱
 		_load_random_normal_chest_frames()
 		_pick_reward()
 	_bounce_timer = randf() * TAU
 
 
 func _pick_reward() -> void:
-	var player: Node = get_tree().get_first_node_in_group("player")
-	if player == null:
-		_pick_buff()
-		return
-
-	# 如果玩家还有未获得的武器，40% 概率掉武器
-	var missing_weapons: Array = []
-	for key in player.WEAPONS:
-		if not player.has_weapon(key):
-			missing_weapons.append(key)
-
-	if not missing_weapons.is_empty() and randf() < 0.4:
-		_reward_type = "weapon"
-		_reward_key = missing_weapons[randi() % missing_weapons.size()]
-		_reward_name = player.WEAPONS[_reward_key].name
-	else:
-		_pick_buff()
+	_reward_type = "potion"
+	var types := ["hp", "mana", "speed"]
+	_reward_key = types[randi() % types.size()]
+	_reward_name = _get_potion_display_name(_reward_key)
 
 
 func _pick_buff() -> void:
@@ -101,6 +94,14 @@ func get_buff_display_name(type: int) -> String:
 		2: return "复活币"
 		3: return "弹道强化"
 		_: return "未知"
+
+
+func _get_potion_display_name(type: String) -> String:
+	match type:
+		"hp": return "生命药水"
+		"mana": return "蓝量药水"
+		"speed": return "移速药水"
+		_: return "未知药水"
 
 
 func is_solid_actor() -> bool:
@@ -134,6 +135,8 @@ func _on_body_entered(body: Node2D) -> void:
 	if is_start_supply:
 		_near_player = body
 		return
+	if not is_weapon_choice:
+		return
 	_opened = true
 
 	if is_weapon_choice:
@@ -160,8 +163,54 @@ func _input(event: InputEvent) -> void:
 		_give_start_supply(_near_player)
 
 
+func take_damage(amount: int) -> void:
+	if _opened or _dying or is_start_supply or is_weapon_choice or amount <= 0:
+		return
+	hp -= amount
+	modulate = Color(3.0, 3.0, 3.0, 1.0)
+	var tween := create_tween()
+	tween.tween_property(self, "modulate", Color.WHITE, 0.08)
+	if hp <= 0:
+		_break_open()
+
+
+func _break_open() -> void:
+	if _opened or _dying:
+		return
+	_opened = true
+	_dying = true
+	GameAudio.play_box_destroy()
+	_spawn_potion_drop()
+	opened.emit(_reward_type, _reward_key)
+	_spawn_label()
+	var tween := create_tween()
+	tween.set_parallel(false)
+	for i in 3:
+		tween.tween_property(self, "modulate", Color(1, 1, 1, 0.2), 0.05)
+		tween.tween_property(self, "modulate", Color(1, 1, 1, 1), 0.05)
+	tween.tween_property(self, "scale", Vector2.ZERO, 0.15).set_ease(Tween.EASE_IN)
+	tween.tween_callback(queue_free)
+
+
+func _spawn_potion_drop() -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		scene = get_parent()
+	if scene == null:
+		return
+	var potion := PotionPickup.new()
+	potion.setup(_reward_key)
+	scene.add_child(potion)
+	potion.global_position = global_position
+
+
 func _give_reward(player: Node) -> void:
 	GameAudio.play_box_destroy()
+	if _reward_type == "potion":
+		_spawn_potion_drop()
+		opened.emit(_reward_type, _reward_key)
+		_spawn_label()
+		return
 	if _reward_type == "weapon":
 		player.add_weapon(_reward_key)
 	else:

@@ -123,7 +123,7 @@ func spawn_man_bullet(pos: Vector2, dir: Vector2, speed: float, damage: int,
 		_activate_bullet(bullet, pos, dir.normalized(), speed, damage, true, false, 0.0, projectile_type)
 		bullet.set_meta("aoe_radius", aoe_radius)
 		bullet.set_meta("aoe_damage", aoe_damage)
-		bullet.set_meta("man_split_done", not berserk)
+		bullet.set_meta("man_split_done", true)
 		_active_player += 1
 		break
 
@@ -248,8 +248,6 @@ func _update_bullet(bullet: Area2D, delta: float, is_player: bool) -> void:
 	if result:
 		var collider: Object = result.get("collider")
 		var hit_position: Vector2 = result.get("position", bullet.global_position)
-		if is_player:
-			_handle_man_berserk_split(bullet, hit_position)
 		if not is_player:
 			_handle_boss_big_snowball_split(bullet, hit_position)
 		if collider and collider.has_method("take_damage"):
@@ -367,7 +365,6 @@ func _on_bullet_body_hit(body: Node2D, bullet: Area2D) -> void:
 		# 玩家子弹击中可破坏障碍物
 		if body.has_method("take_damage") and body.has_method("setup"):
 			body.take_damage(damage)
-			_handle_man_berserk_split(bullet, bullet.global_position)
 			_recycle_bullet(bullet, true)
 		return
 
@@ -384,6 +381,13 @@ func _on_bullet_hit(area: Area2D, bullet: Area2D) -> void:
 	var is_dart: bool = bullet.get_meta("is_dart", false)
 
 	if is_player:
+		if area.is_in_group("chest") and area.has_method("take_damage"):
+			var projectile_type: String = bullet.get_meta("projectile_type", "")
+			area.take_damage(damage)
+			hit_occurred.emit(area.global_position, damage, false, false, projectile_type)
+			if not is_dart:
+				_recycle_bullet(bullet, true)
+			return
 		if area.has_method("take_damage"):
 			var was_dying: bool = "_dying" in area and area._dying
 			var hit_dir: Vector2 = bullet.get_meta("direction", Vector2.RIGHT)
@@ -395,8 +399,6 @@ func _on_bullet_hit(area: Area2D, bullet: Area2D) -> void:
 			if area.has_method("apply_hit_feedback"):
 				var knock_strength := _get_projectile_hit_strength(projectile_type, is_kill, is_boss)
 				area.call("apply_hit_feedback", hit_dir, knock_strength, projectile_type)
-			if projectile_type == "man_bullet_berserk":
-				_handle_man_berserk_split(bullet, hit_pos)
 			if projectile_type == "man_bullet" or projectile_type == "man_bullet_berserk":
 				_apply_man_aoe_damage(hit_pos, area, int(bullet.get_meta("aoe_damage", damage)), float(bullet.get_meta("aoe_radius", 0.0)))
 			hit_occurred.emit(hit_pos, damage, is_kill, is_boss, projectile_type)
@@ -451,36 +453,6 @@ func _get_projectile_hit_strength(projectile_type: String, is_kill: bool, is_bos
 	if is_kill:
 		strength *= 1.35
 	return strength
-
-
-func _handle_man_berserk_split(bullet: Area2D, hit_position: Vector2) -> void:
-	if bullet.get_meta("projectile_type", "") != "man_bullet_berserk":
-		return
-	if bullet.get_meta("man_split_done", false):
-		return
-	bullet.set_meta("man_split_done", true)
-	var base_dir: Vector2 = bullet.get_meta("direction", Vector2.RIGHT)
-	if base_dir == Vector2.ZERO:
-		base_dir = Vector2.RIGHT
-	base_dir = base_dir.normalized()
-	var speed := float(bullet.get_meta("speed", 780.0)) * 0.92
-	var damage := int(bullet.get_meta("damage", 1))
-	for angle_offset in [-0.28, 0.0, 0.28]:
-		_spawn_man_split_child(hit_position + base_dir * 8.0, base_dir.rotated(angle_offset), speed, damage)
-
-
-func _spawn_man_split_child(pos: Vector2, dir: Vector2, speed: float, damage: int) -> void:
-	if _active_player >= _player_bullets.size():
-		return
-	for child in _player_bullets:
-		if child.get_meta("active", false):
-			continue
-		_activate_bullet(child, pos, dir.normalized(), speed, damage, true, false, 0.0, "man_bullet_berserk")
-		child.set_meta("man_split_done", true)
-		child.set_meta("aoe_radius", 0.0)
-		child.set_meta("aoe_damage", 0)
-		_active_player += 1
-		return
 
 
 func _handle_boss_big_snowball_split(bullet: Area2D, hit_position: Vector2) -> void:

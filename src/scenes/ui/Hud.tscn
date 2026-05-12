@@ -161,10 +161,10 @@ offset_bottom = 58.0
 
 [node name="BagIcon" type="TextureRect" parent="BagButton" unique_id=488627411]
 layout_mode = 0
-offset_left = -506.0
-offset_top = 189.0
-offset_right = -470.0
-offset_bottom = 225.0
+offset_left = 374.0
+offset_top = 65.0
+offset_right = 410.0
+offset_bottom = 101.0
 mouse_filter = 2
 texture = ExtResource("13_bag")
 expand_mode = 1
@@ -320,10 +320,10 @@ mouse_filter = 2
 [node name="MessagePanel" type="Control" parent="." unique_id=1190161580]
 layout_mode = 3
 anchors_preset = 0
-offset_left = 742.0
-offset_top = 72.0
-offset_right = 940.0
-offset_bottom = 176.0
+offset_left = 692.0
+offset_top = 80.0
+offset_right = 890.0
+offset_bottom = 184.0
 
 [node name="MessageTitle" type="Label" parent="MessagePanel" unique_id=251819601]
 layout_mode = 0

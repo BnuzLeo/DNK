@@ -129,6 +129,7 @@ var _wall_bodies: Array[StaticBody2D] = []
 var _spawn_warning_positions: Array[Vector2] = []
 var _spawn_warning_timer := 0.0
 var _spawn_warning_room: Vector2i = CENTER
+var _random_chest_spawns_by_room: Dictionary = {}
 
 # 摄像机 + 打击反馈
 var _cam_mgr: CameraManager
@@ -277,6 +278,7 @@ func _ensure_boss_return_portal_visible() -> void:
 func _generate_floor() -> void:
 	_rooms.clear()
 	_doors.clear()
+	_random_chest_spawns_by_room.clear()
 	_boss_defeated = false
 	_portal_active = false
 	_return_portal_near = false
@@ -787,6 +789,7 @@ func _spawn_chest(pos: Vector2) -> void:
 	var chest: Area2D = chest_scene.instantiate()
 	chest.position = pos
 	add_child(chest)
+	_random_chest_spawns_by_room[room_pos] = int(_random_chest_spawns_by_room.get(room_pos, 0)) + 1
 
 
 func _world_to_room_grid_pos(pos: Vector2) -> Vector2i:
@@ -799,7 +802,9 @@ func _can_spawn_random_chest_in_room(room_pos: Vector2i) -> bool:
 	var room: RoomData = _rooms[room_pos]
 	if room.is_start or room.is_boss:
 		return false
-	return _count_random_chests_in_room(room_pos) < MAX_RANDOM_CHESTS_PER_ROOM
+	var spawned_count := int(_random_chest_spawns_by_room.get(room_pos, 0))
+	var live_count := _count_random_chests_in_room(room_pos)
+	return maxi(spawned_count, live_count) < MAX_RANDOM_CHESTS_PER_ROOM
 
 
 func _count_random_chests_in_room(room_pos: Vector2i) -> int:
@@ -859,17 +864,18 @@ func _spawn_room_objects(grid_pos: Vector2i) -> void:
 
 	var objects: Array[Node] = []
 
-	# 木箱 2-5 个（可破坏掩体，30% 掉宝箱）
-	var crate_count := 2 + randi() % 4
-	for i in crate_count:
+	# 普通房间直接生成可破坏宝箱，单房间最多 2 个。
+	var chest_count := 1 + randi() % MAX_RANDOM_CHESTS_PER_ROOM
+	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
+	for i in chest_count:
 		var pos := _random_room_pos(rx, ry, rw, rh, center, 80.0, occupied, 40.0)
 		if pos == Vector2.ZERO:
 			continue
-		var crate: StaticBody2D = load("res://scripts/obstacle.gd").new()
-		crate.position = pos
-		crate.setup(self)
-		add_child(crate)
-		objects.append(crate)
+		var chest: Area2D = chest_scene.instantiate()
+		chest.position = pos
+		add_child(chest)
+		_random_chest_spawns_by_room[grid_pos] = int(_random_chest_spawns_by_room.get(grid_pos, 0)) + 1
+		objects.append(chest)
 		occupied.append(pos)
 
 	_room_objects[grid_pos] = objects
@@ -1435,18 +1441,23 @@ func _draw_buff_bar() -> void:
 		var stacks: int = buffs[type].stacks
 		var time_left: float = buffs[type].time
 		var color: Color = info.color
-		var icon: String = info.icon
-		var panel_w := 28
-		var center := Vector2(x + 14, 14)
-		_buff_bar.draw_circle(center, 13.0, Color(0.2, 0.13, 0.08, 0.75))
-		_buff_bar.draw_arc(center, 13.0, 0, TAU, 18, color.darkened(0.25), 2.0)
-		_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 8, 19), icon, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, color)
+		var panel_w := 32
+		var center := Vector2(x + 16, 16)
+		_buff_bar.draw_circle(center, 15.0, Color(0.2, 0.13, 0.08, 0.75))
+		_buff_bar.draw_arc(center, 15.0, 0, TAU, 22, color.darkened(0.25), 2.0)
+		var icon_texture := info.get("icon_texture", null) as Texture2D
+		if icon_texture != null:
+			_buff_bar.draw_texture_rect(icon_texture, Rect2(center - Vector2(11.0, 11.0), Vector2(22.0, 22.0)), false)
+		else:
+			var icon: String = info.icon
+			_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 10, 21), icon, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, color)
 		# 层数
 		if stacks > 1:
-			_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 16, 26), "%d" % stacks, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color.WHITE)
+			_buff_bar.draw_string(ThemeDB.fallback_font, Vector2(x + 20, 28), "%d" % stacks, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color.WHITE)
 		# 时间条
-		var time_ratio := clampf(time_left / 30.0, 0.0, 1.0)
-		_buff_bar.draw_rect(Rect2(x + 3, 25, 22 * time_ratio, 2), color)
+		var duration: float = maxf(float(buffs[type].get("duration", 30.0)), 0.001)
+		var time_ratio := clampf(time_left / duration, 0.0, 1.0)
+		_buff_bar.draw_rect(Rect2(x + 4, 29, 24 * time_ratio, 2), color)
 		x += panel_w + 5
 
 

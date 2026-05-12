@@ -18,6 +18,9 @@ const MAN_GUN_BERSERK_FRAME_PATHS: Array[String] = [MAN_GUN_TEXTURE_PATH]
 const LASER_GUN_TEXTURE_PATH := "res://assets/export/weapon/weapon_03/飞熊军激光炮.png"
 const LASER_GUN_NORMAL_FRAME_PATHS: Array[String] = [LASER_GUN_TEXTURE_PATH]
 const LASER_GUN_BERSERK_FRAME_PATHS: Array[String] = [LASER_GUN_TEXTURE_PATH]
+const STATUS_HP_ICON := preload("res://assets/export/projectiles/status_hp.png")
+const STATUS_MANA_ICON := preload("res://assets/export/projectiles/status_mana.png")
+const STATUS_SPEED_ICON := preload("res://assets/export/projectiles/status_speed.png")
 
 enum PlayerSpriteAnim { IDLE, RUN_RIGHT, RUN_LEFT, WAVE, JUMP, FAIL, WAIT, DANCE, INSPECT }
 
@@ -51,8 +54,10 @@ const HEAD_BANNER_OFFSET := Vector2(0.0, -60.0)
 const HEAD_BANNER_DURATION := 0.42
 const BASKETBALL_PROMPT_FLASH_DURATION := 0.65
 const BASKETBALL_AUTO_J_COUNT := 2
-const BASKETBALL_AUTO_J_INTERVAL := 0.28
+const BASKETBALL_AUTO_J_INTERVAL := 1.0
 const MAN_GUN_DIRECTION_STEP := PI / 4.0
+const MAN_GUN_BERSERK_SHOTGUN_COUNT := 5
+const MAN_GUN_BERSERK_SHOTGUN_SPREAD := 0.48
 const MAN_GUN_SCALE_NORMAL := 0.42 * 1.5
 const MAN_GUN_SCALE_BERSERK := 0.46 * 1.5
 const MAN_GUN_CENTER_X_OFFSET := 9.0
@@ -67,9 +72,9 @@ const LASER_WIDTH := 32.0
 const LASER_DAMAGE_WIDTH := 42.0
 const LASER_DAMAGE_INTERVAL := 0.12
 const LASER_BERSERK_DURATION := 5.0
-const LASER_BERSERK_BEAM_COUNT := 2
-const LASER_BERSERK_DAMAGE_INTERVAL := 0.18
-const LASER_BERSERK_RADIUS := 40.0
+const LASER_BERSERK_BEAM_COUNT := 1
+const LASER_BERSERK_DAMAGE_INTERVAL := 0.5
+const LASER_BERSERK_RADIUS := 48.0
 const LASER_BERSERK_WARNING_DURATION := 0.55
 const LASER_WALL_MASK := 16
 const LASER_MIN_HIT_DISTANCE := 6.0
@@ -79,7 +84,7 @@ const WEAPONS := {
 	"basketball": {
 		"cooldown": 0.42, "damage": 3, "count": 5, "spread": 0.52,
 		"speed": 690.0, "mana": 0, "name": "篮球", "type": "basketball",
-		"berserk_cooldown": 0.0, "berserk_damage": 9
+		"berserk_cooldown": 1.0, "berserk_damage": 9
 	},
 	"jntm": {
 		"cooldown": 0.0, "damage": 2, "mana": 0, "name": "大族激光",
@@ -89,7 +94,7 @@ const WEAPONS := {
 		"cooldown": 0.11, "damage": 3, "mana": 0,
 		"name": "真正的MAN", "type": "man_gun", "speed": 780.0,
 		"aoe_radius": 0.0, "aoe_damage": 0,
-		"berserk_cooldown": 0.18, "berserk_damage": 5, "berserk_speed": 920.0,
+		"berserk_cooldown": 0.34, "berserk_damage": 5, "berserk_speed": 900.0,
 		"berserk_aoe_radius": 0.0, "berserk_aoe_damage": 0
 	},
 }
@@ -144,11 +149,15 @@ var _queued_head_banner: Texture2D = null
 
 # Buff 系统
 enum BuffType { MANA_REGEN, SPEED, REVIVE, BULLET }
+const PICKUP_STATUS_HP := 4
+const PICKUP_STATUS_MANA := 5
 const BUFF_INFO := {
 	BuffType.MANA_REGEN: {"name": "回蓝", "color": Color(0.2, 0.4, 1.0), "icon": "◆"},
-	BuffType.SPEED:      {"name": "移速", "color": Color(0.0, 0.9, 0.4), "icon": "»"},
+	BuffType.SPEED:      {"name": "移速", "color": Color(0.0, 0.9, 0.4), "icon": "»", "icon_texture": STATUS_SPEED_ICON},
 	BuffType.REVIVE:     {"name": "复活", "color": Color(1.0, 0.84, 0.0), "icon": "★"},
 	BuffType.BULLET:     {"name": "弹道", "color": Color(1.0, 0.4, 0.7), "icon": "†"},
+	PICKUP_STATUS_HP:    {"name": "生命恢复", "color": Color(1.0, 0.28, 0.25), "icon": "+", "icon_texture": STATUS_HP_ICON},
+	PICKUP_STATUS_MANA:  {"name": "蓝量恢复", "color": Color(0.20, 0.65, 1.0), "icon": "◆", "icon_texture": STATUS_MANA_ICON},
 }
 # {BuffType: {"time": float, "stacks": int}}
 var _active_buffs: Dictionary = {}
@@ -370,7 +379,7 @@ func _physics_process(delta: float) -> void:
 	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
 	if _is_basketball_tap_berserk(weapon):
 		if Input.is_action_just_pressed("shoot"):
-			_fire_weapon(weapon, true)
+			_fire_weapon(weapon)
 	elif weapon.get("type", "") == "laser_gun":
 		pass
 	elif Input.is_action_pressed("shoot") and _fire_cooldown <= 0.0:
@@ -577,7 +586,7 @@ func _update_basketball_auto_j(delta: float) -> void:
 		return
 	_basketball_auto_j_timer -= delta
 	while _basketball_auto_j_remaining > 0 and _basketball_auto_j_timer <= 0.0:
-		_fire_weapon(WEAPONS["basketball"], true)
+		_fire_weapon(WEAPONS["basketball"])
 		_basketball_auto_j_remaining -= 1
 		_basketball_auto_j_timer += BASKETBALL_AUTO_J_INTERVAL
 
@@ -714,8 +723,21 @@ func _shoot_man_gun(weapon: Dictionary) -> bool:
 		dir = _facing
 	_weapon_aim_dir = dir
 	var muzzle_pos := _get_man_muzzle_position()
-	_spawn_man_bullet(muzzle_pos, dir, weapon)
+	if _berserk_active:
+		_spawn_man_shotgun(muzzle_pos, dir, weapon)
+	else:
+		_spawn_man_bullet(muzzle_pos, dir, weapon)
 	return true
+
+
+func _spawn_man_shotgun(muzzle_pos: Vector2, dir: Vector2, weapon: Dictionary) -> void:
+	var count := MAN_GUN_BERSERK_SHOTGUN_COUNT + get_buff_stacks(BuffType.BULLET)
+	var spread := MAN_GUN_BERSERK_SHOTGUN_SPREAD
+	for i in count:
+		var angle_offset := 0.0
+		if count > 1:
+			angle_offset = spread * (float(i) / float(count - 1) - 0.5)
+		_spawn_man_bullet(muzzle_pos, dir.rotated(angle_offset), weapon)
 
 
 func _spawn_man_bullet(muzzle_pos: Vector2, dir: Vector2, weapon: Dictionary) -> void:
@@ -817,6 +839,18 @@ func _apply_laser_damage(weapon: Dictionary) -> void:
 				break
 	for enemy in hit_enemies:
 		_deal_projectile_damage_to_enemy(enemy, damage, "laser_beam", 5.0)
+	for node in get_tree().get_nodes_in_group("chest"):
+		var chest := node as Area2D
+		if chest == null or not is_instance_valid(chest) or not chest.has_method("take_damage"):
+			continue
+		if bool(chest.get("is_start_supply")) or bool(chest.get("is_weapon_choice")) or bool(chest.get("_opened")):
+			continue
+		for segment in _laser_segments:
+			var a: Vector2 = segment["from"]
+			var b: Vector2 = segment["to"]
+			if _distance_to_laser_segment(chest.global_position, a, b) <= LASER_DAMAGE_WIDTH * 0.5:
+				chest.take_damage(damage)
+				break
 
 
 func _distance_to_laser_segment(point: Vector2, a: Vector2, b: Vector2) -> float:
@@ -879,16 +913,22 @@ func _create_laser_berserk_visual(parent: Node) -> Node2D:
 			var ratio := clampf(1.0 - warning / LASER_BERSERK_WARNING_DURATION, 0.0, 1.0)
 			var radius := lerpf(18.0, LASER_BERSERK_RADIUS, ratio)
 			visual.draw_circle(Vector2.ZERO, radius, Color(1.0, 0.08, 0.02, 0.10 + ratio * 0.08))
-			visual.draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, Color(1.0, 0.12, 0.04, 0.75), 2.6)
-			visual.draw_arc(Vector2.ZERO, radius * 0.55, 0.0, TAU, 36, Color(1.0, 0.86, 0.30, 0.55), 1.5)
+			visual.draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, Color(1.0, 0.12, 0.04, 0.82), 3.4)
+			visual.draw_arc(Vector2.ZERO, radius * 0.58, 0.0, TAU, 36, Color(1.0, 0.86, 0.30, 0.65), 2.2)
+			visual.draw_line(Vector2(-radius, 0.0), Vector2(radius, 0.0), Color(1.0, 0.16, 0.04, 0.42), 2.0, true)
+			visual.draw_line(Vector2(0.0, -radius), Vector2(0.0, radius), Color(1.0, 0.16, 0.04, 0.42), 2.0, true)
 			return
 		var beam_height := 320.0
 		var radius := LASER_BERSERK_RADIUS * pulse
-		visual.draw_circle(Vector2.ZERO, LASER_BERSERK_RADIUS, Color(1.0, 0.05, 0.02, 0.18))
-		visual.draw_arc(Vector2.ZERO, LASER_BERSERK_RADIUS, 0.0, TAU, 52, Color(1.0, 0.18, 0.04, 0.75), 2.8)
-		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.06, 0.02, 0.28), radius * 1.6, true)
-		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.12, 0.04, 0.62), radius * 0.92, true)
-		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.94, 0.72, 0.92), radius * 0.28, true)
+		visual.draw_circle(Vector2.ZERO, LASER_BERSERK_RADIUS, Color(1.0, 0.05, 0.02, 0.24))
+		visual.draw_circle(Vector2.ZERO, LASER_BERSERK_RADIUS * 0.55, Color(1.0, 0.34, 0.08, 0.18))
+		visual.draw_arc(Vector2.ZERO, LASER_BERSERK_RADIUS, 0.0, TAU, 52, Color(1.0, 0.18, 0.04, 0.90), 4.2)
+		visual.draw_arc(Vector2.ZERO, LASER_BERSERK_RADIUS * 0.70, 0.0, TAU, 44, Color(1.0, 0.92, 0.42, 0.70), 2.4)
+		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.03, 0.01, 0.30), radius * 1.9, true)
+		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.10, 0.02, 0.72), radius * 1.08, true)
+		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.94, 0.72, 0.96), radius * 0.34, true)
+		visual.draw_line(Vector2(-LASER_BERSERK_RADIUS, 0.0), Vector2(LASER_BERSERK_RADIUS, 0.0), Color(1.0, 0.20, 0.03, 0.48), 3.0, true)
+		visual.draw_line(Vector2(0.0, -LASER_BERSERK_RADIUS), Vector2(0.0, LASER_BERSERK_RADIUS), Color(1.0, 0.20, 0.03, 0.48), 3.0, true)
 	)
 	if parent != null:
 		parent.add_child(visual)
@@ -933,7 +973,7 @@ func _apply_laser_berserk_damage(pos: Vector2, weapon: Dictionary) -> void:
 	for enemy in _get_alive_enemies():
 		if enemy.global_position.distance_squared_to(pos) > radius_sq:
 			continue
-		_deal_projectile_damage_to_enemy(enemy, damage, "laser_berserk", 6.0)
+		_deal_projectile_damage_to_enemy(enemy, damage, "laser_berserk", 9.0)
 
 
 func _deal_projectile_damage_to_enemy(enemy: Area2D, amount: int, projectile_type: String, feedback_strength: float) -> void:
@@ -1478,11 +1518,22 @@ func _finish_head_banner(sprite: Sprite2D) -> void:
 func add_buff(type: int, duration: float) -> void:
 	if type in _active_buffs:
 		_active_buffs[type].time += duration
+		_active_buffs[type].duration = maxf(float(_active_buffs[type].get("duration", duration)), float(_active_buffs[type].time))
 		_active_buffs[type].stacks += 1
 	else:
-		_active_buffs[type] = {"time": duration, "stacks": 1}
+		_active_buffs[type] = {"time": duration, "duration": duration, "stacks": 1}
 	var info: Dictionary = BUFF_INFO.get(type, {"name": "未知"})
 	GameManager.post_message("获得状态：%s" % String(info.get("name", "未知")), Color(0.3, 0.85, 1.0))
+
+
+func show_potion_status(type: String, duration: float) -> void:
+	match type:
+		"hp":
+			add_buff(PICKUP_STATUS_HP, duration)
+		"mana":
+			add_buff(PICKUP_STATUS_MANA, duration)
+		"speed":
+			add_buff(BuffType.SPEED, duration)
 
 
 func get_buff_stacks(type: int) -> int:

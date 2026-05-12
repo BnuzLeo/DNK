@@ -1,92 +1,85 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://b0em25qusrf8f"]
 
-[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
-[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_header.png" id="2_header"]
-[ext_resource type="Texture2D" path="res://assets/export/gui/icon_talent_point.png" id="3_icon"]
+[ext_resource type="Texture2D" uid="uid://c3lkhnewmuaok" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
+[ext_resource type="Texture2D" uid="uid://chxcnajxylj3i" path="res://assets/export/gui/ui_popup_header.png" id="2_header"]
+[ext_resource type="Texture2D" uid="uid://cle0eobitipra" path="res://assets/export/gui/icon_talent_point.png" id="3_icon"]
 
-[node name="ReviveCountdownPanel" type="CanvasLayer"]
-layer = 28
+[node name="ReviveCountdownPanel" type="CanvasLayer" unique_id=1923480914]
 process_mode = 3
+layer = 28
 
-[node name="Overlay" type="ColorRect" parent="."]
+[node name="Overlay" type="ColorRect" parent="." unique_id=2091275128]
 offset_right = 960.0
 offset_bottom = 640.0
 color = Color(0, 0, 0, 0.72)
-mouse_filter = 0
 
-[node name="Panel" type="TextureRect" parent="."]
-offset_left = 105.0
-offset_top = 70.0
-offset_right = 855.0
-offset_bottom = 570.0
+[node name="Panel" type="TextureRect" parent="." unique_id=1293460904]
+offset_left = 287.0
+offset_top = 211.0
+offset_right = 674.0
+offset_bottom = 406.0
+mouse_filter = 0
 texture = ExtResource("1_panel")
 expand_mode = 1
-stretch_mode = 0
-mouse_filter = 0
 
-[node name="Header" type="TextureRect" parent="."]
-offset_left = 105.0
-offset_top = 70.0
-offset_right = 855.0
-offset_bottom = 134.0
+[node name="Header" type="TextureRect" parent="." unique_id=1220963221]
+offset_left = 290.0
+offset_top = 212.0
+offset_right = 669.0
+offset_bottom = 257.0
+mouse_filter = 2
 texture = ExtResource("2_header")
 expand_mode = 1
-stretch_mode = 0
-mouse_filter = 2
 
-[node name="TitleIcon" type="TextureRect" parent="."]
-offset_left = 137.0
-offset_top = 78.0
-offset_right = 185.0
-offset_bottom = 126.0
+[node name="TitleIcon" type="TextureRect" parent="." unique_id=460610266]
+offset_left = 304.0
+offset_top = 218.0
+offset_right = 331.0
+offset_bottom = 250.0
+mouse_filter = 2
 texture = ExtResource("3_icon")
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
-[node name="TitleLabel" type="Label" parent="."]
-offset_left = 193.0
-offset_top = 70.0
-offset_right = 715.0
-offset_bottom = 134.0
-vertical_alignment = 1
-text = "复活倒计时"
+[node name="TitleLabel" type="Label" parent="." unique_id=1878838697]
+offset_left = 420.0
+offset_top = 197.0
+offset_right = 540.0
+offset_bottom = 261.0
 theme_override_colors/font_color = Color(0.98, 0.92, 0.78, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
 theme_override_font_sizes/font_size = 24
-mouse_filter = 2
+text = "复活倒计时"
+vertical_alignment = 1
 
-[node name="PromptLabel" type="Label" parent="."]
-offset_left = 135.0
-offset_top = 188.0
-offset_right = 825.0
-offset_bottom = 220.0
-horizontal_alignment = 1
-text = "是否消耗复活币继续战斗？"
+[node name="PromptLabel" type="Label" parent="." unique_id=255814691]
+offset_left = 131.0
+offset_top = 265.0
+offset_right = 821.0
+offset_bottom = 299.0
 theme_override_colors/font_color = Color(1, 0.84, 0, 1)
 theme_override_font_sizes/font_size = 24
-mouse_filter = 2
-
-[node name="CountdownLabel" type="Label" parent="."]
-offset_left = 105.0
-offset_top = 250.0
-offset_right = 855.0
-offset_bottom = 314.0
+text = "是否消耗复活币继续战斗？"
 horizontal_alignment = 1
-text = "10"
+
+[node name="CountdownLabel" type="Label" parent="." unique_id=816906569]
+offset_left = 102.0
+offset_top = 291.0
+offset_right = 852.0
+offset_bottom = 358.0
 theme_override_colors/font_color = Color(1, 0.41, 0.71, 1)
 theme_override_font_sizes/font_size = 48
-mouse_filter = 2
-
-[node name="HintLabel" type="Label" parent="."]
-offset_left = 135.0
-offset_top = 340.0
-offset_right = 825.0
-offset_bottom = 364.0
+text = "10"
 horizontal_alignment = 1
-text = "点击复活 / ESC 放弃"
+
+[node name="HintLabel" type="Label" parent="." unique_id=300098787]
+offset_left = 132.0
+offset_top = 364.0
+offset_right = 822.0
+offset_bottom = 388.0
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
 theme_override_font_sizes/font_size = 16
-mouse_filter = 2
+text = "点击复活 / ESC 放弃"
+horizontal_alignment = 1
