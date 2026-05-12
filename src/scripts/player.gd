@@ -1011,6 +1011,12 @@ func _get_carried_weapon_scale(weapon_type: String) -> float:
 	return MAN_GUN_SCALE_BERSERK if _berserk_active else MAN_GUN_SCALE_NORMAL
 
 
+func _should_play_berserk_attack_frames() -> bool:
+	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
+	var weapon_type: String = weapon.get("type", "")
+	return weapon_type != "laser_gun" and weapon_type != "man_gun"
+
+
 func _build_carried_weapon_frames(paths: Array[String], anim_name: String) -> SpriteFrames:
 	var frames := SpriteFrames.new()
 	if frames.has_animation("default"):
@@ -1048,7 +1054,7 @@ func _update_sprite_animation(delta: float) -> void:
 		next_anim = PlayerSpriteAnim.RUN_LEFT if horizontal < 0.0 else PlayerSpriteAnim.RUN_RIGHT
 	else:
 		_sprite_idle_timer += delta
-		if _berserk_active:
+		if _berserk_active and _should_play_berserk_attack_frames():
 			next_anim = PlayerSpriteAnim.DANCE
 		elif _sprite_idle_timer > 8.0:
 			next_anim = PlayerSpriteAnim.INSPECT
