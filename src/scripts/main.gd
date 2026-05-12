@@ -5,8 +5,12 @@ extends Node2D
 const VS := preload("res://scripts/visual_spec.gd")
 const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
-const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
-const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
+const GUI_ACTION_ATTACK_ICON := preload("res://assets/export/gui/btn-攻击.png")
+const GUI_ACTION_DASH_ICON := preload("res://assets/export/gui/btn-滑行.png")
+const GUI_ACTION_BERSERK_ICON := preload("res://assets/export/gui/btn-狂暴.png")
+const GUI_WEAPON_BASKETBALL_ICON := preload("res://assets/export/gui/btn-weapon1.png")
+const GUI_WEAPON_MAN_GUN_ICON := preload("res://assets/export/gui/btn-weapon2.png")
+const GUI_WEAPON_LASER_GUN_ICON := preload("res://assets/export/gui/btn-weapon3.png")
 const BASKETBALL_HEAD_NORMAL_1_PATH := "res://assets/export/weapon/weapon_01/2.png"
 const BASKETBALL_HEAD_NORMAL_2_PATH := "res://assets/export/weapon/weapon_01/3.png"
 const BASKETBALL_HEAD_BERSERK_PATH := "res://assets/export/weapon/weapon_01/dunk.png"
@@ -37,8 +41,9 @@ const ACTION_Q_X := 646.0
 const ACTION_J_X := 716.0
 const ACTION_K_X := 786.0
 const ACTION_L_X := 856.0
-const ACTION_KEY_Y := 55.0
+const ACTION_KEY_Y := 31.0
 const ACTION_KEY_COLOR := Color(0.78, 0.88, 0.94)
+const ACTION_CLICK_FEEDBACK_DURATION := 0.18
 const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
 const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_yellow_sheet.png"
 const DUNGEON_PORTAL_INTERACT_RADIUS := 58.0
@@ -141,6 +146,7 @@ var _pause_button: Control
 var _bag_button: Control
 var _invincible_test_button: Button
 var _equipment_panel: Node = null
+var _action_button_feedback: Dictionary = {}
 
 # 提示消息系统
 var _active_hints: Array[CanvasLayer] = []
@@ -457,11 +463,11 @@ func _on_player_entered_room(pos: Vector2i) -> void:
 	# 0) 清除上一个房间残留的子弹
 	$BulletPool.clear_all()
 
-	# 起始房间：不刷怪，直接放武器选择宝箱
+	# 起始房间：不刷怪，直接放起始补给宝箱
 	if room.is_start:
 		room.state = RoomState.CLEARED
 		_rooms_cleared += 1
-		_spawn_weapon_chest(pos)
+		_spawn_start_supply_chest(pos)
 		queue_redraw()
 		if _minimap:
 			_minimap.queue_redraw()
@@ -686,6 +692,17 @@ func _spawn_weapon_chest(room_pos: Vector2i) -> void:
 	chest.position = Vector2(cx, cy)
 	chest.is_weapon_choice = true
 	add_child(chest)
+
+
+func _spawn_start_supply_chest(room_pos: Vector2i) -> void:
+	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
+	var chest: Area2D = chest_scene.instantiate()
+	var cx: float = room_pos.x * CELL_W + CELL_W / 2.0
+	var cy: float = room_pos.y * CELL_H + CELL_H / 2.0
+	chest.position = Vector2(cx, cy)
+	chest.is_start_supply = true
+	add_child(chest)
+	_show_hint("按 E 获取补给", Color(1.0, 0.84, 0.0))
 
 
 # ── 房间物件生成 ──────────────────────────────────────────
@@ -1163,13 +1180,53 @@ func _draw_action_key(ctrl: Control, key: String, color: Color = Color.WHITE) ->
 	ctrl.draw_string(font, pos, key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 
+func _draw_action_icon(ctrl: Control, texture: Texture2D, action: String = "") -> void:
+	var ratio := _get_action_feedback_ratio(action)
+	var scale := 1.0 + 0.10 * ratio
+	var size := ACTION_FRAME_SIZE * scale
+	var rect := Rect2((ACTION_FRAME_SIZE - size) * 0.5, size)
+	ctrl.draw_texture_rect(texture, rect, false)
+	if ratio > 0.0:
+		var center := ACTION_FRAME_SIZE * 0.5
+		ctrl.draw_circle(center, ACTION_FRAME_SIZE.x * (0.42 + 0.12 * (1.0 - ratio)), Color(1.0, 1.0, 1.0, 0.20 * ratio))
+		ctrl.draw_arc(center, ACTION_FRAME_SIZE.x * (0.43 + 0.10 * (1.0 - ratio)), 0.0, TAU, 32, Color(1.0, 0.94, 0.62, 0.85 * ratio), 2.2)
+
+
+func _get_action_feedback_ratio(action: String) -> float:
+	if action == "" or action not in _action_button_feedback:
+		return 0.0
+	return clampf(float(_action_button_feedback[action]) / ACTION_CLICK_FEEDBACK_DURATION, 0.0, 1.0)
+
+
+func _get_current_weapon_icon() -> Texture2D:
+	if $Player._weapon_keys.is_empty():
+		return GUI_WEAPON_BASKETBALL_ICON
+	var index: int = clampi($Player._weapon_index, 0, $Player._weapon_keys.size() - 1)
+	var weapon_key: String = $Player._weapon_keys[index]
+	match weapon_key:
+		"chicken_foot":
+			return GUI_WEAPON_MAN_GUN_ICON
+		"jntm":
+			return GUI_WEAPON_LASER_GUN_ICON
+	return GUI_WEAPON_BASKETBALL_ICON
+
+
+func _draw_weapon_count_marker(ctrl: Control) -> void:
+	var count: int = maxi(1, $Player._weapon_keys.size())
+	var text := "%d" % count
+	var font: Font = ThemeDB.fallback_font
+	var font_size := 13
+	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var center := Vector2(ACTION_FRAME_SIZE.x * 0.22, ACTION_FRAME_SIZE.y * 0.25)
+	var pos := Vector2(center.x - text_size.x * 0.5, center.y + text_size.y * 0.34)
+	ctrl.draw_string(font, pos + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.75))
+	ctrl.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.WHITE)
+
+
 func _draw_attack_icon() -> void:
 	var player := $Player
 	var center: Vector2 = ACTION_FRAME_SIZE / 2.0
-	_attack_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
-	var logo_size: Vector2 = Vector2(28, 28)
-	var logo_rect: Rect2 = Rect2((ACTION_FRAME_SIZE - logo_size) * 0.5, logo_size)
-	_attack_icon.draw_texture_rect(GUI_ATTACK_LOGO, logo_rect, false)
+	_draw_action_icon(_attack_icon, GUI_ACTION_ATTACK_ICON, "shoot")
 	var attack_cd_ratio: float = float(player.call("get_fire_cooldown_ratio"))
 	if attack_cd_ratio > 0.0:
 		_draw_action_cooldown_overlay(_attack_icon, center, attack_cd_ratio)
@@ -1180,13 +1237,14 @@ func _draw_attack_icon() -> void:
 
 
 func _draw_switch_icon() -> void:
-	_switch_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
+	_draw_action_icon(_switch_icon, _get_current_weapon_icon(), "switch_weapon")
+	_draw_weapon_count_marker(_switch_icon)
 	_draw_action_key(_switch_icon, "Q", ACTION_KEY_COLOR)
 
 
 func _draw_dash_icon() -> void:
 	var center: Vector2 = ACTION_FRAME_SIZE / 2.0
-	_dash_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
+	_draw_action_icon(_dash_icon, GUI_ACTION_DASH_ICON, "dash")
 	var dash_cd: float = $Player._dash_cooldown
 	if dash_cd > 0.0:
 		var cd_ratio: float = clampf(dash_cd / $Player.DASH_COOLDOWN, 0.0, 1.0)
@@ -1208,7 +1266,7 @@ func _draw_action_cooldown_overlay(ctrl: Control, center: Vector2, cd_ratio: flo
 
 
 func _draw_berserk_icon() -> void:
-	_berserk_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
+	_draw_action_icon(_berserk_icon, GUI_ACTION_BERSERK_ICON, "berserk")
 	_draw_action_key(_berserk_icon, "L", ACTION_KEY_COLOR)
 
 
@@ -1250,9 +1308,42 @@ func _draw_buff_bar() -> void:
 
 func _on_action_button_input(event: InputEvent, action: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 	elif event is InputEventScreenTouch:
+		if event.pressed:
+			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
+
+
+func _trigger_action_button_feedback(action: String) -> void:
+	_action_button_feedback[action] = ACTION_CLICK_FEEDBACK_DURATION
+	match action:
+		"shoot":
+			if _attack_icon:
+				_attack_icon.queue_redraw()
+		"switch_weapon":
+			if _switch_icon:
+				_switch_icon.queue_redraw()
+		"dash":
+			if _dash_icon:
+				_dash_icon.queue_redraw()
+		"berserk":
+			if _berserk_icon:
+				_berserk_icon.queue_redraw()
+
+
+func _update_action_button_feedback(delta: float) -> void:
+	if _action_button_feedback.is_empty():
+		return
+	var finished: Array[String] = []
+	for action in _action_button_feedback:
+		_action_button_feedback[action] = float(_action_button_feedback[action]) - delta
+		if float(_action_button_feedback[action]) <= 0.0:
+			finished.append(action)
+	for action in finished:
+		_action_button_feedback.erase(action)
 
 
 func _emit_virtual_action(action: String, pressed: bool) -> void:
@@ -1376,6 +1467,7 @@ func _show_boss_hp(boss: Area2D) -> void:
 
 func _process(delta: float) -> void:
 	var state := GameManager.state
+	_update_action_button_feedback(delta)
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 	_kills_label.text = ""
 	_practice_label.text = str(GameManager.practice_time)

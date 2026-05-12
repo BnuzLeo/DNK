@@ -11,8 +11,12 @@ const EQUIPMENT_PANEL_SCRIPT := preload("res://scripts/equipment_panel.gd")
 
 const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
-const GUI_SKILL_FRAME := preload("res://assets/export/gui/技能框.png")
-const GUI_ATTACK_LOGO := preload("res://assets/export/gui/攻击logo.png")
+const GUI_ACTION_ATTACK_ICON := preload("res://assets/export/gui/btn-攻击.png")
+const GUI_ACTION_DASH_ICON := preload("res://assets/export/gui/btn-滑行.png")
+const GUI_ACTION_BERSERK_ICON := preload("res://assets/export/gui/btn-狂暴.png")
+const GUI_WEAPON_BASKETBALL_ICON := preload("res://assets/export/gui/btn-weapon1.png")
+const GUI_WEAPON_MAN_GUN_ICON := preload("res://assets/export/gui/btn-weapon2.png")
+const GUI_WEAPON_LASER_GUN_ICON := preload("res://assets/export/gui/btn-weapon3.png")
 const STATUS_SCALE := 1.73
 const STATUS_POS := Vector2(24.0, 20.0)
 const STATUS_FILL_W := 59.0 * STATUS_SCALE
@@ -24,8 +28,9 @@ const ACTION_Q_X := 646.0
 const ACTION_J_X := 716.0
 const ACTION_K_X := 786.0
 const ACTION_L_X := 856.0
-const ACTION_KEY_Y := 55.0
+const ACTION_KEY_Y := 31.0
 const ACTION_KEY_COLOR := Color(0.78, 0.88, 0.94)
+const ACTION_CLICK_FEEDBACK_DURATION := 0.18
 const PLAYER_TOP_Z_INDEX := 1000
 
 const ROOM_W := int(VS.VIEWPORT_SIZE.x)
@@ -64,6 +69,7 @@ var _hud_frame: Control
 var _coin_panel: Control
 var _practice_panel: Control
 var _bag_button: Control
+var _action_button_feedback: Dictionary = {}
 
 # 地图选择
 var _map_select_open := false
@@ -415,6 +421,7 @@ func _create_hud() -> void:
 
 func _process(delta: float) -> void:
 	_anim_timer += delta
+	_update_action_button_feedback(delta)
 
 	if _player and is_instance_valid(_player):
 		_hp_text.text = "%d/%d" % [_player.hp, _player.MAX_HP]
@@ -520,26 +527,72 @@ func _draw_action_key(ctrl: Control, key: String, color: Color = Color.WHITE) ->
 	ctrl.draw_string(font, pos, key, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 
+func _draw_action_icon(ctrl: Control, texture: Texture2D, action: String = "") -> void:
+	var ratio := _get_action_feedback_ratio(action)
+	var scale := 1.0 + 0.10 * ratio
+	var size := ACTION_FRAME_SIZE * scale
+	var rect := Rect2((ACTION_FRAME_SIZE - size) * 0.5, size)
+	ctrl.draw_texture_rect(texture, rect, false)
+	if ratio > 0.0:
+		var center := ACTION_FRAME_SIZE * 0.5
+		ctrl.draw_circle(center, ACTION_FRAME_SIZE.x * (0.42 + 0.12 * (1.0 - ratio)), Color(1.0, 1.0, 1.0, 0.20 * ratio))
+		ctrl.draw_arc(center, ACTION_FRAME_SIZE.x * (0.43 + 0.10 * (1.0 - ratio)), 0.0, TAU, 32, Color(1.0, 0.94, 0.62, 0.85 * ratio), 2.2)
+
+
+func _get_action_feedback_ratio(action: String) -> float:
+	if action == "" or action not in _action_button_feedback:
+		return 0.0
+	return clampf(float(_action_button_feedback[action]) / ACTION_CLICK_FEEDBACK_DURATION, 0.0, 1.0)
+
+
+func _get_current_weapon_icon() -> Texture2D:
+	if _player == null or _player._weapon_keys.is_empty():
+		return GUI_WEAPON_BASKETBALL_ICON
+	var index: int = clampi(_player._weapon_index, 0, _player._weapon_keys.size() - 1)
+	var weapon_key: String = _player._weapon_keys[index]
+	match weapon_key:
+		"chicken_foot":
+			return GUI_WEAPON_MAN_GUN_ICON
+		"jntm":
+			return GUI_WEAPON_LASER_GUN_ICON
+	return GUI_WEAPON_BASKETBALL_ICON
+
+
+func _draw_weapon_count_marker(ctrl: Control) -> void:
+	var count := 1
+	if _player != null:
+		count = maxi(1, _player._weapon_keys.size())
+	var text := "%d" % count
+	var font: Font = ThemeDB.fallback_font
+	var font_size := 13
+	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var center := Vector2(ACTION_FRAME_SIZE.x * 0.22, ACTION_FRAME_SIZE.y * 0.25)
+	var pos := Vector2(center.x - text_size.x * 0.5, center.y + text_size.y * 0.34)
+	ctrl.draw_string(font, pos + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.75))
+	ctrl.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.WHITE)
+
+
 func _draw_attack_icon() -> void:
 	var center: Vector2 = ACTION_FRAME_SIZE / 2.0
-	_attack_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
-	var logo_size: Vector2 = Vector2(28, 28)
-	var logo_rect: Rect2 = Rect2((ACTION_FRAME_SIZE - logo_size) * 0.5, logo_size)
-	_attack_icon.draw_texture_rect(GUI_ATTACK_LOGO, logo_rect, false)
+	_draw_action_icon(_attack_icon, GUI_ACTION_ATTACK_ICON, "shoot")
 	var attack_cd_ratio: float = float(_player.call("get_fire_cooldown_ratio"))
 	if attack_cd_ratio > 0.0:
 		_draw_action_cooldown_overlay(_attack_icon, center, attack_cd_ratio)
-	_draw_action_key(_attack_icon, "J", ACTION_KEY_COLOR)
+	var prompt_active: bool = bool(_player.call("should_show_attack_tap_prompt")) and bool(_player.call("is_berserk_active"))
+	if prompt_active:
+		_draw_basketball_tap_prompt(_attack_icon, float(_player.call("get_attack_tap_prompt_flash_ratio")))
+	_draw_action_key(_attack_icon, "J", Color(1.0, 0.94, 0.62) if prompt_active else ACTION_KEY_COLOR)
 
 
 func _draw_switch_icon() -> void:
-	_switch_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
+	_draw_action_icon(_switch_icon, _get_current_weapon_icon(), "switch_weapon")
+	_draw_weapon_count_marker(_switch_icon)
 	_draw_action_key(_switch_icon, "Q", ACTION_KEY_COLOR)
 
 
 func _draw_dash_icon() -> void:
 	var center: Vector2 = ACTION_FRAME_SIZE / 2.0
-	_dash_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
+	_draw_action_icon(_dash_icon, GUI_ACTION_DASH_ICON, "dash")
 	var dash_cd: float = _player._dash_cooldown
 	if dash_cd > 0.0:
 		var cd_ratio: float = clampf(dash_cd / _player.DASH_COOLDOWN, 0.0, 1.0)
@@ -561,8 +614,21 @@ func _draw_action_cooldown_overlay(ctrl: Control, center: Vector2, cd_ratio: flo
 
 
 func _draw_berserk_icon() -> void:
-	_berserk_icon.draw_texture_rect(GUI_SKILL_FRAME, Rect2(Vector2.ZERO, ACTION_FRAME_SIZE), false)
+	_draw_action_icon(_berserk_icon, GUI_ACTION_BERSERK_ICON, "berserk")
 	_draw_action_key(_berserk_icon, "L", ACTION_KEY_COLOR)
+
+
+func _draw_basketball_tap_prompt(ctrl: Control, flash_ratio: float) -> void:
+	var center := ACTION_FRAME_SIZE * 0.5
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.014)
+	var alpha := 0.18 + 0.28 * pulse + 0.28 * flash_ratio
+	var radius := 18.0 + 3.0 * pulse + 6.0 * flash_ratio
+	ctrl.draw_arc(center, radius, 0.0, TAU, 32, Color(1.0, 0.34, 0.08, alpha), 2.8)
+	ctrl.draw_arc(center, radius - 4.0, 0.0, TAU, 28, Color(1.0, 0.86, 0.22, alpha * 0.7), 1.4)
+	ctrl.draw_circle(center + Vector2(0.0, -4.0), 9.0 + 3.0 * flash_ratio, Color(1.0, 0.38, 0.1, 0.16 + 0.12 * pulse))
+	ctrl.draw_line(center + Vector2(16.0, -7.0), center + Vector2(22.0, -12.0), Color(1.0, 0.82, 0.38, alpha), 2.0)
+	ctrl.draw_line(center + Vector2(22.0, -12.0), center + Vector2(19.0, -12.0), Color(1.0, 0.82, 0.38, alpha), 2.0)
+	ctrl.draw_line(center + Vector2(22.0, -12.0), center + Vector2(22.0, -9.0), Color(1.0, 0.82, 0.38, alpha), 2.0)
 
 
 func _draw_buff_bar() -> void:
@@ -588,9 +654,42 @@ func _draw_buff_bar() -> void:
 
 func _on_action_button_input(event: InputEvent, action: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 	elif event is InputEventScreenTouch:
+		if event.pressed:
+			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
+
+
+func _trigger_action_button_feedback(action: String) -> void:
+	_action_button_feedback[action] = ACTION_CLICK_FEEDBACK_DURATION
+	match action:
+		"shoot":
+			if _attack_icon:
+				_attack_icon.queue_redraw()
+		"switch_weapon":
+			if _switch_icon:
+				_switch_icon.queue_redraw()
+		"dash":
+			if _dash_icon:
+				_dash_icon.queue_redraw()
+		"berserk":
+			if _berserk_icon:
+				_berserk_icon.queue_redraw()
+
+
+func _update_action_button_feedback(delta: float) -> void:
+	if _action_button_feedback.is_empty():
+		return
+	var finished: Array[String] = []
+	for action in _action_button_feedback:
+		_action_button_feedback[action] = float(_action_button_feedback[action]) - delta
+		if float(_action_button_feedback[action]) <= 0.0:
+			finished.append(action)
+	for action in finished:
+		_action_button_feedback.erase(action)
 
 
 func _on_bag_button_input(event: InputEvent) -> void:

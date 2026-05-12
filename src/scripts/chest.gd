@@ -7,13 +7,35 @@ const VS := preload("res://scripts/visual_spec.gd")
 
 signal opened(reward_type: String, reward_key: String)
 
+const START_SUPPLY_WEAPON_KEYS := ["chicken_foot", "jntm"]
+const START_SUPPLY_WEAPON_ICONS := {
+	"chicken_foot": "res://assets/export/weapon/weapon_02/瓦克恩冲锋枪.png",
+	"jntm": "res://assets/export/weapon/weapon_03/飞熊军激光炮.png",
+}
+const GOLD_CHEST_FRAME_PATHS := [
+	"res://assets/export/decoration/gold_chest_idle_frames/gold_chest_idle_00.png",
+	"res://assets/export/decoration/gold_chest_idle_frames/gold_chest_idle_01.png",
+	"res://assets/export/decoration/gold_chest_idle_frames/gold_chest_idle_02.png",
+	"res://assets/export/decoration/gold_chest_idle_frames/gold_chest_idle_03.png",
+	"res://assets/export/decoration/gold_chest_idle_frames/gold_chest_idle_04.png",
+	"res://assets/export/decoration/gold_chest_idle_frames/gold_chest_idle_05.png",
+	"res://assets/export/decoration/gold_chest_idle_frames/gold_chest_idle_06.png",
+]
+const GOLD_CHEST_DISPLAY_SIZE := 58.0
+const GOLD_CHEST_FRAME_TIME := 0.12
+
 var _opened := false
 var _bounce_timer := 0.0
 var _reward_type := ""  # "weapon" or "buff"
 var _reward_key := ""
 var _reward_name := ""
+var _near_player: Node = null
+var _gold_chest_frames: Array[Texture2D] = []
+var _gold_frame_index := 0
+var _gold_frame_timer := 0.0
 
 var is_weapon_choice := false  # 起始房间 3 选 1 模式
+var is_start_supply := false
 
 const BUFF_DURATION_MIN := 20.0
 const BUFF_DURATION_MAX := 40.0
@@ -23,7 +45,12 @@ func _ready() -> void:
 	collision_layer = 32  # PICKUP 层
 	collision_mask = 1    # 碰撞玩家
 	body_entered.connect(_on_body_entered)
-	if not is_weapon_choice:
+	body_exited.connect(_on_body_exited)
+	if is_start_supply:
+		_load_gold_chest_frames()
+		_configure_start_supply_collision()
+		set_process_input(true)
+	elif not is_weapon_choice:
 		_pick_reward()
 	_bounce_timer = randf() * TAU
 
@@ -67,6 +94,11 @@ func get_buff_display_name(type: int) -> String:
 
 func _physics_process(delta: float) -> void:
 	_bounce_timer += delta * 3.0
+	if is_start_supply and not _gold_chest_frames.is_empty():
+		_gold_frame_timer += delta
+		if _gold_frame_timer >= GOLD_CHEST_FRAME_TIME:
+			_gold_frame_timer = fmod(_gold_frame_timer, GOLD_CHEST_FRAME_TIME)
+			_gold_frame_index = (_gold_frame_index + 1) % _gold_chest_frames.size()
 	queue_redraw()
 
 
@@ -75,12 +107,34 @@ func _on_body_entered(body: Node2D) -> void:
 		return
 	if not body.is_in_group("player"):
 		return
+	if is_start_supply:
+		_near_player = body
+		_show_scene_hint("按 E 获取补给", Color(1.0, 0.84, 0.0))
+		return
 	_opened = true
 
 	if is_weapon_choice:
 		_show_weapon_choice(body)
 	else:
 		_give_reward(body)
+
+
+func _on_body_exited(body: Node2D) -> void:
+	if body == _near_player:
+		_near_player = null
+
+
+func _input(event: InputEvent) -> void:
+	if not is_start_supply or _opened:
+		return
+	if _near_player == null or not is_instance_valid(_near_player):
+		return
+	if GameManager.state != GameManager.GameState.PLAYING:
+		return
+	if event.is_action_pressed("interact"):
+		_opened = true
+		get_viewport().set_input_as_handled()
+		_give_start_supply(_near_player)
 
 
 func _give_reward(player: Node) -> void:
@@ -103,6 +157,64 @@ func _give_reward(player: Node) -> void:
 		tween.tween_property(self, "modulate", Color(1, 1, 1, 1), 0.06)
 	tween.tween_property(self, "scale", Vector2.ZERO, 0.15).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
+
+
+func _give_start_supply(player: Node) -> void:
+	var candidates: Array[String] = []
+	for key in START_SUPPLY_WEAPON_KEYS:
+		if not player.has_weapon(key):
+			candidates.append(key)
+	if candidates.is_empty():
+		candidates = START_SUPPLY_WEAPON_KEYS.duplicate()
+	candidates.shuffle()
+
+	var key: String = candidates[0]
+	var added: bool = player.add_weapon(key)
+	if not added:
+		for i in player._weapon_keys.size():
+			if player._weapon_keys[i] == key:
+				player._weapon_index = i
+				GameManager.player_data.weapon_index = i
+				break
+
+	var weapon_name: String = player.WEAPONS[key].name
+	var icon := load(START_SUPPLY_WEAPON_ICONS[key]) as Texture2D
+	if icon != null and player.has_method("queue_head_banner"):
+		player.queue_head_banner(icon)
+	_show_scene_hint("获得补给：%s" % weapon_name, Color(0.0, 0.898, 1.0))
+	_show_scene_hint("按 Q 可以切换武器", Color(1.0, 0.94, 0.62))
+	opened.emit("weapon", key)
+
+	var tween := create_tween()
+	tween.set_parallel(false)
+	for i in 3:
+		tween.tween_property(self, "modulate", Color(1, 1, 1, 0.25), 0.06)
+		tween.tween_property(self, "modulate", Color(1, 1, 1, 1), 0.06)
+	tween.tween_property(self, "scale", Vector2.ZERO, 0.18).set_ease(Tween.EASE_IN)
+	tween.tween_callback(queue_free)
+
+
+func _show_scene_hint(text: String, color: Color) -> void:
+	var scene := get_tree().current_scene
+	if scene != null and scene.has_method("_show_hint"):
+		scene.call("_show_hint", text, color)
+
+
+func _load_gold_chest_frames() -> void:
+	_gold_chest_frames.clear()
+	for path in GOLD_CHEST_FRAME_PATHS:
+		var texture := load(path) as Texture2D
+		if texture != null:
+			_gold_chest_frames.append(texture)
+
+
+func _configure_start_supply_collision() -> void:
+	var shape_node := get_node_or_null("CollisionShape") as CollisionShape2D
+	if shape_node == null:
+		return
+	var circle := shape_node.shape as CircleShape2D
+	if circle != null:
+		circle.radius = 46.0
 
 
 # ── 武器 3 选 1 ──────────────────────────────────────────
@@ -336,6 +448,14 @@ func _spawn_label() -> void:
 func _draw() -> void:
 	var y_off := sin(_bounce_timer) * 3.0
 	var base := Vector2(0, y_off)
+	if is_start_supply and not _gold_chest_frames.is_empty():
+		var texture := _gold_chest_frames[_gold_frame_index]
+		var size := Vector2(GOLD_CHEST_DISPLAY_SIZE, GOLD_CHEST_DISPLAY_SIZE)
+		draw_texture_rect(texture, Rect2(base - size * 0.5, size), false)
+		if not _opened:
+			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.01)
+			draw_arc(base, GOLD_CHEST_DISPLAY_SIZE * 0.42 + pulse * 3.0, 0.0, TAU, 32, Color(1.0, 0.84, 0.0, 0.35 + pulse * 0.2), 2.0)
+		return
 	var col_body := Color(0.2, 0.55, 0.7) if is_weapon_choice else Color(0.55, 0.35, 0.1)
 	var col_lid := Color(0.25, 0.7, 0.9) if is_weapon_choice else Color(0.7, 0.45, 0.15)
 	var col_lock := Color(0.0, 0.898, 1.0) if is_weapon_choice else Color(1.0, 0.84, 0.0)
