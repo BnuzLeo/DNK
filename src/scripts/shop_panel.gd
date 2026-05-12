@@ -3,6 +3,7 @@ extends Node
 ## 卡皮巴拉 — 武器商店面板
 
 const VS := preload("res://scripts/visual_spec.gd")
+const PopupGui := preload("res://scripts/popup_gui.gd")
 
 var _canvas: CanvasLayer
 var _player: Node
@@ -23,57 +24,26 @@ func _build_ui() -> void:
 	for child in _canvas.get_children():
 		child.queue_free()
 
-	# 半透明遮罩
-	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.65)
-	bg.size = VS.VIEWPORT_SIZE
-	bg.mouse_filter = Control.MOUSE_FILTER_STOP
-	_canvas.add_child(bg)
-
-	# 面板背景
-	var panel := ColorRect.new()
-	panel.color = Color(0.1, 0.1, 0.12)
-	panel.position = Vector2(130, 60)
-	panel.size = Vector2(700, 520)
-	_canvas.add_child(panel)
-	panel.draw.connect(_draw_panel_border.bind(panel))
-
-	# 标题
-	var title := Label.new()
-	title.text = "卡皮巴拉 - 武器商店"
-	title.position = Vector2(160, 75)
-	title.add_theme_font_size_override("font_size", 22)
-	title.add_theme_color_override("font_color", Color(0.5, 0.6, 0.8))
-	_canvas.add_child(title)
+	var panel_pos := PopupGui.panel_position()
+	PopupGui.add_overlay(_canvas)
+	PopupGui.add_panel(_canvas)
+	PopupGui.add_title(_canvas, "武器商店")
+	PopupGui.add_close_button(_canvas, Callable(self, "_close"))
 
 	# 货币
 	var currency := Label.new()
 	currency.text = "坤币: %d" % GameManager.kun_coins
-	currency.position = Vector2(620, 80)
+	currency.position = panel_pos + Vector2(560, 82)
 	currency.add_theme_font_size_override("font_size", 16)
 	currency.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
 	currency.name = "CoinLabel"
 	_canvas.add_child(currency)
 
 	# 武器列表
-	var y_offset := 120.0
+	var y_offset := panel_pos.y + 128.0
 	for key in SHOP_WEAPONS:
 		_create_weapon_row(key, y_offset)
 		y_offset += 95.0
-
-	# 关闭按钮
-	var close_btn := Label.new()
-	close_btn.text = "[ 关闭 (ESC) ]"
-	close_btn.position = Vector2(440, 550)
-	close_btn.add_theme_font_size_override("font_size", 16)
-	close_btn.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
-	close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	close_btn.gui_input.connect(_on_close_input)
-	_canvas.add_child(close_btn)
-
-
-func _draw_panel_border(panel: ColorRect) -> void:
-	panel.draw_rect(Rect2(Vector2.ZERO, panel.size), Color(0.3, 0.4, 0.7), false, 2.0)
 
 
 func _create_weapon_row(key: String, y: float) -> void:
@@ -81,11 +51,14 @@ func _create_weapon_row(key: String, y: float) -> void:
 	var price: int = GameManager.WEAPON_COSTS[key]
 	var owned: bool = key in GameManager.player_data.owned_weapons
 	var can_buy: bool = not owned and GameManager.kun_coins >= price
+	var panel_pos := PopupGui.panel_position()
+	var left_x := panel_pos.x + 58.0
+	var action_x := panel_pos.x + 558.0
 
 	# 武器名
 	var name_label := Label.new()
 	name_label.text = weapon.name
-	name_label.position = Vector2(160, y)
+	name_label.position = Vector2(left_x, y)
 	name_label.add_theme_font_size_override("font_size", 20)
 	name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	_canvas.add_child(name_label)
@@ -101,7 +74,7 @@ func _create_weapon_row(key: String, y: float) -> void:
 		_: type_text = "武器"
 	var type_label := Label.new()
 	type_label.text = "[%s]" % type_text
-	type_label.position = Vector2(300, y + 3)
+	type_label.position = Vector2(left_x + 150.0, y + 3.0)
 	type_label.add_theme_font_size_override("font_size", 14)
 	type_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 	_canvas.add_child(type_label)
@@ -110,7 +83,7 @@ func _create_weapon_row(key: String, y: float) -> void:
 	var stats_text := _get_weapon_stats_text(weapon)
 	var stats_label := Label.new()
 	stats_label.text = stats_text
-	stats_label.position = Vector2(160, y + 26)
+	stats_label.position = Vector2(left_x, y + 30.0)
 	stats_label.add_theme_font_size_override("font_size", 13)
 	stats_label.add_theme_color_override("font_color", Color(0.6, 0.7, 0.8))
 	_canvas.add_child(stats_label)
@@ -119,36 +92,32 @@ func _create_weapon_row(key: String, y: float) -> void:
 	if owned:
 		var owned_label := Label.new()
 		owned_label.text = "[ 已拥有 ]"
-		owned_label.position = Vector2(600, y + 8)
+		owned_label.position = Vector2(action_x + 20.0, y + 19.0)
 		owned_label.add_theme_font_size_override("font_size", 16)
 		owned_label.add_theme_color_override("font_color", Color(0.0, 0.9, 0.4))
 		_canvas.add_child(owned_label)
 	else:
 		var price_label := Label.new()
 		price_label.text = "坤币: %d" % price
-		price_label.position = Vector2(600, y)
+		price_label.position = Vector2(action_x + 28.0, y - 18.0)
 		price_label.add_theme_font_size_override("font_size", 14)
 		var price_color := Color(1.0, 0.84, 0.0) if can_buy else Color(0.5, 0.3, 0.3)
 		price_label.add_theme_color_override("font_color", price_color)
 		_canvas.add_child(price_label)
 
-		var btn := Label.new()
-		btn.text = "[ 购买 ]"
-		btn.position = Vector2(600, y + 24)
-		btn.add_theme_font_size_override("font_size", 16)
-		var btn_color := Color(0.0, 0.9, 0.4) if can_buy else Color(0.4, 0.4, 0.4)
-		btn.add_theme_color_override("font_color", btn_color)
-		if can_buy:
-			btn.mouse_filter = Control.MOUSE_FILTER_STOP
-			btn.gui_input.connect(_on_buy_input.bind(key))
-		_canvas.add_child(btn)
+		PopupGui.add_normal_button(_canvas, Vector2(action_x, y + 6.0), "购买", Callable(self, "_buy_weapon").bind(key), can_buy)
 
 	# 分割线
 	var sep := ColorRect.new()
 	sep.color = Color(0.2, 0.2, 0.25)
-	sep.position = Vector2(160, y + 75)
-	sep.size = Vector2(640, 1)
+	sep.position = Vector2(left_x, y + 78.0)
+	sep.size = Vector2(635.0, 1.0)
 	_canvas.add_child(sep)
+
+
+func _buy_weapon(key: String) -> void:
+	if GameManager.purchase_weapon(key):
+		_build_ui()
 
 
 func _on_buy_input(event: InputEvent, key: String) -> void:

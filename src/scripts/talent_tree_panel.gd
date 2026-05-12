@@ -2,6 +2,8 @@ extends Node
 
 ## 天赋树面板 — 练习生基地专属
 
+const PopupGui := preload("res://scripts/popup_gui.gd")
+
 var _canvas: CanvasLayer
 var _player: Node
 var _anim_timer := 0.0
@@ -151,51 +153,28 @@ func _build_ui() -> void:
 	for child in _canvas.get_children():
 		child.queue_free()
 
-	# 遮罩（IGNORE 让鼠标事件穿透到 _unhandled_input 处理节点点击）
-	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.75)
-	bg.size = Vector2(960, 640)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(bg)
-
-	# 标题
-	var title := Label.new()
-	title.text = "天赋树"
-	title.position = Vector2(430, 60)
-	title.add_theme_font_size_override("font_size", 28)
-	title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5))
-	_canvas.add_child(title)
+	var panel_pos := PopupGui.panel_position()
+	PopupGui.add_overlay(_canvas, Control.MOUSE_FILTER_IGNORE)
+	var panel := PopupGui.add_panel(_canvas)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	PopupGui.add_title(_canvas, "天赋树")
+	PopupGui.add_close_button(_canvas, Callable(self, "_save_apply_and_close"))
 
 	# 练习时长
 	var pt_label := Label.new()
 	pt_label.text = "练习时长: %d" % GameManager.practice_time
-	pt_label.position = Vector2(680, 70)
+	pt_label.position = panel_pos + Vector2(560, 84)
 	pt_label.add_theme_font_size_override("font_size", 16)
 	pt_label.add_theme_color_override("font_color", Color(0.4, 0.8, 1.0))
 	_canvas.add_child(pt_label)
 
 	# 重置按钮
-	var reset_btn := Label.new()
-	reset_btn.text = "[ 重置天赋 ]"
-	reset_btn.position = Vector2(200, 70)
-	reset_btn.add_theme_font_size_override("font_size", 16)
-	reset_btn.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
-	reset_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	reset_btn.gui_input.connect(_on_reset_input)
-	_canvas.add_child(reset_btn)
-
-	# 关闭
-	var close_btn := Label.new()
-	close_btn.text = "ESC 关闭"
-	close_btn.position = Vector2(440, 590)
-	close_btn.add_theme_font_size_override("font_size", 14)
-	close_btn.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
-	_canvas.add_child(close_btn)
+	PopupGui.add_normal_button(_canvas, panel_pos + Vector2(44, 70), "重置", Callable(self, "_reset_talents"))
 
 	# 状态提示
 	_status_label = Label.new()
 	_status_label.text = _status_msg
-	_status_label.position = Vector2(350, 560)
+	_status_label.position = panel_pos + Vector2(300, 452)
 	_status_label.add_theme_font_size_override("font_size", 15)
 	_status_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.3))
 	_canvas.add_child(_status_label)
@@ -281,9 +260,7 @@ func _find_node(key: String) -> Dictionary:
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		get_viewport().set_input_as_handled()
-		_save_levels()
-		_apply_talents()
-		_close()
+		_save_apply_and_close()
 		return
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -336,24 +313,34 @@ func _show_status(msg: String) -> void:
 
 func _on_reset_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		# 退还所有花费
-		var refund := 0
-		for node_def in _nodes:
-			var key: String = node_def.key
-			var level: int = _node_levels.get(key, 0)
-			var costs: Array = node_def.costs
-			for i in level:
-				refund += costs[i]
-			_node_levels[key] = 0
-		GameManager.practice_time += refund
-		_save_levels()
-		_apply_talents()
-		_build_ui()
+		_reset_talents()
+
+
+func _reset_talents() -> void:
+	# 退还所有花费
+	var refund := 0
+	for node_def in _nodes:
+		var key: String = node_def.key
+		var level: int = _node_levels.get(key, 0)
+		var costs: Array = node_def.costs
+		for i in level:
+			refund += costs[i]
+		_node_levels[key] = 0
+	GameManager.practice_time += refund
+	_save_levels()
+	_apply_talents()
+	_build_ui()
 
 
 func _apply_talents() -> void:
 	if _player and is_instance_valid(_player):
 		_player._load_from_game_manager()
+
+
+func _save_apply_and_close() -> void:
+	_save_levels()
+	_apply_talents()
+	_close()
 
 
 func _close() -> void:

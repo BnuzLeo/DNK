@@ -3,6 +3,7 @@ extends Node
 ## 装备管理面板 — 装备槽 + 背包 + 槽位解锁
 
 const VS := preload("res://scripts/visual_spec.gd")
+const PopupGui := preload("res://scripts/popup_gui.gd")
 
 var _canvas: CanvasLayer
 var _player: Node
@@ -24,9 +25,9 @@ var _confirm_no_rect := Rect2()
 const SLOT_W := VS.SLOT_SIZE.x
 const SLOT_H := VS.SLOT_SIZE.y
 const SLOT_GAP := 12.0
-const PANEL_SIZE := VS.VIEWPORT_SIZE
-const EQUIPPED_AREA_POS := Vector2(80.0, 140.0)
-const BACKPACK_AREA_POS := Vector2(80.0, 305.0)
+const INPUT_SIZE := VS.VIEWPORT_SIZE
+const EQUIPPED_AREA_POS := Vector2(145.0, 160.0)
+const BACKPACK_AREA_POS := Vector2(145.0, 310.0)
 const SLOT_OFFSET := Vector2(20.0, 10.0)
 const DRAG_THRESHOLD := 6.0
 
@@ -51,43 +52,23 @@ func _build_ui() -> void:
 	_bp_draw = null
 	_drag_draw = null
 
-	# 遮罩
-	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.7)
-	bg.size = PANEL_SIZE
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(bg)
-
-	# 面板背景
-	var panel := ColorRect.new()
-	panel.color = Color(0.1, 0.1, 0.13)
-	panel.position = Vector2(80, 60)
-	panel.size = Vector2(800, 520)
+	var panel_pos := PopupGui.panel_position()
+	PopupGui.add_overlay(_canvas, Control.MOUSE_FILTER_IGNORE)
+	var panel := PopupGui.add_panel(_canvas)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(panel)
-	panel.draw.connect(func():
-		panel.draw_rect(Rect2(Vector2.ZERO, panel.size), Color(0.3, 0.6, 0.4), false, 2.0)
-	)
-
-	# 标题
-	var title := Label.new()
-	title.text = "装备管理"
-	title.position = Vector2(420, 75)
-	title.add_theme_font_size_override("font_size", 24)
-	title.add_theme_color_override("font_color", Color(0.3, 0.9, 0.5))
-	_canvas.add_child(title)
+	PopupGui.add_title(_canvas, "背包")
 
 	# 装备槽标题
 	var eq_label := Label.new()
 	eq_label.text = "装备槽（Q键切换武器）"
-	eq_label.position = Vector2(110, 115)
+	eq_label.position = panel_pos + Vector2(40.0, 78.0)
 	eq_label.add_theme_font_size_override("font_size", 16)
 	eq_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))
 	_canvas.add_child(eq_label)
 
 	# 绘制装备槽
 	var eq_draw := Control.new()
-	eq_draw.size = Vector2(800, 120)
+	eq_draw.size = Vector2(690, 112)
 	eq_draw.position = EQUIPPED_AREA_POS
 	eq_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	eq_draw.draw.connect(_draw_equipped_slots)
@@ -97,39 +78,33 @@ func _build_ui() -> void:
 	# 背包标题
 	var bp_label := Label.new()
 	bp_label.text = "背包（未装备）"
-	bp_label.position = Vector2(110, 280)
+	bp_label.position = panel_pos + Vector2(40.0, 228.0)
 	bp_label.add_theme_font_size_override("font_size", 16)
 	bp_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))
 	_canvas.add_child(bp_label)
 
 	# 绘制背包
 	var bp_draw := Control.new()
-	bp_draw.size = Vector2(800, 200)
+	bp_draw.size = Vector2(690, 136)
 	bp_draw.position = BACKPACK_AREA_POS
 	bp_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bp_draw.draw.connect(_draw_backpack)
 	_canvas.add_child(bp_draw)
 	_bp_draw = bp_draw
 
-	# 关闭提示
-	var close_hint := Label.new()
-	close_hint.text = "ESC / B 关闭"
-	close_hint.position = Vector2(400, 555)
-	close_hint.add_theme_font_size_override("font_size", 14)
-	close_hint.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
-	_canvas.add_child(close_hint)
-
 	var input_layer := Control.new()
-	input_layer.size = PANEL_SIZE
+	input_layer.size = INPUT_SIZE
 	input_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	input_layer.gui_input.connect(_on_panel_input)
 	_canvas.add_child(input_layer)
 
 	_drag_draw = Control.new()
-	_drag_draw.size = PANEL_SIZE
+	_drag_draw.size = INPUT_SIZE
 	_drag_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_drag_draw.draw.connect(_draw_drag_preview)
 	_canvas.add_child(_drag_draw)
+
+	PopupGui.add_close_button(_canvas, Callable(self, "_close"))
 
 	# 解锁确认对话框
 	if _confirm_open:
@@ -215,7 +190,7 @@ func _draw_backpack() -> void:
 	if backpack.is_empty():
 		var empty_text := "没有未装备的武器"
 		var et_size := ThemeDB.fallback_font.get_string_size(empty_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
-		ctrl.draw_string(ThemeDB.fallback_font, Vector2((800 - et_size.x) / 2, 60), empty_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.4, 0.4, 0.4))
+		ctrl.draw_string(ThemeDB.fallback_font, Vector2((ctrl.size.x - et_size.x) / 2, 60), empty_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.4, 0.4, 0.4))
 		return
 
 	var base_x := 20.0
@@ -467,6 +442,21 @@ func _on_confirm_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 
+func _confirm_unlock_slot() -> void:
+	if not _confirm_open:
+		return
+	if GameManager.unlock_weapon_slot():
+		_confirm_open = false
+		_confirm_slot = -1
+	_build_ui()
+
+
+func _cancel_unlock_slot() -> void:
+	_confirm_open = false
+	_confirm_slot = -1
+	_build_ui()
+
+
 func _input(event: InputEvent) -> void:
 	if _canvas and event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or event.keycode == KEY_B):
 		get_viewport().set_input_as_handled()
@@ -486,38 +476,41 @@ func _build_confirm_dialog() -> void:
 
 	# 遮罩层
 	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.5)
-	overlay.size = PANEL_SIZE
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.color = Color(0, 0, 0, 0.55)
+	overlay.size = INPUT_SIZE
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	_canvas.add_child(overlay)
 
 	# 对话框背景
-	var dlg_w := 320.0
-	var dlg_h := 160.0
-	var dlg_x := (960.0 - dlg_w) / 2.0
-	var dlg_y := (640.0 - dlg_h) / 2.0
-	var dlg := ColorRect.new()
-	dlg.color = Color(0.1, 0.1, 0.14)
+	var dlg_size := Vector2(420.0, 230.0)
+	var dlg_x := (VS.VIEWPORT_SIZE.x - dlg_size.x) / 2.0
+	var dlg_y := (VS.VIEWPORT_SIZE.y - dlg_size.y) / 2.0
+	var dlg := TextureRect.new()
+	dlg.texture = PopupGui.load_texture(PopupGui.BACKGROUND_PATH)
 	dlg.position = Vector2(dlg_x, dlg_y)
-	dlg.size = Vector2(dlg_w, dlg_h)
+	dlg.size = dlg_size
+	dlg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	dlg.stretch_mode = TextureRect.STRETCH_SCALE
 	dlg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.add_child(dlg)
-	dlg.draw.connect(func():
-		dlg.draw_rect(Rect2(Vector2.ZERO, dlg.size), Color(0.4, 0.5, 0.7), false, 2.0)
-	)
 
 	# 标题
 	var title := Label.new()
 	title.text = "解锁槽位"
-	title.position = Vector2(dlg_x + 110, dlg_y + 15)
+	title.position = Vector2(dlg_x, dlg_y + 24.0)
+	title.size = Vector2(dlg_size.x, 28.0)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 18)
-	title.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	title.add_theme_color_override("font_color", Color(0.98, 0.9, 0.55))
 	_canvas.add_child(title)
 
 	# 提示文字
 	var msg := Label.new()
 	msg.text = "是否花费 %d 坤币解锁第 %d 个槽位？" % [cost, next_slot]
-	msg.position = Vector2(dlg_x + 40, dlg_y + 50)
+	msg.position = Vector2(dlg_x + 50.0, dlg_y + 76.0)
+	msg.size = Vector2(dlg_size.x - 100.0, 24.0)
+	msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	msg.add_theme_font_size_override("font_size", 14)
 	var msg_color := Color(0.8, 0.8, 0.8) if can_afford else Color(0.8, 0.3, 0.3)
 	msg.add_theme_color_override("font_color", msg_color)
@@ -526,57 +519,14 @@ func _build_confirm_dialog() -> void:
 	# 当前坤币
 	var coin_info := Label.new()
 	coin_info.text = "当前坤币: %d" % GameManager.kun_coins
-	coin_info.position = Vector2(dlg_x + 40, dlg_y + 75)
+	coin_info.position = Vector2(dlg_x + 50.0, dlg_y + 106.0)
+	coin_info.size = Vector2(dlg_size.x - 100.0, 22.0)
+	coin_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	coin_info.add_theme_font_size_override("font_size", 13)
 	coin_info.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
 	_canvas.add_child(coin_info)
 
 	# 按钮区域
-	var btn_w := 100.0
-	var btn_h := 36.0
-	var btn_y := dlg_y + 110.0
-	var yes_x := dlg_x + 50.0
-	var no_x := dlg_x + dlg_w - btn_w - 50.0
-
-	_confirm_yes_rect = Rect2(yes_x, btn_y, btn_w, btn_h)
-	_confirm_no_rect = Rect2(no_x, btn_y, btn_w, btn_h)
-
-	# 按钮背景
-	var yes_bg := ColorRect.new()
-	yes_bg.position = Vector2(yes_x, btn_y)
-	yes_bg.size = Vector2(btn_w, btn_h)
-	yes_bg.color = Color(0.1, 0.2, 0.1) if can_afford else Color(0.12, 0.12, 0.12)
-	yes_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(yes_bg)
-
-	var no_bg := ColorRect.new()
-	no_bg.position = Vector2(no_x, btn_y)
-	no_bg.size = Vector2(btn_w, btn_h)
-	no_bg.color = Color(0.2, 0.1, 0.1)
-	no_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(no_bg)
-
-	# 确认按钮
-	var yes_btn := Label.new()
-	yes_btn.text = "[ 确认 ]"
-	yes_btn.position = Vector2(yes_x + 25, btn_y + 10)
-	yes_btn.add_theme_font_size_override("font_size", 16)
-	var yes_color := Color(0.0, 0.9, 0.4) if can_afford else Color(0.4, 0.4, 0.4)
-	yes_btn.add_theme_color_override("font_color", yes_color)
-	yes_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(yes_btn)
-
-	# 取消按钮
-	var no_btn := Label.new()
-	no_btn.text = "[ 取消 ]"
-	no_btn.position = Vector2(no_x + 25, btn_y + 10)
-	no_btn.add_theme_font_size_override("font_size", 16)
-	no_btn.add_theme_color_override("font_color", Color(0.7, 0.5, 0.5))
-	no_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(no_btn)
-
-	var confirm_input := Control.new()
-	confirm_input.size = PANEL_SIZE
-	confirm_input.mouse_filter = Control.MOUSE_FILTER_STOP
-	confirm_input.gui_input.connect(_on_confirm_input)
-	_canvas.add_child(confirm_input)
+	var btn_y := dlg_y + 150.0
+	PopupGui.add_confirm_button(_canvas, Vector2(dlg_x + 70.0, btn_y), "确认", Callable(self, "_confirm_unlock_slot"), can_afford)
+	PopupGui.add_normal_button(_canvas, Vector2(dlg_x + dlg_size.x - 205.0, btn_y), "取消", Callable(self, "_cancel_unlock_slot"))
