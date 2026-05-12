@@ -245,7 +245,7 @@ func _draw() -> void:
 
 	# 交互提示
 	if _prompt_alpha > 0.05:
-		var prompt_text := "交互提示：按 E 交互"
+		var prompt_text := "按 E 交互"
 		var p_size := ThemeDB.fallback_font.get_string_size(prompt_text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
 		var c := Color(1, 1, 0.6, _prompt_alpha)

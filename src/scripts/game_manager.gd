@@ -15,7 +15,7 @@ var total_kills: int = 0
 var revive_coins: int = 1
 
 # ── 经济系统 ──
-var practice_time: int = 1000
+var practice_time: int = 0
 var kun_coins: int = 100
 var message_log: Array[Dictionary] = []
 
@@ -117,12 +117,13 @@ func _prepare_lobby_test_weapons() -> void:
 
 func add_kill() -> void:
 	total_kills += 1
-	practice_time += 1
 
 
 func add_dungeon_clear() -> void:
 	kun_coins += 1
+	practice_time += 1
 	post_message("获得坤币 +1", Color(0.0, 0.898, 1.0))
+	post_message("获得练习时长 +1", Color(0.0, 0.898, 1.0))
 
 
 func post_message(text: String, color: Color = Color.WHITE) -> void:

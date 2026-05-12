@@ -1123,5 +1123,5 @@ func _enter_dungeon() -> void:
 
 func _draw() -> void:
 	if _portal_near and not _map_select_open:
-		draw_string(ThemeDB.fallback_font, _get_portal_position() + Vector2(-58, -76), "交互提示：按 E 交互",
+		draw_string(ThemeDB.fallback_font, _get_portal_position() + Vector2(-34, -76), "按 E 交互",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))

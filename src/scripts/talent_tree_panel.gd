@@ -112,6 +112,16 @@ func _define_tree() -> void:
 		["mana_max", "mana_regen"],
 		["mana_max", "dmg_up"],
 	]
+	_normalize_talent_costs()
+
+
+func _normalize_talent_costs() -> void:
+	for node_def in _nodes:
+		var max_level: int = int(node_def.get("max_level", 1))
+		var costs: Array = []
+		for _i in range(max_level):
+			costs.append(1)
+		node_def.costs = costs
 
 
 var _status_label: Label

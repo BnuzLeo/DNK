@@ -94,6 +94,7 @@ var _contact_cooldown := 0.0
 var _dying := false
 var _spawn_invuln_timer := 0.0
 var _sprite: AnimatedSprite2D = null
+var _sprite_base_scale := Vector2.ONE
 var _weapon_sprite: Sprite2D = null
 var _attack_effect_sprite: Sprite2D = null
 var _archer_facing := 1.0
@@ -109,6 +110,9 @@ var _tank_state_timer := 0.0
 var _tank_charge_cooldown := 0.0
 var _tank_charge_dir := Vector2.RIGHT
 var _tank_afterimage_timer := 0.0
+var _hit_recoil := Vector2.ZERO
+var _hit_squash_timer := 0.0
+var _hit_squash_duration := 0.12
 
 # 射击
 var _shoot_timer := 0.0
@@ -199,6 +203,7 @@ func _physics_process(delta: float) -> void:
 
 	# 移动
 	_update_movement(delta)
+	_update_hit_recoil(delta)
 	var separation_offset := _resolve_enemy_overlap()
 	if separation_offset.length_squared() > 0.01:
 		_moving_this_frame = true
@@ -468,6 +473,7 @@ func _setup_sprite() -> void:
 	if frame_size > 0.0:
 		var scale_factor: float = display_size / frame_size
 		_sprite.scale = Vector2(scale_factor, scale_factor)
+		_sprite_base_scale = _sprite.scale
 	_setup_weapon_sprite()
 	_setup_attack_effect_sprite()
 	_set_animation("idle", true)
@@ -726,6 +732,41 @@ func take_damage(amount: int) -> void:
 		_die()
 	elif _has_animation("hit"):
 		_set_animation("hit", true)
+
+
+func apply_hit_feedback(direction: Vector2, strength: float = 7.0, projectile_type: String = "") -> void:
+	if _dying:
+		return
+	var dir := direction.normalized()
+	if dir == Vector2.ZERO and _player != null:
+		dir = (global_position - _player.global_position).normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT
+	_hit_recoil += dir * minf(strength, 28.0)
+	_hit_squash_duration = 0.16 if projectile_type == "basketball_berserk" or projectile_type == "man_bullet_berserk" else 0.11
+	_hit_squash_timer = _hit_squash_duration
+	_apply_hit_squash(1.0)
+
+
+func _update_hit_recoil(delta: float) -> void:
+	if _hit_recoil.length_squared() > 0.01:
+		global_position += _hit_recoil
+		_hit_recoil = _hit_recoil.move_toward(Vector2.ZERO, 180.0 * delta)
+	if _hit_squash_timer > 0.0:
+		_hit_squash_timer = maxf(_hit_squash_timer - delta, 0.0)
+		var ratio := _hit_squash_timer / maxf(_hit_squash_duration, 0.001)
+		_apply_hit_squash(ratio)
+	elif _sprite != null and _sprite.scale != _sprite_base_scale:
+		_sprite.scale = _sprite_base_scale
+
+
+func _apply_hit_squash(ratio: float) -> void:
+	if _sprite == null:
+		return
+	var punch := sin(ratio * PI)
+	var stretch_x := 1.0 + punch * 0.16
+	var squash_y := 1.0 - punch * 0.10
+	_sprite.scale = Vector2(_sprite_base_scale.x * stretch_x, _sprite_base_scale.y * squash_y)
 
 
 func apply_slow(factor: float, duration: float) -> void:

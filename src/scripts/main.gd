@@ -667,7 +667,8 @@ func _spawn_boss(pos: Vector2, room: RoomData, bounds: Rect2) -> void:
 	boss.room_bounds = bounds
 	add_child(boss)
 	room.enemies.append(boss)
-	boss.tree_exiting.connect(_on_boss_died.bind(room))
+	if boss.has_signal("died"):
+		boss.connect("died", Callable(self, "_on_boss_died").bind(room))
 	if boss.has_signal("phase_changed"):
 		boss.connect("phase_changed", Callable(self, "_on_boss_phase_changed"))
 	# 显示 Boss 血条
@@ -685,6 +686,8 @@ func _on_enemy_died(_enemy: Area2D, room: RoomData) -> void:
 
 
 func _on_boss_died(room: RoomData) -> void:
+	if _boss_defeated:
+		return
 	_boss_defeated = true
 	room.enemies = room.enemies.filter(func(e): return is_instance_valid(e) and not e._dying)
 	_start_boss_settlement(room)
@@ -2580,8 +2583,8 @@ func _draw() -> void:
 	# 传送门提示
 	if is_instance_valid($Player):
 		if $Player.global_position.distance_to(_start_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
-			draw_string(ThemeDB.fallback_font, _start_portal_pos + Vector2(-58, -100), "交互提示：按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
+			draw_string(ThemeDB.fallback_font, _start_portal_pos + Vector2(-34, -100), "按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
 		if _portal_active and $Player.global_position.distance_to(_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
-			draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-58, -100), "交互提示：按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
+			draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-34, -100), "按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
 
 	# 怪物出生预警由黄色震荡波节点播放。

@@ -7,6 +7,7 @@ const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
 const BOSS_MINION_SCRIPT := preload("res://scripts/boss_minion.gd")
 
 signal phase_changed(phase_number: int)
+signal died
 
 enum Phase { P1, P2, P3 }
 enum AttackType { BIG_SNOWBALLS, SNOW_STORM, JUMP_SUMMON }
@@ -478,7 +479,10 @@ func _get_fallback_separation_dir(other: Node) -> Vector2:
 
 
 func _die() -> void:
+	if _dying:
+		return
 	_dying = true
+	died.emit()
 	if _has_animation("death"):
 		modulate = _get_base_modulate()
 		_set_animation("death", true)

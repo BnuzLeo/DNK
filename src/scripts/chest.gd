@@ -467,7 +467,7 @@ func _draw() -> void:
 			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.01)
 			draw_arc(base, GOLD_CHEST_DISPLAY_SIZE * 0.42 + pulse * 3.0, 0.0, TAU, 32, Color(1.0, 0.84, 0.0, 0.35 + pulse * 0.2), 2.0)
 			if _near_player != null and is_instance_valid(_near_player):
-				draw_string(ThemeDB.fallback_font, Vector2(-72, -GOLD_CHEST_DISPLAY_SIZE * 0.5 - 18), "交互提示：按 E 获取补给", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
+				draw_string(ThemeDB.fallback_font, Vector2(-48, -GOLD_CHEST_DISPLAY_SIZE * 0.5 - 18), "按 E 获取补给", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
 		return
 	var col_body := Color(0.2, 0.55, 0.7) if is_weapon_choice else Color(0.55, 0.35, 0.1)
 	var col_lid := Color(0.25, 0.7, 0.9) if is_weapon_choice else Color(0.7, 0.45, 0.15)

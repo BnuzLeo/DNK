@@ -379,11 +379,15 @@ func _on_bullet_hit(area: Area2D, bullet: Area2D) -> void:
 	if is_player:
 		if area.has_method("take_damage"):
 			var was_dying: bool = "_dying" in area and area._dying
+			var hit_dir: Vector2 = bullet.get_meta("direction", Vector2.RIGHT)
 			area.take_damage(damage)
 			var is_kill: bool = not was_dying and area.hp <= 0
 			var is_boss: bool = area.max_hp > 50
 			var projectile_type: String = bullet.get_meta("projectile_type", "")
 			var hit_pos: Vector2 = area.global_position
+			if area.has_method("apply_hit_feedback"):
+				var knock_strength := _get_projectile_hit_strength(projectile_type, is_kill, is_boss)
+				area.call("apply_hit_feedback", hit_dir, knock_strength, projectile_type)
 			if projectile_type == "man_bullet" or projectile_type == "man_bullet_berserk":
 				_apply_man_aoe_damage(hit_pos, area, int(bullet.get_meta("aoe_damage", damage)), float(bullet.get_meta("aoe_radius", 0.0)))
 			hit_occurred.emit(hit_pos, damage, is_kill, is_boss, projectile_type)
@@ -413,8 +417,31 @@ func _apply_man_aoe_damage(center: Vector2, primary: Area2D, amount: int, radius
 			continue
 		var was_dying: bool = "_dying" in enemy_area and enemy_area._dying
 		enemy_area.take_damage(amount)
+		if enemy_area.has_method("apply_hit_feedback"):
+			var dir := (enemy_area.global_position - center).normalized()
+			if dir == Vector2.ZERO:
+				dir = Vector2.RIGHT.rotated(randf() * TAU)
+			enemy_area.call("apply_hit_feedback", dir, 8.0, "man_bullet_aoe")
 		if not was_dying and "hp" in enemy_area and enemy_area.hp <= 0:
 			GameManager.add_kill()
+
+
+func _get_projectile_hit_strength(projectile_type: String, is_kill: bool, is_boss: bool) -> float:
+	var strength := 7.0
+	match projectile_type:
+		"basketball":
+			strength = 11.0
+		"basketball_berserk":
+			strength = 22.0
+		"man_bullet":
+			strength = 13.0
+		"man_bullet_berserk":
+			strength = 18.0
+	if is_boss:
+		strength *= 0.38
+	if is_kill:
+		strength *= 1.35
+	return strength
 
 
 func _handle_boss_big_snowball_split(bullet: Area2D, hit_position: Vector2) -> void:

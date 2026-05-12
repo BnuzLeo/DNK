@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://08d7qvyiau0n"]
 
 [ext_resource type="Script" uid="uid://cr1t8wxhg6ggi" path="res://scripts/title_screen.gd" id="1"]
-[ext_resource type="Texture2D" uid="uid://dpoa7bqdxmy8r" path="res://assets/export/start/background.png" id="2"]
-[ext_resource type="Texture2D" uid="uid://yxjsch4g2glg" path="res://assets/export/start/kun.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://c0hoa2au2j85l" path="res://assets/export/start/背景.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://4lf47dglnxh3" path="res://assets/export/start/首帧.png" id="3"]
 [ext_resource type="Texture2D" uid="uid://cj8ob2qpgwpxb" path="res://assets/export/start/btn-开始按钮.png" id="4"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_start_btn"]
