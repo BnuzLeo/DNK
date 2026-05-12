@@ -40,16 +40,18 @@ const REGEN_PER_LEVEL := 0.5
 # 闪避技能
 const DASH_SPEED := 500.0
 const DASH_DURATION := 0.25
-const DASH_COOLDOWN := 5.0
+const DASH_COOLDOWN := 0.5
 const DASH_INVULN := 0.5
+const HURT_FLASH_DURATION := 0.22
 const BERSERK_DURATION := 5.0
+const BERSERK_COOLDOWN := 10.0
 const BERSERK_COLOR := Color(1.0, 0.25, 0.08)
 const HEAD_BANNER_DISPLAY_SIZE := 52.0
 const HEAD_BANNER_OFFSET := Vector2(0.0, -60.0)
 const HEAD_BANNER_DURATION := 0.42
 const BASKETBALL_PROMPT_FLASH_DURATION := 0.65
-const BASKETBALL_AUTO_J_COUNT := 5
-const BASKETBALL_AUTO_J_INTERVAL := 0.2
+const BASKETBALL_AUTO_J_COUNT := 2
+const BASKETBALL_AUTO_J_INTERVAL := 0.28
 const MAN_GUN_DIRECTION_STEP := PI / 4.0
 const MAN_GUN_SCALE_NORMAL := 0.42 * 1.5
 const MAN_GUN_SCALE_BERSERK := 0.46 * 1.5
@@ -64,6 +66,11 @@ const LASER_MAX_DISTANCE := 900.0
 const LASER_WIDTH := 32.0
 const LASER_DAMAGE_WIDTH := 42.0
 const LASER_DAMAGE_INTERVAL := 0.12
+const LASER_BERSERK_DURATION := 5.0
+const LASER_BERSERK_BEAM_COUNT := 2
+const LASER_BERSERK_DAMAGE_INTERVAL := 0.18
+const LASER_BERSERK_RADIUS := 40.0
+const LASER_BERSERK_WARNING_DURATION := 0.55
 const LASER_WALL_MASK := 16
 const LASER_MIN_HIT_DISTANCE := 6.0
 const LASER_REFLECT_ANGLE := PI / 3.0
@@ -76,14 +83,14 @@ const WEAPONS := {
 	},
 	"jntm": {
 		"cooldown": 0.0, "damage": 2, "mana": 0, "name": "大族激光",
-		"type": "laser_gun", "berserk_damage": 3, "berserk_cooldown": 0.0
+		"type": "laser_gun", "berserk_damage": 4, "berserk_cooldown": 0.0
 	},
 	"chicken_foot": {
-		"cooldown": 0.5, "damage": 8, "mana": 0,
+		"cooldown": 0.11, "damage": 3, "mana": 0,
 		"name": "真正的MAN", "type": "man_gun", "speed": 780.0,
-		"lock_range": 430.0, "aoe_radius": 76.0, "aoe_damage": 5,
-		"berserk_cooldown": 0.3, "berserk_damage": 9, "berserk_speed": 920.0,
-		"berserk_aoe_radius": 92.0, "berserk_aoe_damage": 6
+		"aoe_radius": 0.0, "aoe_damage": 0,
+		"berserk_cooldown": 0.18, "berserk_damage": 5, "berserk_speed": 920.0,
+		"berserk_aoe_radius": 0.0, "berserk_aoe_damage": 0
 	},
 }
 
@@ -95,8 +102,10 @@ var _weapon_index := 0
 var _weapon_keys := ["basketball"]
 var _invuln_timer := 0.0
 var _test_invincible := false
+var _hurt_flash_timer := 0.0
 var _berserk_active := false
 var _berserk_timer := 0.0
+var _berserk_cooldown := 0.0
 var _berserk_flash_timer := 0.0
 var _room_blast_pending := 0
 var _room_blast_timer := 0.0
@@ -116,6 +125,10 @@ var _laser_visual: Node2D = null
 var _laser_segments: Array[Dictionary] = []
 var _laser_damage_timer := 0.0
 var _laser_audio_active := false
+var _laser_berserk_active := false
+var _laser_berserk_timer := 0.0
+var _laser_berserk_beams: Array[Dictionary] = []
+var _laser_berserk_cooldown := 0.0
 
 # 闪避状态
 var _dash_timer := 0.0
@@ -244,11 +257,18 @@ func _physics_process(delta: float) -> void:
 		_dash_cooldown = 0.0
 
 	# 副本内狂暴持续时间
+	if s == GameManager.GameState.PLAYING and _berserk_cooldown > 0.0:
+		_berserk_cooldown = maxf(_berserk_cooldown - delta, 0.0)
+	elif s == GameManager.GameState.LOBBY:
+		_berserk_cooldown = 0.0
 	if s == GameManager.GameState.PLAYING and _berserk_active and _berserk_timer > 0.0:
 		_berserk_timer -= delta
 		if _berserk_timer <= 0.0:
 			_berserk_active = false
 			_berserk_timer = 0.0
+			_clear_laser_berserk()
+	if _laser_berserk_cooldown > 0.0:
+		_laser_berserk_cooldown = maxf(_laser_berserk_cooldown - delta, 0.0)
 	if _basketball_prompt_flash_timer > 0.0:
 		_basketball_prompt_flash_timer = maxf(_basketball_prompt_flash_timer - delta, 0.0)
 	if _basketball_auto_j_remaining > 0:
@@ -273,7 +293,11 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# 无敌闪烁（闪避后延续的无敌时间）
-	if _dash_invuln_visual_timer > 0.0:
+	if _hurt_flash_timer > 0.0:
+		_hurt_flash_timer = maxf(_hurt_flash_timer - delta, 0.0)
+		var hurt_pulse := 0.65 + 0.35 * sin(Time.get_ticks_msec() * 0.045)
+		modulate = Color(1.0, 0.28 + 0.18 * hurt_pulse, 0.28 + 0.18 * hurt_pulse, 1.0)
+	elif _dash_invuln_visual_timer > 0.0:
 		_dash_invuln_visual_timer -= delta
 		modulate = Color.WHITE
 	elif _test_invincible:
@@ -293,7 +317,7 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("dash") and _dash_cooldown <= 0.0:
 		GameAudio.play_dash()
 		_dash_timer = DASH_DURATION
-		_dash_cooldown = 0.0 if s == GameManager.GameState.LOBBY else DASH_COOLDOWN - _talent_dash_cd_reduction
+		_dash_cooldown = 0.0 if s == GameManager.GameState.LOBBY else DASH_COOLDOWN
 		# 有移动输入就用移动方向，否则用朝向
 		var dash_input := Vector2(
 			Input.get_axis("move_left", "move_right"),
@@ -326,6 +350,7 @@ func _physics_process(delta: float) -> void:
 	_update_facing_from_input(input)
 	_weapon_aim_dir = _get_preview_weapon_aim_dir()
 	_update_laser_gun(delta)
+	_update_laser_berserk(delta)
 
 	# 武器切换
 	if _pending_weapon_switch:
@@ -383,12 +408,26 @@ func _cycle_weapon() -> void:
 
 func _trigger_berserk() -> void:
 	var was_active := _berserk_active
+	var current_weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
+	if GameManager.state == GameManager.GameState.PLAYING and _berserk_cooldown > 0.0:
+		return
+	if GameManager.state == GameManager.GameState.PLAYING and current_weapon.get("type", "") == "laser_gun":
+		if _laser_berserk_cooldown > 0.0:
+			return
+		_start_laser_berserk()
+		_berserk_cooldown = BERSERK_COOLDOWN
+		_berserk_flash_timer = 0.25
+		GameAudio.play_berserk()
+		if not was_active:
+			_play_berserk_awakening_fx()
+		return
 	if GameManager.state == GameManager.GameState.LOBBY:
 		_berserk_active = not _berserk_active
 		_berserk_timer = 0.0
 	else:
 		_berserk_active = true
 		_berserk_timer = BERSERK_DURATION
+		_berserk_cooldown = BERSERK_COOLDOWN
 	_berserk_flash_timer = 0.25
 	if _berserk_active:
 		GameAudio.play_berserk()
@@ -423,6 +462,12 @@ func get_fire_cooldown_ratio() -> float:
 	if max_cooldown <= 0.0 or _fire_cooldown <= 0.0:
 		return 0.0
 	return clampf(_fire_cooldown / max_cooldown, 0.0, 1.0)
+
+
+func get_berserk_cooldown_ratio() -> float:
+	if BERSERK_COOLDOWN <= 0.0 or _berserk_cooldown <= 0.0:
+		return 0.0
+	return clampf(_berserk_cooldown / BERSERK_COOLDOWN, 0.0, 1.0)
 
 
 func _fire_weapon(weapon: Dictionary, ignore_cooldown: bool = false) -> void:
@@ -664,27 +709,13 @@ func _spawn_roosters(weapon: Dictionary) -> bool:
 func _shoot_man_gun(weapon: Dictionary) -> bool:
 	if bullet_pool == null:
 		return false
-	var targets: Array[Area2D] = _get_man_targets(weapon)
-	if targets.is_empty():
-		var dir := _snap_man_gun_dir(_weapon_aim_dir)
-		if dir == Vector2.ZERO:
-			dir = _facing
-		_weapon_aim_dir = dir
-		var muzzle_pos := _get_man_muzzle_position()
-		_spawn_man_bullet(muzzle_pos, dir, weapon)
-		return true
-	var fired := false
-	for enemy in targets:
-		if enemy == null or not is_instance_valid(enemy):
-			continue
-		var dir := _snap_man_gun_dir(enemy.global_position - global_position)
-		if dir == Vector2.ZERO:
-			dir = _facing
-		_weapon_aim_dir = dir
-		var muzzle_pos := _get_man_muzzle_position()
-		_spawn_man_bullet(muzzle_pos, dir, weapon)
-		fired = true
-	return fired
+	var dir := _snap_man_gun_dir(_weapon_aim_dir)
+	if dir == Vector2.ZERO:
+		dir = _facing
+	_weapon_aim_dir = dir
+	var muzzle_pos := _get_man_muzzle_position()
+	_spawn_man_bullet(muzzle_pos, dir, weapon)
+	return true
 
 
 func _spawn_man_bullet(muzzle_pos: Vector2, dir: Vector2, weapon: Dictionary) -> void:
@@ -697,7 +728,7 @@ func _spawn_man_bullet(muzzle_pos: Vector2, dir: Vector2, weapon: Dictionary) ->
 
 func _update_laser_gun(delta: float) -> void:
 	var weapon: Dictionary = WEAPONS[_weapon_keys[_weapon_index]]
-	if weapon.get("type", "") != "laser_gun" or not Input.is_action_pressed("shoot"):
+	if weapon.get("type", "") != "laser_gun" or _berserk_active or not Input.is_action_pressed("shoot"):
 		_clear_laser_visual()
 		_laser_damage_timer = 0.0
 		_laser_audio_active = false
@@ -706,7 +737,7 @@ func _update_laser_gun(delta: float) -> void:
 	if dir == Vector2.ZERO:
 		dir = _facing
 	_weapon_aim_dir = dir
-	_laser_segments = _build_laser_segments(_get_laser_muzzle_position(), dir, 2 if _berserk_active else 0)
+	_laser_segments = _build_laser_segments(_get_laser_muzzle_position(), dir, 0)
 	_update_laser_visual()
 	if not _laser_audio_active:
 		GameAudio.play_shoot()
@@ -775,7 +806,7 @@ func _get_laser_reflect_dir(incoming_dir: Vector2, normal: Vector2) -> Vector2:
 func _apply_laser_damage(weapon: Dictionary) -> void:
 	if _laser_segments.is_empty():
 		return
-	var damage: int = (weapon.get("berserk_damage", weapon.damage) if _berserk_active else weapon.damage) + damage_bonus
+	var damage: int = weapon.damage + damage_bonus
 	var hit_enemies: Array[Area2D] = []
 	for enemy in _get_alive_enemies():
 		for segment in _laser_segments:
@@ -785,7 +816,7 @@ func _apply_laser_damage(weapon: Dictionary) -> void:
 				hit_enemies.append(enemy)
 				break
 	for enemy in hit_enemies:
-		_deal_damage_to_enemy(enemy, damage)
+		_deal_projectile_damage_to_enemy(enemy, damage, "laser_beam", 5.0)
 
 
 func _distance_to_laser_segment(point: Vector2, a: Vector2, b: Vector2) -> float:
@@ -801,8 +832,148 @@ func _update_laser_visual() -> void:
 	_ensure_laser_visual()
 	if _laser_visual == null or not is_instance_valid(_laser_visual):
 		return
-	var color := Color(0.12, 0.92, 1.0, 0.95) if not _berserk_active else Color(0.86, 0.18, 1.0, 1.0)
+	var color := Color(1.0, 0.08, 0.02, 0.95)
 	_laser_visual.call("setup", _laser_segments, null, LASER_WIDTH, color)
+
+
+func _start_laser_berserk() -> void:
+	if _laser_berserk_active:
+		return
+	_clear_laser_visual()
+	_laser_audio_active = false
+	_laser_berserk_active = true
+	_laser_berserk_timer = LASER_BERSERK_DURATION
+	_laser_berserk_cooldown = LASER_BERSERK_DURATION
+	_laser_berserk_beams.clear()
+	var scene := get_tree().current_scene
+	if scene == null:
+		scene = get_parent()
+	var used_targets: Array[Area2D] = []
+	for i in LASER_BERSERK_BEAM_COUNT:
+		var target := _find_closest_enemy_to(global_position, used_targets)
+		if target != null:
+			used_targets.append(target)
+		var pos := target.global_position if target != null else global_position + _facing * (80.0 + i * 32.0)
+		var visual := _create_laser_berserk_visual(scene)
+		_laser_berserk_beams.append({
+			"target": target,
+			"pos": pos,
+			"warning": LASER_BERSERK_WARNING_DURATION,
+			"damage_timer": 0.0,
+			"visual": visual,
+			"phase": float(i) * 1.7,
+		})
+	_berserk_active = false
+	_berserk_timer = 0.0
+
+
+func _create_laser_berserk_visual(parent: Node) -> Node2D:
+	var visual := Node2D.new()
+	visual.z_index = 95
+	visual.z_as_relative = false
+	visual.draw.connect(func():
+		var warning := float(visual.get_meta("warning", 0.0))
+		var phase := float(visual.get_meta("phase", 0.0))
+		var pulse := 0.72 + sin(Time.get_ticks_msec() * 0.018 + phase) * 0.18
+		if warning > 0.0:
+			var ratio := clampf(1.0 - warning / LASER_BERSERK_WARNING_DURATION, 0.0, 1.0)
+			var radius := lerpf(18.0, LASER_BERSERK_RADIUS, ratio)
+			visual.draw_circle(Vector2.ZERO, radius, Color(1.0, 0.08, 0.02, 0.10 + ratio * 0.08))
+			visual.draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, Color(1.0, 0.12, 0.04, 0.75), 2.6)
+			visual.draw_arc(Vector2.ZERO, radius * 0.55, 0.0, TAU, 36, Color(1.0, 0.86, 0.30, 0.55), 1.5)
+			return
+		var beam_height := 320.0
+		var radius := LASER_BERSERK_RADIUS * pulse
+		visual.draw_circle(Vector2.ZERO, LASER_BERSERK_RADIUS, Color(1.0, 0.05, 0.02, 0.18))
+		visual.draw_arc(Vector2.ZERO, LASER_BERSERK_RADIUS, 0.0, TAU, 52, Color(1.0, 0.18, 0.04, 0.75), 2.8)
+		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.06, 0.02, 0.28), radius * 1.6, true)
+		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.12, 0.04, 0.62), radius * 0.92, true)
+		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.94, 0.72, 0.92), radius * 0.28, true)
+	)
+	if parent != null:
+		parent.add_child(visual)
+	return visual
+
+
+func _update_laser_berserk(delta: float) -> void:
+	if not _laser_berserk_active:
+		return
+	_laser_berserk_timer -= delta
+	var weapon: Dictionary = WEAPONS["jntm"]
+	for i in _laser_berserk_beams.size():
+		var beam: Dictionary = _laser_berserk_beams[i]
+		var target := beam.get("target", null) as Area2D
+		if target == null or not is_instance_valid(target) or ("_dying" in target and target._dying):
+			target = _find_closest_enemy_to(beam.get("pos", global_position))
+			beam["target"] = target
+		if target != null:
+			beam["pos"] = (beam["pos"] as Vector2).lerp(target.global_position, clampf(delta * 10.0, 0.0, 1.0))
+		var warning := maxf(float(beam.get("warning", 0.0)) - delta, 0.0)
+		beam["warning"] = warning
+		var visual := beam.get("visual", null) as Node2D
+		if visual != null and is_instance_valid(visual):
+			visual.global_position = beam["pos"]
+			visual.set_meta("warning", warning)
+			visual.set_meta("phase", float(beam.get("phase", 0.0)))
+			visual.queue_redraw()
+		if warning <= 0.0:
+			var damage_timer := float(beam.get("damage_timer", 0.0)) - delta
+			if damage_timer <= 0.0:
+				damage_timer += LASER_BERSERK_DAMAGE_INTERVAL
+				_apply_laser_berserk_damage(beam["pos"], weapon)
+			beam["damage_timer"] = damage_timer
+		_laser_berserk_beams[i] = beam
+	if _laser_berserk_timer <= 0.0:
+		_clear_laser_berserk()
+
+
+func _apply_laser_berserk_damage(pos: Vector2, weapon: Dictionary) -> void:
+	var damage: int = weapon.get("berserk_damage", weapon.damage) + damage_bonus
+	var radius_sq := LASER_BERSERK_RADIUS * LASER_BERSERK_RADIUS
+	for enemy in _get_alive_enemies():
+		if enemy.global_position.distance_squared_to(pos) > radius_sq:
+			continue
+		_deal_projectile_damage_to_enemy(enemy, damage, "laser_berserk", 6.0)
+
+
+func _deal_projectile_damage_to_enemy(enemy: Area2D, amount: int, projectile_type: String, feedback_strength: float) -> void:
+	var was_dying: bool = "_dying" in enemy and enemy._dying
+	var old_hp: int = enemy.hp if "hp" in enemy else 1
+	enemy.take_damage(amount)
+	var is_kill: bool = not was_dying and old_hp > 0 and "hp" in enemy and enemy.hp <= 0
+	var is_boss: bool = enemy.max_hp > 50 if "max_hp" in enemy else false
+	if enemy.has_method("apply_hit_feedback"):
+		var dir := (enemy.global_position - global_position).normalized()
+		if dir == Vector2.ZERO:
+			dir = _facing
+		enemy.call("apply_hit_feedback", dir, feedback_strength, projectile_type)
+	if is_kill:
+		GameManager.add_kill()
+	if bullet_pool != null and bullet_pool.has_signal("hit_occurred"):
+		bullet_pool.emit_signal("hit_occurred", enemy.global_position, amount, is_kill, is_boss, projectile_type)
+
+
+func _clear_laser_berserk() -> void:
+	for beam in _laser_berserk_beams:
+		var visual := beam.get("visual", null) as Node2D
+		if visual != null and is_instance_valid(visual):
+			visual.queue_free()
+	_laser_berserk_beams.clear()
+	_laser_berserk_active = false
+	_laser_berserk_timer = 0.0
+
+
+func _find_closest_enemy_to(origin: Vector2, excluded: Array[Area2D] = []) -> Area2D:
+	var best: Area2D = null
+	var best_dist := INF
+	for enemy in _get_alive_enemies():
+		if enemy in excluded:
+			continue
+		var dist := origin.distance_squared_to(enemy.global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best = enemy
+	return best
 
 
 func _clear_laser_visual() -> void:
@@ -814,21 +985,7 @@ func _clear_laser_visual() -> void:
 
 
 func _get_man_targets(weapon: Dictionary) -> Array[Area2D]:
-	var enemies := _get_alive_enemies()
-	if _berserk_active:
-		return enemies
-	var closest: Area2D = null
-	var lock_range: float = weapon.get("lock_range", 430.0)
-	var closest_dist := lock_range * lock_range
-	for enemy in enemies:
-		var dist := global_position.distance_squared_to(enemy.global_position)
-		if dist < closest_dist:
-			closest_dist = dist
-			closest = enemy
-	var targets: Array[Area2D] = []
-	if closest != null:
-		targets.append(closest)
-	return targets
+	return []
 
 
 func _get_alive_enemies() -> Array[Area2D]:
@@ -852,11 +1009,7 @@ func _get_preview_weapon_aim_dir() -> Vector2:
 		return _facing
 	if weapon_type == "laser_gun":
 		return _snap_man_gun_dir(_facing)
-	var targets := _get_man_targets(weapon)
-	if targets.is_empty():
-		return _snap_man_gun_dir(_facing)
-	var dir := _snap_man_gun_dir(targets[0].global_position - global_position)
-	return dir if dir != Vector2.ZERO else _snap_man_gun_dir(_facing)
+	return _snap_man_gun_dir(_facing)
 
 
 func _update_facing_from_input(input: Vector2) -> void:
@@ -919,11 +1072,14 @@ func take_damage(amount: int) -> void:
 	if remaining > 0:
 		hp -= remaining
 		hp_changed.emit(hp, MAX_HP)
+	_hurt_flash_timer = HURT_FLASH_DURATION
 	player_hit.emit()
 	_invuln_timer = 0.5
 	if hp <= 0:
 		GameAudio.play_player_dead()
 		player_died.emit()
+	else:
+		GameAudio.play_player_hurt()
 
 
 func set_test_invincible(enabled: bool) -> void:

@@ -318,13 +318,19 @@ func _create_hud() -> void:
 	_weapon_label = _hud_canvas.get_node("WeaponLabel") as Label
 	_hud_frame = _hud_canvas.get_node("StatusPanel/HudFrame") as Control
 	_hp_bar = _hud_canvas.get_node("StatusPanel/HpFill") as TextureRect
-	_hp_bar_bg = _hud_canvas.get_node("StatusPanel/HpFrame") as TextureRect
+	_hp_bar_bg = _hud_canvas.get_node_or_null("StatusPanel/HpFrame") as TextureRect
+	if _hp_bar_bg == null:
+		_hp_bar_bg = _hud_frame as TextureRect
 	_hp_text = _hud_canvas.get_node("StatusPanel/HpText") as Label
 	_shield_bar = _hud_canvas.get_node("StatusPanel/ArmorFill") as TextureRect
-	_shield_bar_bg = _hud_canvas.get_node("StatusPanel/ArmorFrame") as TextureRect
+	_shield_bar_bg = _hud_canvas.get_node_or_null("StatusPanel/ArmorFrame") as TextureRect
+	if _shield_bar_bg == null:
+		_shield_bar_bg = _hud_frame as TextureRect
 	_shield_text = _hud_canvas.get_node("StatusPanel/ArmorText") as Label
 	_mana_bar = _hud_canvas.get_node("StatusPanel/ManaFill") as TextureRect
-	_mana_bar_bg = _hud_canvas.get_node("StatusPanel/ManaFrame") as TextureRect
+	_mana_bar_bg = _hud_canvas.get_node_or_null("StatusPanel/ManaFrame") as TextureRect
+	if _mana_bar_bg == null:
+		_mana_bar_bg = _hud_frame as TextureRect
 	_mana_text = _hud_canvas.get_node("StatusPanel/ManaText") as Label
 	_hp_bar_max_width = _hp_bar.size.x
 	_shield_bar_max_width = _shield_bar.size.x
@@ -391,7 +397,8 @@ func _process(delta: float) -> void:
 		var armor_ratio := 0.0 if _player.max_armor <= 0 else float(_player.armor) / float(_player.max_armor)
 		_shield_bar.size.x = _shield_bar_max_width * clampf(armor_ratio, 0.0, 1.0)
 		_shield_bar.visible = _player.armor > 0
-		_shield_bar_bg.visible = true
+		if _shield_bar_bg:
+			_shield_bar_bg.visible = true
 		_shield_text.visible = true
 		_portal_near = _player.global_position.distance_to(_get_portal_position()) < 50.0
 
@@ -667,7 +674,13 @@ func _draw_action_cooldown_overlay(ctrl: Control, center: Vector2, cd_ratio: flo
 
 
 func _draw_berserk_icon() -> void:
+	var center: Vector2 = ACTION_FRAME_SIZE / 2.0
 	_draw_action_icon(_berserk_icon, GUI_ACTION_BERSERK_ICON, "berserk")
+	var berserk_cd_ratio: float = 0.0
+	if _player != null and _player.has_method("get_berserk_cooldown_ratio"):
+		berserk_cd_ratio = float(_player.call("get_berserk_cooldown_ratio"))
+	if berserk_cd_ratio > 0.0:
+		_draw_action_cooldown_overlay(_berserk_icon, center, berserk_cd_ratio)
 	_draw_action_key(_berserk_icon, "L", ACTION_KEY_COLOR)
 
 

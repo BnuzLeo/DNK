@@ -14,6 +14,7 @@ const DASH := "res://assets/music/音效/fx_sword2 #310027.wav"
 const SHOOT := "res://assets/music/音效/fx_show_up #310028.wav"
 const PLAYER_DEAD := "res://assets/music/dialogue/你干嘛.wav"
 const DUNGEON_BGM := "res://assets/music/音效/bgm_1Low #310032.wav"
+const PLAYER_HURT := "res://assets/music/音效/fx_hit #310030.wav"
 
 var _cache: Dictionary = {}
 var _last_played_msec: Dictionary = {}
@@ -103,6 +104,10 @@ func play_shoot() -> void:
 
 func play_player_dead() -> void:
 	play_voice(PLAYER_DEAD)
+
+
+func play_player_hurt() -> void:
+	play_sfx(PLAYER_HURT, -5.0, 0.12)
 
 
 func play_voice(path: String, volume_db: float = -2.0) -> void:

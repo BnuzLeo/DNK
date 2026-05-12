@@ -134,6 +134,9 @@ var _spawn_warning_room: Vector2i = CENTER
 var _cam_mgr: CameraManager
 var _hit_stop_until := 0
 var _damage_numbers: Array[Dictionary] = []
+var _player_hurt_flash_canvas: CanvasLayer
+var _player_hurt_flash_rect: ColorRect
+var _player_hurt_flash_tween: Tween
 const MAX_DAMAGE_NUMBERS := 20
 var _basketball_texture_cache: Dictionary = {}
 var _hit_sfx_cache: Array[AudioStream] = []
@@ -1087,13 +1090,19 @@ func _create_hud() -> void:
 	_weapon_label = canvas.get_node("WeaponLabel") as Label
 	_hud_frame = canvas.get_node("StatusPanel/HudFrame") as Control
 	_hp_bar = canvas.get_node("StatusPanel/HpFill") as TextureRect
-	_hp_bar_bg = canvas.get_node("StatusPanel/HpFrame") as TextureRect
+	_hp_bar_bg = canvas.get_node_or_null("StatusPanel/HpFrame") as TextureRect
+	if _hp_bar_bg == null:
+		_hp_bar_bg = _hud_frame as TextureRect
 	_hp_text = canvas.get_node("StatusPanel/HpText") as Label
 	_shield_bar = canvas.get_node("StatusPanel/ArmorFill") as TextureRect
-	_shield_bar_bg = canvas.get_node("StatusPanel/ArmorFrame") as TextureRect
+	_shield_bar_bg = canvas.get_node_or_null("StatusPanel/ArmorFrame") as TextureRect
+	if _shield_bar_bg == null:
+		_shield_bar_bg = _hud_frame as TextureRect
 	_shield_text = canvas.get_node("StatusPanel/ArmorText") as Label
 	_mana_bar = canvas.get_node("StatusPanel/ManaFill") as TextureRect
-	_mana_bar_bg = canvas.get_node("StatusPanel/ManaFrame") as TextureRect
+	_mana_bar_bg = canvas.get_node_or_null("StatusPanel/ManaFrame") as TextureRect
+	if _mana_bar_bg == null:
+		_mana_bar_bg = _hud_frame as TextureRect
 	_mana_text = canvas.get_node("StatusPanel/ManaText") as Label
 	_hp_bar_max_width = _hp_bar.size.x
 	_shield_bar_max_width = _shield_bar.size.x
@@ -1394,7 +1403,14 @@ func _draw_action_cooldown_overlay(ctrl: Control, center: Vector2, cd_ratio: flo
 
 
 func _draw_berserk_icon() -> void:
+	var center: Vector2 = ACTION_FRAME_SIZE / 2.0
 	_draw_action_icon(_berserk_icon, GUI_ACTION_BERSERK_ICON, "berserk")
+	var player := $Player
+	var berserk_cd_ratio: float = 0.0
+	if player.has_method("get_berserk_cooldown_ratio"):
+		berserk_cd_ratio = float(player.call("get_berserk_cooldown_ratio"))
+	if berserk_cd_ratio > 0.0:
+		_draw_action_cooldown_overlay(_berserk_icon, center, berserk_cd_ratio)
 	_draw_action_key(_berserk_icon, "L", ACTION_KEY_COLOR)
 
 
@@ -1665,7 +1681,8 @@ func _process(delta: float) -> void:
 	var armor_ratio := 0.0 if $Player.max_armor <= 0 else float($Player.armor) / float($Player.max_armor)
 	_shield_bar.size.x = _shield_bar_max_width * clampf(armor_ratio, 0.0, 1.0)
 	_shield_bar.visible = $Player.armor > 0
-	_shield_bar_bg.visible = true
+	if _shield_bar_bg:
+		_shield_bar_bg.visible = true
 	_shield_text.visible = true
 
 	# 技能图标刷新
@@ -1751,7 +1768,37 @@ func _process(delta: float) -> void:
 
 func _on_player_hit() -> void:
 	if _cam_mgr:
-		_cam_mgr.shake(4.0, 0.15)
+		_cam_mgr.shake(9.0, 0.22)
+	trigger_hit_stop(2, 0.0, 0.0)
+	_show_player_hurt_flash()
+
+
+func _show_player_hurt_flash() -> void:
+	if _player_hurt_flash_canvas == null or not is_instance_valid(_player_hurt_flash_canvas):
+		_player_hurt_flash_canvas = CanvasLayer.new()
+		_player_hurt_flash_canvas.layer = 45
+		_player_hurt_flash_canvas.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(_player_hurt_flash_canvas)
+
+		_player_hurt_flash_rect = ColorRect.new()
+		_player_hurt_flash_rect.size = VS.VIEWPORT_SIZE
+		_player_hurt_flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_player_hurt_flash_rect.visible = false
+		_player_hurt_flash_canvas.add_child(_player_hurt_flash_rect)
+
+	if _player_hurt_flash_rect == null or not is_instance_valid(_player_hurt_flash_rect):
+		return
+	if _player_hurt_flash_tween != null and _player_hurt_flash_tween.is_valid():
+		_player_hurt_flash_tween.kill()
+
+	_player_hurt_flash_rect.visible = true
+	_player_hurt_flash_rect.color = Color(1.0, 0.04, 0.02, 0.26)
+	_player_hurt_flash_tween = create_tween()
+	_player_hurt_flash_tween.tween_property(_player_hurt_flash_rect, "color:a", 0.0, 0.18)
+	_player_hurt_flash_tween.tween_callback(func() -> void:
+		if _player_hurt_flash_rect != null and is_instance_valid(_player_hurt_flash_rect):
+			_player_hurt_flash_rect.visible = false
+	)
 
 
 func _on_player_hp_changed(current: int, max_hp: int) -> void:
@@ -2071,13 +2118,17 @@ func _on_bullet_hit_feedback(pos: Vector2, damage: int, is_kill: bool, is_boss: 
 	elif projectile_type == "basketball_berserk":
 		_spawn_basketball_berserk_hit_fx(pos)
 		_spawn_basketball_hit_icon(pos, _load_basketball_texture(BASKETBALL_HEAD_BERSERK_PATH), true)
-		trigger_hit_stop(5, 14.0, 0.32)
-		spawn_damage_number(pos, damage, Color(1.0, 0.26, 0.08), 18)
+		trigger_hit_stop(2, 4.0, 0.12)
+		spawn_damage_number(pos, damage, Color(1.0, 0.26, 0.08), 16)
 		return
 	elif projectile_type == "man_bullet":
 		_spawn_man_hit_fx(pos, false)
+		_spawn_basketball_hit_icon(pos, _load_basketball_texture(BASKETBALL_HEAD_BERSERK_PATH), true)
 	elif projectile_type == "man_bullet_berserk":
 		_spawn_man_hit_fx(pos, true)
+		_spawn_basketball_hit_icon(pos, _load_basketball_texture(BASKETBALL_HEAD_BERSERK_PATH), true)
+	elif projectile_type == "laser_beam" or projectile_type == "laser_berserk":
+		_spawn_basketball_hit_icon(pos, _load_basketball_texture(BASKETBALL_HEAD_BERSERK_PATH), true)
 	if is_kill:
 		trigger_hit_stop(3, 1.0, 0.05)
 		spawn_damage_number(pos, damage, Color(1.0, 0.53, 0.0), 16)
@@ -2127,15 +2178,15 @@ func _spawn_basketball_hit_fx(pos: Vector2) -> void:
 func _spawn_basketball_berserk_hit_fx(pos: Vector2) -> void:
 	var effect := BASKETBALL_BERSERK_HIT_EFFECT.new()
 	add_child(effect)
-	effect.global_position = pos + Vector2(0.0, -24.0)
-	effect.setup(118.0)
+	effect.global_position = pos + Vector2(0.0, -12.0)
+	effect.setup(78.0)
 	if effect.sprite_frames != null and effect.sprite_frames.get_frame_count("explode") > 0:
 		return
 	effect.queue_free()
 	var fallback := EXPLOSION_EFFECT_SCRIPT.new()
 	add_child(fallback)
 	fallback.global_position = pos
-	fallback.setup(0.34, 54.0)
+	fallback.setup(0.24, 34.0)
 
 
 func _spawn_man_hit_fx(pos: Vector2, is_berserk: bool) -> void:
@@ -2208,6 +2259,8 @@ func _get_hit_spark_size(projectile_type: String, is_kill: bool, is_boss: bool) 
 			size = 18.0
 		"man_bullet_berserk":
 			size = 24.0
+		"laser_beam", "laser_berserk":
+			size = 22.0
 	if is_boss:
 		size *= 1.25
 	if is_kill:
@@ -2221,6 +2274,8 @@ func _get_hit_spark_color(projectile_type: String) -> Color:
 			return Color(1.0, 0.78, 0.24, 0.95)
 		"man_bullet", "man_bullet_berserk":
 			return Color(1.0, 0.18, 0.08, 0.95)
+		"laser_beam", "laser_berserk":
+			return Color(1.0, 0.08, 0.02, 0.95)
 	return Color(1.0, 1.0, 1.0, 0.95)
 
 
