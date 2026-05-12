@@ -54,14 +54,6 @@ const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_yellow_sh
 const DUNGEON_PORTAL_INTERACT_RADIUS := 58.0
 const BOSS_SETTLEMENT_RETURN_TIME := 10.0
 const SYSTEM_HINT_DURATION := 1.8
-const MAP_COLOR_ROOM := Color(0.25, 0.40, 0.45)
-const MAP_COLOR_ROOM_START := Color(0.20, 0.34, 0.28)
-const MAP_COLOR_ROOM_BOSS := Color(0.34, 0.25, 0.38)
-const MAP_COLOR_CORRIDOR := Color(0.18, 0.28, 0.30)
-const MAP_COLOR_WALL := Color(0.84, 0.91, 0.96)
-const MAP_COLOR_WALL_EDGE := Color(0.58, 0.72, 0.80)
-const MAP_COLOR_PATH := Color(0.84, 0.95, 1.0, 0.6)
-const MAP_COLOR_GRID := Color(1.0, 1.0, 1.0, 0.08)
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 
@@ -2421,8 +2413,8 @@ func _create_minimap() -> void:
 	add_child(canvas)
 
 	var minimap_control := Control.new()
-	minimap_control.position = Vector2(856, 178)
-	minimap_control.size = Vector2(84, 116)
+	minimap_control.position = Vector2(830, 154)
+	minimap_control.size = Vector2(118, 132)
 	minimap_control.name = "Minimap"
 	minimap_control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	minimap_control.draw.connect(_draw_minimap.bind(minimap_control))
@@ -2434,21 +2426,27 @@ func _draw_minimap(ctrl: Control) -> void:
 	if _rooms.is_empty():
 		return
 
-	var cell_size := Vector2(10, 10)
-	var gap := 1.5
-	var padding := Vector2(17, 22)
-	var total := Vector2(GRID_SIZE, GRID_SIZE) * cell_size + padding * 2
+	var panel := Rect2(Vector2.ZERO, ctrl.size)
+	var title_h := 18.0
+	var map_origin := Vector2(12, 30)
+	var cell_size := Vector2(14, 14)
+	var cell_gap := 2.0
+	var map_step := cell_size + Vector2(cell_gap, cell_gap)
+	var map_size := Vector2(GRID_SIZE - 1, GRID_SIZE - 1) * map_step + cell_size
 
-	ctrl.draw_rect(Rect2(Vector2(22, 4), Vector2(16, 24)), Color(0.32, 0.34, 0.36))
-	ctrl.draw_rect(Rect2(Vector2(29, 28), Vector2(2, 18)), Color(0.92, 0.94, 0.96))
-	ctrl.draw_rect(Rect2(Vector2(17, 44), Vector2(28, 28)), Color(0.92, 0.94, 0.96))
-	ctrl.draw_rect(Rect2(Vector2(21, 48), Vector2(20, 20)), Color(0.12, 0.16, 0.17))
+	ctrl.draw_rect(panel, Color(0.05, 0.07, 0.09, 0.92))
+	ctrl.draw_rect(panel.grow(-1.0), Color(0.11, 0.14, 0.17, 0.94))
+	ctrl.draw_rect(Rect2(Vector2(0, 0), Vector2(ctrl.size.x, title_h)), Color(0.15, 0.18, 0.21, 0.95))
+	ctrl.draw_line(Vector2(10, title_h + 0.5), Vector2(ctrl.size.x - 10, title_h + 0.5), Color(0.34, 0.52, 0.58, 0.8), 1.0)
+	ctrl.draw_string(ThemeDB.fallback_font, Vector2(10, 14), "小地图", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.90, 0.95, 0.98))
+	ctrl.draw_rect(Rect2(map_origin - Vector2(2, 2), map_size + Vector2(4, 4)), Color(0.02, 0.03, 0.04, 0.7))
+	ctrl.draw_rect(Rect2(map_origin - Vector2(1, 1), map_size + Vector2(2, 2)), Color(0.16, 0.22, 0.25, 0.9), false, 1.0)
 
 	# 先画走廊连线
 	for pos in _rooms:
 		if not _rooms[pos].explored:
 			continue
-		var r_pos := padding + Vector2(pos) * cell_size
+		var r_pos := map_origin + Vector2(pos) * map_step
 		var room_doors := _get_door_dirs(pos)
 		for d in room_doors:
 			var adj_pos := Vector2i(pos.x, pos.y)
@@ -2458,31 +2456,46 @@ func _draw_minimap(ctrl: Control) -> void:
 				"e": adj_pos = Vector2i(pos.x + 1, pos.y)
 				"w": adj_pos = Vector2i(pos.x - 1, pos.y)
 			if _has_room_connection(pos, adj_pos) and _rooms[adj_pos].explored:
-				var a_pos := padding + Vector2(adj_pos) * cell_size
+				var a_pos := map_origin + Vector2(adj_pos) * map_step
 				var from := r_pos + cell_size / 2
 				var to := a_pos + cell_size / 2
-				ctrl.draw_line(from, to, Color(0.78, 0.82, 0.84), gap)
+				ctrl.draw_line(from, to, Color(0.58, 0.86, 0.92, 0.75), 3.0)
+				ctrl.draw_line(from, to, Color(0.08, 0.14, 0.16, 0.95), 1.0)
 
 	# 画房间
 	for pos in _rooms:
 		var room: RoomData = _rooms[pos]
-		var r_pos := padding + Vector2(pos) * cell_size
+		var r_pos := map_origin + Vector2(pos) * map_step
+		var room_rect := Rect2(r_pos, cell_size)
 
 		if not room.explored:
+			if room.is_start or room.is_boss:
+				ctrl.draw_rect(room_rect, Color(0.10, 0.13, 0.15, 0.35))
 			continue
 
-		var color := Color(0.42, 0.45, 0.48)
-		if room.is_boss:
-			color = Color(0.7, 0.16, 0.15)
+		var fill := Color(0.26, 0.30, 0.33)
+		if room.is_start:
+			fill = Color(0.20, 0.58, 0.42)
+		elif room.is_boss:
+			fill = Color(0.78, 0.18, 0.30)
 		elif room.state == RoomState.CLEARED:
-			color = Color(0.08, 0.85, 0.28)
+			fill = Color(0.20, 0.70, 0.54)
 		elif room.state == RoomState.ACTIVE:
-			color = Color(0.7, 0.62, 0.15)
+			fill = Color(0.92, 0.72, 0.20)
 
-		ctrl.draw_rect(Rect2(r_pos, cell_size), color)
+		ctrl.draw_rect(room_rect, fill)
+		ctrl.draw_rect(room_rect.grow(-1.0), Color(1.0, 1.0, 1.0, 0.08))
+		ctrl.draw_rect(room_rect, Color(0.04, 0.06, 0.07, 0.8), false, 1.0)
+
+		if room.is_start:
+			ctrl.draw_rect(room_rect.grow(-4.0), Color(0.92, 1.0, 0.96, 0.35), false, 1.0)
+		elif room.is_boss:
+			ctrl.draw_rect(room_rect.grow(-3.0), Color(1.0, 0.74, 0.82, 0.28), false, 1.0)
 
 		if pos == _current_room:
-			ctrl.draw_rect(Rect2(r_pos - Vector2(3, 3), cell_size + Vector2(6, 6)), Color.WHITE, false, 2.0)
+			ctrl.draw_rect(room_rect.grow(3.0), Color(0.95, 0.98, 1.0, 0.95), false, 2.0)
+			ctrl.draw_rect(room_rect.grow(1.0), Color(0.14, 0.28, 0.34, 0.8), false, 1.0)
+			ctrl.draw_circle(room_rect.get_center(), 2.0, Color.WHITE)
 
 
 func _get_door_dirs(pos: Vector2i) -> Array[String]:
@@ -2560,55 +2573,20 @@ func _draw_tiled_textures(rect: Rect2, textures: Array, seed: int, tint: Color =
 
 
 func _draw_floor_tiles(rect: Rect2, room: RoomData, seed: int) -> void:
-	var base := MAP_COLOR_ROOM
+	var tint := Color.WHITE
 	if room.is_start:
-		base = MAP_COLOR_ROOM_START
+		tint = Color(1.0, 1.0, 1.0)
 	elif room.is_boss:
-		base = MAP_COLOR_ROOM_BOSS
-	draw_rect(rect, base)
-	draw_rect(rect.grow(-7.0), base.lightened(0.08))
-	draw_rect(rect.grow(-10.0), Color(0.0, 0.0, 0.0, 0.08), false, 2.0)
-
-	var tile_step := 64.0
-	var start_x := rect.position.x + fmod(float(seed), tile_step)
-	var x := start_x
-	while x < rect.end.x:
-		draw_line(Vector2(x, rect.position.y + 10.0), Vector2(x, rect.end.y - 10.0), MAP_COLOR_GRID, 1.0)
-		x += tile_step
-	var start_y := rect.position.y + fmod(float(seed * 3), tile_step)
-	var y := start_y
-	while y < rect.end.y:
-		draw_line(Vector2(rect.position.x + 10.0, y), Vector2(rect.end.x - 10.0, y), MAP_COLOR_GRID, 1.0)
-		y += tile_step
-
-	var center := rect.get_center()
-	draw_line(Vector2(rect.position.x + 36.0, center.y), Vector2(rect.end.x - 36.0, center.y), MAP_COLOR_PATH, 2.0)
-	draw_line(Vector2(center.x, rect.position.y + 34.0), Vector2(center.x, rect.end.y - 34.0), MAP_COLOR_PATH.darkened(0.15), 1.5)
-	draw_arc(center, min(rect.size.x, rect.size.y) * 0.18, 0.0, TAU, 48, MAP_COLOR_PATH, 2.0)
-
-	if room.is_boss:
-		draw_rect(rect.grow(-18.0), Color(1.0, 0.25, 0.45, 0.12), false, 3.0)
-	elif room.is_start:
-		draw_rect(rect.grow(-18.0), Color(0.35, 1.0, 0.58, 0.12), false, 3.0)
+		tint = Color(0.88, 0.95, 1.0)
+	_draw_tiled_textures(rect, ICE_FLOOR_TILES, seed, tint)
 
 
 func _draw_corridor_tiles(rect: Rect2, seed: int) -> void:
-	draw_rect(rect, MAP_COLOR_CORRIDOR)
-	draw_rect(rect.grow(-5.0), MAP_COLOR_CORRIDOR.lightened(0.12))
-	if rect.size.y > rect.size.x:
-		var x := rect.get_center().x
-		draw_line(Vector2(x, rect.position.y + 8.0), Vector2(x, rect.end.y - 8.0), MAP_COLOR_PATH, 2.0)
-	else:
-		var y := rect.get_center().y
-		draw_line(Vector2(rect.position.x + 8.0, y), Vector2(rect.end.x - 8.0, y), MAP_COLOR_PATH, 2.0)
+	_draw_tiled_textures(rect, ICE_FLOOR_TILES, seed, Color(0.94, 0.98, 1.0))
 
 
 func _draw_wall_tiles(rect: Rect2, seed: int) -> void:
-	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
-		return
-	draw_rect(rect, MAP_COLOR_WALL)
-	draw_rect(rect.grow(-3.0), MAP_COLOR_WALL.lightened(0.08))
-	draw_rect(rect, MAP_COLOR_WALL_EDGE, false, 2.0)
+	_draw_tiled_textures(rect, ICE_WALL_TILES, seed, Color(0.96, 0.99, 1.0), true)
 
 
 func _draw_room_corner_tiles(rx: float, ry: float, seed: int) -> void:

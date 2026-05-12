@@ -5,9 +5,11 @@ const VS := preload("res://scripts/visual_spec.gd")
 const TITLE_STINGER_PATH := "res://assets/music/dialogue/真的是你啊.MP3"
 const MENU_VIDEO_FRAME_DIR := "res://assets/export/start/start_video_frames"
 const MENU_VIDEO_FPS := 12.0
-const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/开场视频.ogv"
+const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/宣发视频.mp4"
 const KUN_PARALLAX_RANGE := Vector2(36.0, 24.0)
 const SKIP_HOLD_TIME := 1.0
+const ENABLE_DIALOGUE_AUDIO := false
+const MUTED_DIALOGUE_VOLUME_DB := -80.0
 
 @onready var _menu_video_layer: CanvasLayer = $MenuVideoLayer
 @onready var _menu_video_player: TextureRect = $MenuVideoLayer/MenuVideoPlayer
@@ -42,6 +44,8 @@ func _ready() -> void:
 	_lobby_test_button.pressed.connect(_go_to_lobby)
 	_dungeon_test_button.pressed.connect(_go_to_dungeon)
 	_video_player.finished.connect(_on_video_finished)
+	if not ENABLE_DIALOGUE_AUDIO:
+		_video_player.volume_db = MUTED_DIALOGUE_VOLUME_DB
 	_video_overlay.visible = false
 	_setup_feedback_nodes()
 	_update_title_style()
@@ -121,6 +125,8 @@ func _setup_feedback_nodes() -> void:
 
 
 func _prepare_title_stinger() -> void:
+	if not ENABLE_DIALOGUE_AUDIO:
+		return
 	var stream := _load_audio_stream(TITLE_STINGER_PATH)
 	if stream == null:
 		return
@@ -132,6 +138,8 @@ func _prepare_title_stinger() -> void:
 
 
 func _play_title_stinger() -> void:
+	if not ENABLE_DIALOGUE_AUDIO:
+		return
 	if _title_stinger == null:
 		_prepare_title_stinger()
 	if _title_stinger == null:
@@ -260,6 +268,8 @@ func _load_and_play_video() -> void:
 		_finish_video_and_enter_lobby()
 		return
 	_video_player.stream = stream
+	if not ENABLE_DIALOGUE_AUDIO:
+		_video_player.volume_db = MUTED_DIALOGUE_VOLUME_DB
 	_video_player.play()
 
 

@@ -5,6 +5,7 @@ const VS := preload("res://scripts/visual_spec.gd")
 
 const AWAKENING_IMAGE_PATH := "res://assets/export/characters/KUN/觉醒.png"
 const AWAKENING_MUSIC_PATH := "res://assets/music/dialogue/觉醒music.wav"
+const ENABLE_DIALOGUE_AUDIO := false
 
 const ENTRY_DURATION := 0.14
 const EXIT_DURATION := 0.16
@@ -56,6 +57,8 @@ func _load_texture(path: String) -> Texture2D:
 
 
 func _load_music_stream() -> AudioStream:
+	if not ENABLE_DIALOGUE_AUDIO:
+		return null
 	var stream := load(AWAKENING_MUSIC_PATH) as AudioStream
 	if stream != null:
 		return stream
@@ -68,6 +71,8 @@ func _load_music_stream() -> AudioStream:
 
 
 func _play_awakening_music() -> void:
+	if not ENABLE_DIALOGUE_AUDIO:
+		return
 	var scene := get_tree().current_scene
 	if scene == null:
 		return

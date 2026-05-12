@@ -8,6 +8,7 @@ const LOBBY_MUSIC := preload("res://assets/music/dialogue/鸡你太美.wav")
 const BULLET_POOL_SCRIPT := preload("res://scripts/bullet_pool.gd")
 const PLAYER_SCRIPT := preload("res://scripts/player.gd")
 const EQUIPMENT_PANEL_SCRIPT := preload("res://scripts/equipment_panel.gd")
+const ENABLE_DIALOGUE_AUDIO := false
 
 const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
 const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
@@ -96,6 +97,8 @@ func _ready() -> void:
 
 
 func _start_lobby_music() -> void:
+	if not ENABLE_DIALOGUE_AUDIO:
+		return
 	_lobby_music = AudioStreamPlayer.new()
 	_lobby_music.bus = "Master"
 	_lobby_music.volume_db = -4.0
@@ -106,6 +109,8 @@ func _start_lobby_music() -> void:
 
 
 func _replay_lobby_music() -> void:
+	if not ENABLE_DIALOGUE_AUDIO:
+		return
 	if _lobby_music != null and is_instance_valid(_lobby_music):
 		_lobby_music.play()
 
