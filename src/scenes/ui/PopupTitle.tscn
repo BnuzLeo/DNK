@@ -1,0 +1,38 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_header.png" id="1_header"]
+
+[node name="PopupTitle" type="Control"]
+offset_right = 750.0
+offset_bottom = 64.0
+mouse_filter = 2
+
+[node name="TitleBackground" type="TextureRect" parent="."]
+offset_right = 750.0
+offset_bottom = 64.0
+mouse_filter = 2
+texture = ExtResource("1_header")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Icon" type="TextureRect" parent="."]
+offset_left = 32.0
+offset_top = 8.0
+offset_right = 80.0
+offset_bottom = 56.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TitleLabel" type="Label" parent="."]
+offset_left = 88.0
+offset_top = 0.0
+offset_right = 610.0
+offset_bottom = 64.0
+mouse_filter = 2
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.98, 0.92, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 24

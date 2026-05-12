@@ -44,9 +44,20 @@ const PHASE3_SUMMON_COUNT := 3
 const PHASE3_SUMMON_RADIUS := 120.0
 const PHASE3_SHOCKWAVE_HEIGHT := 128.0
 const PHASE_ENV_SNOW_COUNT := 26
-const PHASE_ENV_CRACK_COUNT := 10
 
 const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_yellow_sheet.png"
+const ENV_PHASE1_SNOW_PARTICLE := "res://assets/export/enemies/boss/environment/phase1_snow_particle.png"
+const ENV_PHASE2_VORTEX_DIR := "res://assets/export/enemies/boss/environment/phase2_vortex_sheet"
+const ENV_PHASE3_RAGE_AURA_DIR := "res://assets/export/enemies/boss/environment/phase3_rage_aura_sheet"
+const ENV_PHASE3_LANDING_IMPACT_DIR := "res://assets/export/enemies/boss/environment/phase3_landing_impact_sheet"
+const ENV_PHASE3_ICE_SHARDS := [
+	"res://assets/export/enemies/boss/environment/phase3_ice_shard_01.png",
+	"res://assets/export/enemies/boss/environment/phase3_ice_shard_02.png",
+	"res://assets/export/enemies/boss/environment/phase3_ice_shard_03.png",
+]
+const ENV_PHASE2_VORTEX_FPS := 18.0
+const ENV_PHASE3_RAGE_AURA_FPS := 18.0
+const ENV_PHASE3_LANDING_IMPACT_FPS := 14.0
 
 const BOSS_ANIMATIONS := {
 	"frame_size": 120,
@@ -96,6 +107,13 @@ var _phase_visual_time := 0.0
 var _hit_recoil := Vector2.ZERO
 var _hit_squash_timer := 0.0
 var _hit_squash_duration := 0.12
+var _phase1_snow_texture: Texture2D = null
+var _phase2_vortex_frames: Array[Texture2D] = []
+var _phase3_rage_aura_frames: Array[Texture2D] = []
+var _phase3_landing_impact_frames: Array[Texture2D] = []
+var _phase3_ice_shards: Array[Texture2D] = []
+var _landing_impact_timer := 0.0
+var _landing_impact_position := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -104,6 +122,7 @@ func _ready() -> void:
 	add_to_group("enemy")
 	body_entered.connect(_on_body_entered)
 	_setup_sprite()
+	_setup_environment_assets()
 
 
 func setup(player: CharacterBody2D, pool: Node2D, room_data = null) -> void:
@@ -120,6 +139,7 @@ func _physics_process(delta: float) -> void:
 
 	_update_phase()
 	_phase_visual_time += delta
+	_landing_impact_timer = maxf(_landing_impact_timer - delta, 0.0)
 	queue_redraw()
 	_contact_cooldown = max(_contact_cooldown - delta, 0.0)
 	_jump_land_cooldown = max(_jump_land_cooldown - delta, 0.0)
@@ -335,6 +355,7 @@ func _update_jump(delta: float) -> void:
 	_resolve_actor_overlap()
 	_clamp_bounds()
 	_create_landing_shockwave()
+	_start_landing_impact_effect(global_position)
 	_damage_on_landing()
 	_summon_minions()
 	_jump_step += 1
@@ -613,6 +634,71 @@ func _load_texture(path: String) -> Texture2D:
 	return ImageTexture.create_from_image(image)
 
 
+func _setup_environment_assets() -> void:
+	_phase1_snow_texture = _load_texture(ENV_PHASE1_SNOW_PARTICLE)
+	_phase2_vortex_frames = _load_texture_sequence(ENV_PHASE2_VORTEX_DIR)
+	_phase3_rage_aura_frames = _load_texture_sequence(ENV_PHASE3_RAGE_AURA_DIR)
+	_phase3_landing_impact_frames = _load_texture_sequence(ENV_PHASE3_LANDING_IMPACT_DIR)
+	_phase3_ice_shards.clear()
+	for path in ENV_PHASE3_ICE_SHARDS:
+		var texture := _load_texture(String(path))
+		if texture != null:
+			_phase3_ice_shards.append(texture)
+
+
+func _load_texture_sequence(dir_path: String) -> Array[Texture2D]:
+	var frames: Array[Texture2D] = []
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return frames
+	var files := Array(dir.get_files())
+	files.sort_custom(func(a: String, b: String) -> bool:
+		var number_a := _extract_first_number(a)
+		var number_b := _extract_first_number(b)
+		if number_a == number_b:
+			return a < b
+		return number_a < number_b
+	)
+	for file_name in files:
+		if file_name.get_extension().to_lower() != "png":
+			continue
+		var texture := _load_texture(dir_path.path_join(file_name))
+		if texture != null:
+			frames.append(texture)
+	return frames
+
+
+func _extract_first_number(text: String) -> int:
+	var digits := ""
+	for index in text.length():
+		var character := text.unicode_at(index)
+		if character >= 48 and character <= 57:
+			digits += char(character)
+		elif not digits.is_empty():
+			break
+	return int(digits) if not digits.is_empty() else 0
+
+
+func _get_looping_frame(frames: Array[Texture2D], fps: float) -> Texture2D:
+	if frames.is_empty():
+		return null
+	var frame_index := int(floor(_phase_visual_time * fps)) % frames.size()
+	return frames[frame_index]
+
+
+func _draw_texture_centered(texture: Texture2D, center: Vector2, display_size: Vector2, color := Color.WHITE) -> void:
+	if texture == null:
+		return
+	draw_texture_rect(texture, Rect2(center - display_size * 0.5, display_size), false, color)
+
+
+func _start_landing_impact_effect(pos: Vector2) -> void:
+	if _phase3_landing_impact_frames.is_empty():
+		return
+	_landing_impact_position = pos
+	_landing_impact_timer = float(_phase3_landing_impact_frames.size()) / ENV_PHASE3_LANDING_IMPACT_FPS
+
+
 func _face_direction(dir: Vector2) -> void:
 	if _sprite == null or dir.length_squared() <= 0.001:
 		return
@@ -670,32 +756,48 @@ func _draw_phase_one_environment(room_rect: Rect2) -> void:
 	for i in PHASE_ENV_SNOW_COUNT:
 		var x: float = room_rect.position.x + fmod(_phase_visual_time * 18.0 + float(i * 47), room_rect.size.x)
 		var y: float = room_rect.position.y + fmod(_phase_visual_time * 34.0 + float(i * 83), room_rect.size.y)
-		var radius: float = 1.2 + float(i % 3) * 0.45
-		draw_circle(Vector2(x, y), radius, Color(0.9, 0.97, 1.0, 0.42))
+		var size := Vector2.ONE * (12.0 + float(i % 4) * 3.0)
+		var alpha := 0.18 + float(i % 3) * 0.08
+		_draw_texture_centered(_phase1_snow_texture, Vector2(x, y), size, Color(1.0, 1.0, 1.0, alpha))
 
 
 func _draw_phase_two_environment(room_rect: Rect2) -> void:
 	draw_rect(room_rect, Color(0.2, 0.62, 0.95, 0.14), true)
-	var pulse: float = sin(_phase_visual_time * 7.0) * 0.5 + 0.5
-	for i in 8:
-		var radius: float = 42.0 + float(i) * 28.0 + pulse * 10.0
-		var start_angle: float = _phase_visual_time * 3.4 + float(i) * 0.7
-		draw_arc(Vector2.ZERO, radius, start_angle, start_angle + PI * 1.35, 42, Color(0.78, 0.95, 1.0, 0.22), 2.2)
-	for i in 10:
-		var offset: float = fmod(_phase_visual_time * 90.0 + float(i * 72), room_rect.size.x + room_rect.size.y)
-		var from: Vector2 = room_rect.position + Vector2(offset - room_rect.size.y, 0.0)
-		var to: Vector2 = from + Vector2(room_rect.size.y, room_rect.size.y)
-		draw_line(from, to, Color(0.82, 0.96, 1.0, 0.16), 2.0)
+	var vortex := _get_looping_frame(_phase2_vortex_frames, ENV_PHASE2_VORTEX_FPS)
+	var pulse := sin(_phase_visual_time * 5.0) * 0.5 + 0.5
+	_draw_texture_centered(vortex, Vector2.ZERO, Vector2.ONE * (300.0 + pulse * 28.0), Color(0.8, 0.95, 1.0, 0.7))
+	_draw_texture_centered(vortex, Vector2.ZERO, Vector2.ONE * (430.0 + pulse * 34.0), Color(0.65, 0.88, 1.0, 0.28))
 
 
 func _draw_phase_three_environment(room_rect: Rect2) -> void:
 	draw_rect(room_rect, Color(0.06, 0.12, 0.18, 0.18), true)
-	var pulse: float = sin(_phase_visual_time * 9.0) * 0.5 + 0.5
-	draw_circle(Vector2.ZERO, 54.0 + pulse * 18.0, Color(1.0, 0.78, 0.28, 0.08))
-	draw_arc(Vector2.ZERO, 82.0 + pulse * 24.0, 0.0, TAU, 52, Color(1.0, 0.74, 0.18, 0.26), 3.0)
-	for i in PHASE_ENV_CRACK_COUNT:
-		var angle: float = float(i) * TAU / float(PHASE_ENV_CRACK_COUNT) + sin(_phase_visual_time * 2.0) * 0.08
-		var length: float = 86.0 + float((i * 19) % 70)
-		var start: Vector2 = Vector2(cos(angle), sin(angle)) * 34.0
-		var end: Vector2 = Vector2(cos(angle), sin(angle)) * length
-		draw_line(start, end, Color(1.0, 0.82, 0.38, 0.22), 2.0)
+	var aura := _get_looping_frame(_phase3_rage_aura_frames, ENV_PHASE3_RAGE_AURA_FPS)
+	var pulse := sin(_phase_visual_time * 7.0) * 0.5 + 0.5
+	_draw_texture_centered(aura, Vector2.ZERO, Vector2.ONE * (280.0 + pulse * 30.0), Color(1.0, 0.92, 0.72, 0.82))
+	_draw_phase_three_ice_shards(room_rect)
+	_draw_landing_impact()
+
+
+func _draw_phase_three_ice_shards(room_rect: Rect2) -> void:
+	if _phase3_ice_shards.is_empty():
+		return
+	var positions := [
+		Vector2(room_rect.position.x + room_rect.size.x * 0.18, room_rect.position.y + room_rect.size.y * 0.25),
+		Vector2(room_rect.position.x + room_rect.size.x * 0.82, room_rect.position.y + room_rect.size.y * 0.22),
+		Vector2(room_rect.position.x + room_rect.size.x * 0.28, room_rect.position.y + room_rect.size.y * 0.78),
+		Vector2(room_rect.position.x + room_rect.size.x * 0.76, room_rect.position.y + room_rect.size.y * 0.74),
+	]
+	for i in positions.size():
+		var texture := _phase3_ice_shards[i % _phase3_ice_shards.size()]
+		var size := texture.get_size() * (0.85 + float(i % 2) * 0.18)
+		_draw_texture_centered(texture, positions[i], size, Color(1.0, 1.0, 1.0, 0.72))
+
+
+func _draw_landing_impact() -> void:
+	if _landing_impact_timer <= 0.0 or _phase3_landing_impact_frames.is_empty():
+		return
+	var duration := float(_phase3_landing_impact_frames.size()) / ENV_PHASE3_LANDING_IMPACT_FPS
+	var progress := clampf(1.0 - _landing_impact_timer / maxf(duration, 0.001), 0.0, 0.999)
+	var frame_index := mini(int(floor(progress * float(_phase3_landing_impact_frames.size()))), _phase3_landing_impact_frames.size() - 1)
+	var texture := _phase3_landing_impact_frames[frame_index]
+	_draw_texture_centered(texture, to_local(_landing_impact_position), Vector2(220.0, 154.0), Color(1.0, 1.0, 1.0, 0.88))

@@ -24,6 +24,9 @@ const GUI_ACTION_BERSERK_ICON := preload("res://assets/export/gui/btn-狂暴.png
 const GUI_WEAPON_BASKETBALL_ICON := preload("res://assets/export/gui/btn-weapon1.png")
 const GUI_WEAPON_MAN_GUN_ICON := preload("res://assets/export/gui/btn-weapon2.png")
 const GUI_WEAPON_LASER_GUN_ICON := preload("res://assets/export/gui/btn-weapon3.png")
+const HUD_SCENE := preload("res://scenes/ui/Hud.tscn")
+const PAUSE_MENU_SCENE := preload("res://scenes/ui/PauseMenu.tscn")
+const REVIVE_PANEL_SCENE := preload("res://scenes/ui/ReviveCountdownPanel.tscn")
 const BASKETBALL_HEAD_NORMAL_1_PATH := "res://assets/export/weapon/weapon_01/2.png"
 const BASKETBALL_HEAD_NORMAL_2_PATH := "res://assets/export/weapon/weapon_01/3.png"
 const BASKETBALL_HEAD_BERSERK_PATH := "res://assets/export/weapon/weapon_01/dunk.png"
@@ -92,6 +95,7 @@ const CORRIDOR_W := int(VS.CORRIDOR_WIDTH)
 const WALL_T := int(VS.WALL_THICKNESS)
 const DOOR_COLLISION_LAYER := 16
 const MAP_TILE_SIZE := 32.0
+const MAX_RANDOM_CHESTS_PER_ROOM := 2
 
 const GRID_SIZE := 5
 const CENTER := Vector2i(2, 2)
@@ -186,6 +190,9 @@ var _action_button_feedback: Dictionary = {}
 var _message_panel: Control
 var _message_scroll: ScrollContainer
 var _message_list: VBoxContainer
+var _hp_bar_max_width := STATUS_FILL_W
+var _shield_bar_max_width := STATUS_FILL_W
+var _mana_bar_max_width := STATUS_FILL_W
 
 
 func _ready() -> void:
@@ -770,10 +777,43 @@ func _room_cleared(room: RoomData) -> void:
 
 
 func _spawn_chest(pos: Vector2) -> void:
+	var room_pos := _world_to_room_grid_pos(pos)
+	if not _can_spawn_random_chest_in_room(room_pos):
+		return
 	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
 	var chest: Area2D = chest_scene.instantiate()
 	chest.position = pos
 	add_child(chest)
+
+
+func _world_to_room_grid_pos(pos: Vector2) -> Vector2i:
+	return Vector2i(floori(pos.x / float(CELL_W)), floori(pos.y / float(CELL_H)))
+
+
+func _can_spawn_random_chest_in_room(room_pos: Vector2i) -> bool:
+	if room_pos not in _rooms:
+		return false
+	var room: RoomData = _rooms[room_pos]
+	if room.is_start or room.is_boss:
+		return false
+	return _count_random_chests_in_room(room_pos) < MAX_RANDOM_CHESTS_PER_ROOM
+
+
+func _count_random_chests_in_room(room_pos: Vector2i) -> int:
+	var count := 0
+	for node in get_tree().get_nodes_in_group("chest"):
+		if not is_instance_valid(node):
+			continue
+		var chest := node as Area2D
+		if chest == null:
+			continue
+		if bool(chest.get("is_start_supply")) or bool(chest.get("is_weapon_choice")):
+			continue
+		if bool(chest.get("_opened")):
+			continue
+		if _world_to_room_grid_pos(chest.global_position) == room_pos:
+			count += 1
+	return count
 
 
 func _spawn_weapon_chest(room_pos: Vector2i) -> void:
@@ -1039,165 +1079,69 @@ func _physics_process(_delta: float) -> void:
 # ── HUD ──────────────────────────────────────────────
 
 func _create_hud() -> void:
-	var canvas := CanvasLayer.new()
-	canvas.layer = 10
-	canvas.process_mode = Node.PROCESS_MODE_ALWAYS
+	var canvas := HUD_SCENE.instantiate() as CanvasLayer
 	add_child(canvas)
 
-	_fps_label = Label.new()
-	_fps_label.visible = false
-	canvas.add_child(_fps_label)
+	_fps_label = canvas.get_node("FpsLabel") as Label
+	_kills_label = canvas.get_node("KillsLabel") as Label
+	_weapon_label = canvas.get_node("WeaponLabel") as Label
+	_hud_frame = canvas.get_node("StatusPanel/HudFrame") as Control
+	_hp_bar = canvas.get_node("StatusPanel/HpFill") as TextureRect
+	_hp_bar_bg = canvas.get_node("StatusPanel/HpFrame") as TextureRect
+	_hp_text = canvas.get_node("StatusPanel/HpText") as Label
+	_shield_bar = canvas.get_node("StatusPanel/ArmorFill") as TextureRect
+	_shield_bar_bg = canvas.get_node("StatusPanel/ArmorFrame") as TextureRect
+	_shield_text = canvas.get_node("StatusPanel/ArmorText") as Label
+	_mana_bar = canvas.get_node("StatusPanel/ManaFill") as TextureRect
+	_mana_bar_bg = canvas.get_node("StatusPanel/ManaFrame") as TextureRect
+	_mana_text = canvas.get_node("StatusPanel/ManaText") as Label
+	_hp_bar_max_width = _hp_bar.size.x
+	_shield_bar_max_width = _shield_bar.size.x
+	_mana_bar_max_width = _mana_bar.size.x
 
-	_kills_label = Label.new()
-	_kills_label.visible = false
-	canvas.add_child(_kills_label)
+	_practice_panel = canvas.get_node("PracticePanel") as Control
+	_practice_label = canvas.get_node("PracticePanel/PracticeLabel") as Label
+	_coin_panel = canvas.get_node("CoinPanel") as Control
+	_coin_label = canvas.get_node("CoinPanel/CoinLabel") as Label
 
-	_hud_frame = Control.new()
-	_hud_frame.position = STATUS_POS
-	_hud_frame.size = STATUS_PANEL_SIZE
-	_hud_frame.z_index = 0
-	_hud_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hud_frame.draw.connect(_draw_stats_frame)
-	canvas.add_child(_hud_frame)
-
-	_hp_bar = _add_hud_texture(canvas, GUI_HUD_BAR_FILL_HP, STATUS_POS + Vector2(STATUS_BAR_POS_X + STATUS_BAR_FILL_OFFSET_X, 18.0 + STATUS_BAR_FILL_OFFSET_Y), Vector2(STATUS_FILL_W, STATUS_FILL_H), 1)
-	_hp_bar_bg = _add_hud_texture(canvas, GUI_HUD_BAR_FRAME, STATUS_POS + Vector2(STATUS_BAR_POS_X, 18.0), STATUS_BAR_FRAME_SIZE, 2)
-	_add_hud_texture(canvas, GUI_HUD_ICON_HP, STATUS_POS + Vector2(14.0, 16.0), STATUS_ICON_SIZE, 3)
-	_hp_text = _make_hud_value_label(STATUS_POS + Vector2(76.0, 16.0), Color.WHITE)
-	_hp_text.z_index = 4
-	canvas.add_child(_hp_text)
-
-	_shield_bar = _add_hud_texture(canvas, GUI_HUD_BAR_FILL_ARMOR, STATUS_POS + Vector2(STATUS_BAR_POS_X + STATUS_BAR_FILL_OFFSET_X, 45.0 + STATUS_BAR_FILL_OFFSET_Y), Vector2(STATUS_FILL_W, STATUS_FILL_H), 1)
-	_shield_bar_bg = _add_hud_texture(canvas, GUI_HUD_BAR_FRAME, STATUS_POS + Vector2(STATUS_BAR_POS_X, 45.0), STATUS_BAR_FRAME_SIZE, 2)
-	_add_hud_texture(canvas, GUI_HUD_ICON_ARMOR, STATUS_POS + Vector2(14.0, 43.0), STATUS_ICON_SIZE, 3)
-	_shield_text = _make_hud_value_label(STATUS_POS + Vector2(76.0, 43.0), Color.WHITE)
-	_shield_text.z_index = 4
-	canvas.add_child(_shield_text)
-
-	_mana_bar = _add_hud_texture(canvas, GUI_HUD_BAR_FILL_MANA, STATUS_POS + Vector2(STATUS_BAR_POS_X + STATUS_BAR_FILL_OFFSET_X, 72.0 + STATUS_BAR_FILL_OFFSET_Y), Vector2(STATUS_FILL_W, STATUS_FILL_H), 1)
-	_mana_bar_bg = _add_hud_texture(canvas, GUI_HUD_BAR_FRAME, STATUS_POS + Vector2(STATUS_BAR_POS_X, 72.0), STATUS_BAR_FRAME_SIZE, 2)
-	_add_hud_texture(canvas, GUI_HUD_ICON_MANA, STATUS_POS + Vector2(14.0, 70.0), STATUS_ICON_SIZE, 3)
-	_mana_text = _make_hud_value_label(STATUS_POS + Vector2(76.0, 70.0), Color.WHITE)
-	_mana_text.z_index = 4
-	canvas.add_child(_mana_text)
-
-	_weapon_label = Label.new()
-	_weapon_label.visible = false
-	canvas.add_child(_weapon_label)
-
-	_practice_panel = Control.new()
-	_practice_panel.position = Vector2(584, 14)
-	_practice_panel.size = HUD_CURRENCY_PANEL_SIZE
-	_practice_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_practice_panel.draw.connect(_draw_practice_panel)
-	canvas.add_child(_practice_panel)
-
-	_practice_label = Label.new()
-	_practice_label.position = Vector2(632, 26)
-	_practice_label.size = Vector2(78, 22)
-	_practice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_practice_label.add_theme_font_size_override("font_size", 18)
-	_practice_label.add_theme_color_override("font_color", Color.WHITE)
-	canvas.add_child(_practice_label)
-
-	_coin_panel = Control.new()
-	_coin_panel.position = Vector2(730, 14)
-	_coin_panel.size = HUD_CURRENCY_PANEL_SIZE
-	_coin_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_coin_panel.draw.connect(_draw_coin_panel)
-	canvas.add_child(_coin_panel)
-
-	_coin_label = Label.new()
-	_coin_label.position = Vector2(778, 26)
-	_coin_label.size = Vector2(78, 22)
-	_coin_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_coin_label.add_theme_font_size_override("font_size", 18)
-	_coin_label.add_theme_color_override("font_color", Color.WHITE)
-	canvas.add_child(_coin_label)
-
-	_pause_button = Control.new()
-	_pause_button.position = Vector2(902, 14)
-	_pause_button.size = Vector2(44, 44)
-	_pause_button.mouse_filter = Control.MOUSE_FILTER_STOP
-	_pause_button.draw.connect(_draw_pause_button)
+	_pause_button = canvas.get_node("PauseButton") as Control
 	_pause_button.gui_input.connect(_on_pause_button_input)
-	canvas.add_child(_pause_button)
-
-	_bag_button = Control.new()
-	_bag_button.position = Vector2(536, 14)
-	_bag_button.size = Vector2(40, 44)
-	_bag_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_bag_button = canvas.get_node("BagButton") as Control
 	_bag_button.draw.connect(_draw_bag_button)
 	_bag_button.gui_input.connect(_on_bag_button_input)
-	canvas.add_child(_bag_button)
 
-	var kill_boss_test_button := Button.new()
-	kill_boss_test_button.text = "秒杀Boss"
-	kill_boss_test_button.position = Vector2(306, 64)
-	kill_boss_test_button.size = Vector2(88, 30)
-	kill_boss_test_button.focus_mode = Control.FOCUS_NONE
-	kill_boss_test_button.add_theme_font_size_override("font_size", 15)
+	var kill_boss_test_button := canvas.get_node("KillBossTestButton") as Button
 	kill_boss_test_button.pressed.connect(_on_kill_boss_test_pressed)
-	canvas.add_child(kill_boss_test_button)
 
-	_invincible_test_button = Button.new()
-	_invincible_test_button.text = "无敌测试"
-	_invincible_test_button.position = Vector2(410, 64)
-	_invincible_test_button.size = Vector2(88, 30)
-	_invincible_test_button.focus_mode = Control.FOCUS_NONE
-	_invincible_test_button.add_theme_font_size_override("font_size", 15)
+	_invincible_test_button = canvas.get_node("InvincibleTestButton") as Button
 	_invincible_test_button.pressed.connect(_on_invincible_test_pressed)
-	canvas.add_child(_invincible_test_button)
 
-	var boss_test_button := Button.new()
-	boss_test_button.text = "Boss测试"
-	boss_test_button.position = Vector2(514, 64)
-	boss_test_button.size = Vector2(88, 30)
-	boss_test_button.focus_mode = Control.FOCUS_NONE
-	boss_test_button.add_theme_font_size_override("font_size", 15)
+	var boss_test_button := canvas.get_node("BossTestButton") as Button
 	boss_test_button.pressed.connect(_on_boss_test_pressed)
-	canvas.add_child(boss_test_button)
 
-	_attack_icon = Control.new()
-	_attack_icon.position = Vector2(ACTION_J_X, ACTION_ROW_Y)
-	_attack_icon.size = ACTION_CONTROL_SIZE
-	_attack_icon.mouse_filter = Control.MOUSE_FILTER_STOP
+	_attack_icon = canvas.get_node("AttackIcon") as Control
 	_attack_icon.draw.connect(_draw_attack_icon)
 	_attack_icon.gui_input.connect(_on_action_button_input.bind("shoot"))
-	canvas.add_child(_attack_icon)
 
-	_switch_icon = Control.new()
-	_switch_icon.position = Vector2(ACTION_Q_X, ACTION_ROW_Y)
-	_switch_icon.size = ACTION_CONTROL_SIZE
-	_switch_icon.mouse_filter = Control.MOUSE_FILTER_STOP
+	_switch_icon = canvas.get_node("SwitchIcon") as Control
 	_switch_icon.draw.connect(_draw_switch_icon)
 	_switch_icon.gui_input.connect(_on_action_button_input.bind("switch_weapon"))
-	canvas.add_child(_switch_icon)
 
-	_dash_icon = Control.new()
-	_dash_icon.position = Vector2(ACTION_K_X, ACTION_ROW_Y)
-	_dash_icon.size = ACTION_CONTROL_SIZE
-	_dash_icon.mouse_filter = Control.MOUSE_FILTER_STOP
+	_dash_icon = canvas.get_node("DashIcon") as Control
 	_dash_icon.draw.connect(_draw_dash_icon)
 	_dash_icon.gui_input.connect(_on_action_button_input.bind("dash"))
-	canvas.add_child(_dash_icon)
 
-	_berserk_icon = Control.new()
-	_berserk_icon.position = Vector2(ACTION_L_X, ACTION_ROW_Y)
-	_berserk_icon.size = ACTION_CONTROL_SIZE
-	_berserk_icon.mouse_filter = Control.MOUSE_FILTER_STOP
+	_berserk_icon = canvas.get_node("BerserkIcon") as Control
 	_berserk_icon.draw.connect(_draw_berserk_icon)
 	_berserk_icon.gui_input.connect(_on_action_button_input.bind("berserk"))
-	canvas.add_child(_berserk_icon)
 
-	# Buff 状态栏
-	_buff_bar = Control.new()
-	_buff_bar.position = Vector2(218, 22)
-	_buff_bar.size = Vector2(130, 28)
+	_buff_bar = canvas.get_node("BuffBar") as Control
 	_buff_bar.draw.connect(_draw_buff_bar)
-	canvas.add_child(_buff_bar)
 
-	_create_message_panel(canvas)
+	_message_panel = canvas.get_node("MessagePanel") as Control
+	_message_panel.draw.connect(_draw_message_panel)
+	_message_scroll = canvas.get_node("MessagePanel/MessageScroll") as ScrollContainer
+	_message_list = canvas.get_node("MessagePanel/MessageScroll/MessageList") as VBoxContainer
 
 
 func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
@@ -1325,7 +1269,6 @@ func _draw_pause_button() -> void:
 
 
 func _draw_bag_button() -> void:
-	_bag_button.draw_texture_rect(GUI_BAG_ICON, Rect2(Vector2(2, 0), Vector2(36, 36)), false)
 	_draw_button_key(_bag_button, "B", Color(0.98, 0.90, 0.62))
 
 
@@ -1697,12 +1640,12 @@ func _process(delta: float) -> void:
 	_mana_text.text = "%d/%d" % [int($Player.mana), int($Player.MAX_MANA)]
 
 	var mana_ratio: float = $Player.mana / $Player.MAX_MANA
-	_mana_bar.size.x = STATUS_FILL_W * clampf(mana_ratio, 0.0, 1.0)
+	_mana_bar.size.x = _mana_bar_max_width * clampf(mana_ratio, 0.0, 1.0)
 	var hp_ratio: float = float($Player.hp) / float($Player.MAX_HP)
-	_hp_bar.size.x = STATUS_FILL_W * clampf(hp_ratio, 0.0, 1.0)
+	_hp_bar.size.x = _hp_bar_max_width * clampf(hp_ratio, 0.0, 1.0)
 	_hp_bar.modulate = Color.WHITE
 	var armor_ratio := 0.0 if $Player.max_armor <= 0 else float($Player.armor) / float($Player.max_armor)
-	_shield_bar.size.x = STATUS_FILL_W * clampf(armor_ratio, 0.0, 1.0)
+	_shield_bar.size.x = _shield_bar_max_width * clampf(armor_ratio, 0.0, 1.0)
 	_shield_bar.visible = $Player.armor > 0
 	_shield_bar_bg.visible = true
 	_shield_text.visible = true
@@ -1795,7 +1738,7 @@ func _on_player_hit() -> void:
 
 func _on_player_hp_changed(current: int, max_hp: int) -> void:
 	var ratio := float(current) / float(max_hp)
-	_hp_bar.size.x = STATUS_FILL_W * ratio
+	_hp_bar.size.x = _hp_bar_max_width * ratio
 	if ratio > 0.3:
 		_hp_bar.modulate = Color(0.0, 0.8, 0.2).lerp(Color.WHITE, ratio)
 	else:
@@ -1936,43 +1879,12 @@ func _finish_boss_settlement() -> void:
 func _show_revive_ui() -> void:
 	if _revive_canvas != null:
 		_revive_canvas.queue_free()
-	_revive_canvas = CanvasLayer.new()
+	_revive_canvas = REVIVE_PANEL_SCENE.instantiate() as CanvasLayer
 	_revive_canvas.layer = 28
 	add_child(_revive_canvas)
 
-	PopupGui.add_overlay(_revive_canvas)
-	var panel := PopupGui.add_panel(_revive_canvas)
-	PopupGui.add_title(_revive_canvas, "复活倒计时", "res://assets/export/gui/icon_talent_point.png")
-
-	# 标题
-	var title := Label.new()
-	title.text = "是否消耗复活币继续战斗？"
-	title.size = Vector2(690, 32)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 24)
-	title.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
-	title.position = panel.position + Vector2(30, 118)
-	_revive_canvas.add_child(title)
-
-	# 倒计时
-	_revive_countdown_label = Label.new()
+	_revive_countdown_label = _revive_canvas.get_node("CountdownLabel") as Label
 	_revive_countdown_label.text = "10"
-	_revive_countdown_label.add_theme_font_size_override("font_size", 48)
-	_revive_countdown_label.add_theme_color_override("font_color", Color(1.0, 0.41, 0.71))
-	_revive_countdown_label.size = Vector2(750, 64)
-	_revive_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_revive_countdown_label.position = panel.position + Vector2(0, 180)
-	_revive_canvas.add_child(_revive_countdown_label)
-
-	# 提示
-	var hint := Label.new()
-	hint.text = "点击复活 / ESC 放弃"
-	hint.size = Vector2(690, 24)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", 16)
-	hint.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-	hint.position = panel.position + Vector2(30, 270)
-	_revive_canvas.add_child(hint)
 
 
 func _hide_revive_ui() -> void:
@@ -2068,26 +1980,18 @@ func _input(event: InputEvent) -> void:
 func _show_pause_menu() -> void:
 	if _pause_canvas != null:
 		return
-	_pause_canvas = CanvasLayer.new()
+	_pause_canvas = PAUSE_MENU_SCENE.instantiate() as CanvasLayer
 	_pause_canvas.layer = 35
 	_pause_canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_pause_canvas)
 
-	PopupGui.add_overlay(_pause_canvas)
-	var panel := PopupGui.add_panel(_pause_canvas)
-	PopupGui.add_title(_pause_canvas, "已暂停", "res://assets/export/gui/btn_pause.png")
+	var continue_button := _pause_canvas.get_node("ContinueButton") as Button
+	continue_button.pressed.connect(GameAudio.play_button)
+	continue_button.pressed.connect(_resume_from_pause_menu)
 
-	var hint := Label.new()
-	hint.text = "ESC / P 继续游戏"
-	hint.position = panel.position + Vector2(0, 150)
-	hint.size = Vector2(PopupGui.PANEL_SIZE.x, 28)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", 20)
-	hint.add_theme_color_override("font_color", Color(0.82, 0.92, 1.0))
-	_pause_canvas.add_child(hint)
-
-	PopupGui.add_confirm_button(_pause_canvas, panel.position + Vector2(286, 230), "继续", Callable(self, "_resume_from_pause_menu"))
-	PopupGui.add_normal_button(_pause_canvas, panel.position + Vector2(286, 296), "返回大厅", Callable(self, "_return_to_lobby_from_pause_menu"))
+	var return_button := _pause_canvas.get_node("ReturnLobbyButton") as Button
+	return_button.pressed.connect(GameAudio.play_button)
+	return_button.pressed.connect(_return_to_lobby_from_pause_menu)
 
 
 func _hide_pause_menu() -> void:

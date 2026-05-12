@@ -4,6 +4,7 @@ extends Node
 
 const VS := preload("res://scripts/visual_spec.gd")
 const PopupGui := preload("res://scripts/popup_gui.gd")
+const EQUIPMENT_PANEL_SCENE := preload("res://scenes/ui/EquipmentPanel.tscn")
 const EQUIP_SLOT_TEXTURE := preload("res://assets/export/gui/ui_popup_slot.png")
 const EQUIP_SLOT_SELECTED_TEXTURE := preload("res://assets/export/gui/ui_popup_slot_selected.png")
 const EQUIP_LOCK_TEXTURE := preload("res://assets/export/gui/ui_badge_locked.png")
@@ -56,59 +57,32 @@ func _build_ui() -> void:
 	_bp_draw = null
 	_drag_draw = null
 
-	var panel_pos := PopupGui.panel_position()
-	PopupGui.add_overlay(_canvas, Control.MOUSE_FILTER_IGNORE)
-	var panel := PopupGui.add_panel(_canvas)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	PopupGui.add_title(_canvas, "背包", "res://assets/export/gui/icon_bag.png")
+	var shell := EQUIPMENT_PANEL_SCENE.instantiate() as Control
+	_canvas.add_child(shell)
 
-	# 装备槽标题
-	var eq_label := Label.new()
-	eq_label.text = "装备槽（Q键切换武器）"
-	eq_label.position = panel_pos + Vector2(40.0, 78.0)
-	eq_label.add_theme_font_size_override("font_size", 16)
-	eq_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))
-	_canvas.add_child(eq_label)
-
-	# 绘制装备槽
-	var eq_draw := Control.new()
-	eq_draw.size = Vector2(690, 112)
-	eq_draw.position = EQUIPPED_AREA_POS
+	var eq_draw := shell.get_node("EquippedDraw") as Control
 	eq_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	eq_draw.draw.connect(_draw_equipped_slots)
-	_canvas.add_child(eq_draw)
 	_eq_draw = eq_draw
 
-	# 背包标题
-	var bp_label := Label.new()
-	bp_label.text = "背包（未装备）"
-	bp_label.position = panel_pos + Vector2(40.0, 228.0)
-	bp_label.add_theme_font_size_override("font_size", 16)
-	bp_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))
-	_canvas.add_child(bp_label)
-
-	# 绘制背包
-	var bp_draw := Control.new()
-	bp_draw.size = Vector2(690, 136)
-	bp_draw.position = BACKPACK_AREA_POS
+	var bp_draw := shell.get_node("BackpackDraw") as Control
 	bp_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bp_draw.draw.connect(_draw_backpack)
-	_canvas.add_child(bp_draw)
 	_bp_draw = bp_draw
 
-	var input_layer := Control.new()
+	var input_layer := shell.get_node("InputLayer") as Control
 	input_layer.size = INPUT_SIZE
 	input_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	input_layer.gui_input.connect(_on_panel_input)
-	_canvas.add_child(input_layer)
 
-	_drag_draw = Control.new()
+	_drag_draw = shell.get_node("DragDraw") as Control
 	_drag_draw.size = INPUT_SIZE
 	_drag_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_drag_draw.draw.connect(_draw_drag_preview)
-	_canvas.add_child(_drag_draw)
 
-	PopupGui.add_close_button(_canvas, Callable(self, "_close"))
+	var close_button := shell.get_node("CloseButton") as Button
+	close_button.pressed.connect(GameAudio.play_button)
+	close_button.pressed.connect(_close)
 
 	# 解锁确认对话框
 	if _confirm_open:
@@ -332,6 +306,8 @@ func _get_backpack_weapons() -> Array:
 func _get_backpack_index_at(panel_pos: Vector2) -> int:
 	var backpack := _get_backpack_weapons()
 	var base := BACKPACK_AREA_POS + SLOT_OFFSET
+	if _bp_draw != null:
+		base = _bp_draw.global_position + SLOT_OFFSET
 	for i in backpack.size():
 		var rect := Rect2(base + Vector2(i * (SLOT_W + SLOT_GAP), 0.0), Vector2(SLOT_W, SLOT_H))
 		if rect.has_point(panel_pos):
@@ -341,6 +317,8 @@ func _get_backpack_index_at(panel_pos: Vector2) -> int:
 
 func _get_equipped_slot_at(panel_pos: Vector2) -> int:
 	var base := EQUIPPED_AREA_POS + SLOT_OFFSET
+	if _eq_draw != null:
+		base = _eq_draw.global_position + SLOT_OFFSET
 	for i in range(5):
 		var rect := Rect2(base + Vector2(i * (SLOT_W + SLOT_GAP), 0.0), Vector2(SLOT_W, SLOT_H))
 		if rect.has_point(panel_pos):

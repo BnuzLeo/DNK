@@ -23,6 +23,12 @@ const GOLD_CHEST_FRAME_PATHS := [
 ]
 const GOLD_CHEST_DISPLAY_SIZE := 58.0
 const GOLD_CHEST_FRAME_TIME := 0.12
+const NORMAL_CHEST_FRAME_DIRS := [
+	"res://assets/export/decoration/brown_chest_idle_frames",
+	"res://assets/export/decoration/white_chest_idle_frames",
+]
+const NORMAL_CHEST_DISPLAY_SIZE := 50.0
+const NORMAL_CHEST_FRAME_TIME := 0.08
 
 var _opened := false
 var _bounce_timer := 0.0
@@ -33,6 +39,9 @@ var _near_player: Node = null
 var _gold_chest_frames: Array[Texture2D] = []
 var _gold_frame_index := 0
 var _gold_frame_timer := 0.0
+var _normal_chest_frames: Array[Texture2D] = []
+var _normal_frame_index := 0
+var _normal_frame_timer := 0.0
 
 var is_weapon_choice := false  # 起始房间 3 选 1 模式
 var is_start_supply := false
@@ -52,6 +61,7 @@ func _ready() -> void:
 		_configure_start_supply_collision()
 		set_process_input(true)
 	elif not is_weapon_choice:
+		_load_random_normal_chest_frames()
 		_pick_reward()
 	_bounce_timer = randf() * TAU
 
@@ -108,6 +118,11 @@ func _physics_process(delta: float) -> void:
 		if _gold_frame_timer >= GOLD_CHEST_FRAME_TIME:
 			_gold_frame_timer = fmod(_gold_frame_timer, GOLD_CHEST_FRAME_TIME)
 			_gold_frame_index = (_gold_frame_index + 1) % _gold_chest_frames.size()
+	elif not is_weapon_choice and not _normal_chest_frames.is_empty():
+		_normal_frame_timer += delta
+		if _normal_frame_timer >= NORMAL_CHEST_FRAME_TIME:
+			_normal_frame_timer = fmod(_normal_frame_timer, NORMAL_CHEST_FRAME_TIME)
+			_normal_frame_index = (_normal_frame_index + 1) % _normal_chest_frames.size()
 	queue_redraw()
 
 
@@ -221,6 +236,32 @@ func _load_gold_chest_frames() -> void:
 		var texture := load(path) as Texture2D
 		if texture != null:
 			_gold_chest_frames.append(texture)
+
+
+func _load_random_normal_chest_frames() -> void:
+	_normal_chest_frames.clear()
+	_normal_frame_index = 0
+	_normal_frame_timer = 0.0
+	if NORMAL_CHEST_FRAME_DIRS.is_empty():
+		return
+	var dir_path := String(NORMAL_CHEST_FRAME_DIRS[randi() % NORMAL_CHEST_FRAME_DIRS.size()])
+	_normal_chest_frames = _load_texture_frames_from_dir(dir_path)
+
+
+func _load_texture_frames_from_dir(dir_path: String) -> Array[Texture2D]:
+	var frames: Array[Texture2D] = []
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return frames
+	var files := dir.get_files()
+	files.sort()
+	for file_name in files:
+		if file_name.get_extension().to_lower() != "png":
+			continue
+		var texture := load(dir_path.path_join(file_name)) as Texture2D
+		if texture != null:
+			frames.append(texture)
+	return frames
 
 
 func _configure_start_supply_collision() -> void:
@@ -474,6 +515,11 @@ func _draw() -> void:
 			draw_arc(base, GOLD_CHEST_DISPLAY_SIZE * 0.42 + pulse * 3.0, 0.0, TAU, 32, Color(1.0, 0.84, 0.0, 0.35 + pulse * 0.2), 2.0)
 			if _near_player != null and is_instance_valid(_near_player):
 				draw_string(ThemeDB.fallback_font, Vector2(-48, -GOLD_CHEST_DISPLAY_SIZE * 0.5 - 18), "按 E 获取补给", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
+		return
+	if not is_weapon_choice and not _normal_chest_frames.is_empty():
+		var texture := _normal_chest_frames[_normal_frame_index]
+		var size := Vector2(NORMAL_CHEST_DISPLAY_SIZE, NORMAL_CHEST_DISPLAY_SIZE)
+		draw_texture_rect(texture, Rect2(base - size * 0.5, size), false)
 		return
 	var col_body := Color(0.2, 0.55, 0.7) if is_weapon_choice else Color(0.55, 0.35, 0.1)
 	var col_lid := Color(0.25, 0.7, 0.9) if is_weapon_choice else Color(0.7, 0.45, 0.15)

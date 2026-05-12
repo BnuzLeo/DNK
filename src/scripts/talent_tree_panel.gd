@@ -2,7 +2,7 @@ extends Node
 
 ## 天赋树面板 — 练习生基地专属
 
-const PopupGui := preload("res://scripts/popup_gui.gd")
+const TALENT_PANEL_SCENE := preload("res://scenes/ui/TalentTreePanel.tscn")
 const TALENT_SLOT := preload("res://assets/export/gui/ui_popup_slot.png")
 const TALENT_SLOT_SELECTED := preload("res://assets/export/gui/ui_popup_slot_selected.png")
 const TALENT_POINT_ICON := preload("res://assets/export/gui/icon_talent_point.png")
@@ -26,6 +26,7 @@ const BRANCH_COLORS := {
 
 # 连线定义 [from_key, to_key]
 var _connections: Array[Array] = []
+var _tree_draw: Control
 
 
 func _init() -> void:
@@ -166,38 +167,25 @@ func _build_ui() -> void:
 	for child in _canvas.get_children():
 		child.queue_free()
 
-	var panel_pos := PopupGui.panel_position()
-	PopupGui.add_overlay(_canvas, Control.MOUSE_FILTER_IGNORE)
-	var panel := PopupGui.add_panel(_canvas)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	PopupGui.add_title(_canvas, "天赋树", "res://assets/export/gui/icon_talent.png")
-	PopupGui.add_close_button(_canvas, Callable(self, "_save_apply_and_close"))
+	var shell := TALENT_PANEL_SCENE.instantiate() as Control
+	_canvas.add_child(shell)
 
-	# 练习时长
-	var pt_label := Label.new()
+	var close_button := shell.get_node("CloseButton") as Button
+	close_button.pressed.connect(GameAudio.play_button)
+	close_button.pressed.connect(_save_apply_and_close)
+
+	var reset_button := shell.get_node("ResetButton") as Button
+	reset_button.pressed.connect(GameAudio.play_button)
+	reset_button.pressed.connect(_reset_talents)
+
+	var pt_label := shell.get_node("PracticeLabel") as Label
 	pt_label.text = "练习时长: %d" % GameManager.practice_time
-	pt_label.position = panel_pos + Vector2(560, 84)
-	pt_label.add_theme_font_size_override("font_size", 16)
-	pt_label.add_theme_color_override("font_color", Color(0.4, 0.8, 1.0))
-	_canvas.add_child(pt_label)
 
-	# 重置按钮
-	PopupGui.add_normal_button(_canvas, panel_pos + Vector2(44, 74), "重置", Callable(self, "_reset_talents"))
-
-	# 状态提示
-	_status_label = Label.new()
+	_status_label = shell.get_node("StatusLabel") as Label
 	_status_label.text = _status_msg
-	_status_label.position = panel_pos + Vector2(300, 452)
-	_status_label.add_theme_font_size_override("font_size", 15)
-	_status_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.3))
-	_canvas.add_child(_status_label)
 
-	# 绘制连线和节点
-	var tree_draw := Control.new()
-	tree_draw.size = Vector2(960, 640)
-	tree_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tree_draw.draw.connect(_draw_tree)
-	_canvas.add_child(tree_draw)
+	_tree_draw = shell.get_node("TreeDraw") as Control
+	_tree_draw.draw.connect(_draw_tree)
 
 
 func _draw_tree() -> void:
@@ -208,7 +196,7 @@ func _draw_tree() -> void:
 		if from_node and to_node:
 			var from_level: int = _node_levels.get(from_node.key, 0)
 			var line_color: Color = from_node.color.darkened(0.3) if from_level > 0 else Color(0.2, 0.2, 0.25)
-			_canvas.get_child(-1).draw_line(from_node.pos, to_node.pos, line_color, 3.0)
+			_tree_draw.draw_line(from_node.pos, to_node.pos, line_color, 3.0)
 
 	# 画节点
 	for node_def in _nodes:
@@ -233,7 +221,7 @@ func _draw_node(node_def: Dictionary) -> void:
 	else:
 		draw_color = color.darkened(0.6) if parent_unlocked else Color(0.15, 0.15, 0.15)
 
-	var node_ctrl := _canvas.get_child(-1)  # tree_draw control
+	var node_ctrl := _tree_draw
 	var slot_rect := Rect2(pos - Vector2(34, 34), Vector2(68, 68))
 	var slot_tex := TALENT_SLOT_SELECTED if level > 0 else TALENT_SLOT
 	var slot_modulate := Color.WHITE if parent_unlocked else Color(0.38, 0.38, 0.42, 0.85)
@@ -284,6 +272,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		get_viewport().set_input_as_handled()
 		var click_pos: Vector2 = event.position
+		if _tree_draw != null:
+			click_pos -= _tree_draw.global_position
 		for node_def in _nodes:
 			if click_pos.distance_to(node_def.pos) < 25.0:
 				_try_upgrade(node_def)

@@ -1,0 +1,381 @@
+[gd_scene format=3 uid="uid://b8u6mabj1gcl7"]
+
+[ext_resource type="Texture2D" uid="uid://cw063ml74gx43" path="res://assets/export/gui/hud_status_panel.png" id="1_status"]
+[ext_resource type="Texture2D" uid="uid://bqxcrdk8hhri0" path="res://assets/export/gui/hud_bar_frame.png" id="2_bar_frame"]
+[ext_resource type="Texture2D" uid="uid://bj8evgsmcqxcm" path="res://assets/export/gui/hud_bar_fill_hp.png" id="3_hp_fill"]
+[ext_resource type="Texture2D" uid="uid://dvffmoyiol2p4" path="res://assets/export/gui/hud_bar_fill_armor.png" id="4_armor_fill"]
+[ext_resource type="Texture2D" uid="uid://c7ufjpuh4gix" path="res://assets/export/gui/hud_bar_fill_mana.png" id="5_mana_fill"]
+[ext_resource type="Texture2D" uid="uid://b1p53i4vdns7p" path="res://assets/export/gui/hud_icon_hp.png" id="6_hp_icon"]
+[ext_resource type="Texture2D" uid="uid://c0lupg6d1tq6k" path="res://assets/export/gui/hud_icon_armor.png" id="7_armor_icon"]
+[ext_resource type="Texture2D" uid="uid://ddxcy8pvon4ec" path="res://assets/export/gui/hud_icon_mana.png" id="8_mana_icon"]
+[ext_resource type="Texture2D" uid="uid://dwbkgy6272nqw" path="res://assets/export/gui/hud_currency_panel.png" id="9_currency"]
+[ext_resource type="Texture2D" uid="uid://bkowu6j0vfw57" path="res://assets/export/gui/hud_icon_practice.png" id="10_practice"]
+[ext_resource type="Texture2D" uid="uid://deafaf1k54ehh" path="res://assets/export/gui/hud_icon_kun_coin.png" id="11_coin"]
+[ext_resource type="Texture2D" uid="uid://bvhpieqw4b3w1" path="res://assets/export/gui/btn_pause.png" id="12_pause"]
+[ext_resource type="Texture2D" uid="uid://dsax3hrls5gmm" path="res://assets/export/gui/icon_bag.png" id="13_bag"]
+
+[node name="Hud" type="CanvasLayer" unique_id=147197020]
+process_mode = 3
+layer = 10
+
+[node name="FpsLabel" type="Label" parent="." unique_id=1718855231]
+visible = false
+
+[node name="KillsLabel" type="Label" parent="." unique_id=1112115684]
+visible = false
+
+[node name="WeaponLabel" type="Label" parent="." unique_id=1548661089]
+visible = false
+
+[node name="StatusPanel" type="Control" parent="." unique_id=825557902]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 18.0
+offset_top = 16.0
+offset_right = 208.0
+offset_bottom = 115.0
+mouse_filter = 2
+
+[node name="HudFrame" type="TextureRect" parent="StatusPanel" unique_id=280310105]
+layout_mode = 0
+offset_right = 190.0
+offset_bottom = 99.0
+mouse_filter = 2
+texture = ExtResource("1_status")
+expand_mode = 1
+
+[node name="HpFill" type="TextureRect" parent="StatusPanel" unique_id=771509857]
+z_index = 1
+layout_mode = 0
+offset_left = 44.0
+offset_top = 18.0
+offset_right = 176.0
+offset_bottom = 36.0
+mouse_filter = 2
+texture = ExtResource("3_hp_fill")
+expand_mode = 1
+
+[node name="HpFrame" type="TextureRect" parent="StatusPanel" unique_id=319202710]
+z_index = 2
+layout_mode = 0
+offset_left = 42.0
+offset_top = 18.0
+offset_right = 178.0
+offset_bottom = 36.0
+mouse_filter = 2
+texture = ExtResource("2_bar_frame")
+expand_mode = 1
+
+[node name="HpIcon" type="TextureRect" parent="StatusPanel" unique_id=246563967]
+z_index = 3
+layout_mode = 0
+offset_left = 14.0
+offset_top = 16.0
+offset_right = 35.0
+offset_bottom = 37.0
+mouse_filter = 2
+texture = ExtResource("6_hp_icon")
+expand_mode = 1
+
+[node name="HpText" type="Label" parent="StatusPanel" unique_id=1182353701]
+z_index = 4
+layout_mode = 0
+offset_left = 76.0
+offset_top = 16.0
+offset_right = 150.0
+offset_bottom = 34.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 1
+
+[node name="ArmorFill" type="TextureRect" parent="StatusPanel" unique_id=1724060115]
+z_index = 1
+layout_mode = 0
+offset_left = 44.0
+offset_top = 45.0
+offset_right = 176.0
+offset_bottom = 63.0
+mouse_filter = 2
+texture = ExtResource("4_armor_fill")
+expand_mode = 1
+
+[node name="ArmorFrame" type="TextureRect" parent="StatusPanel" unique_id=1520773651]
+z_index = 2
+layout_mode = 0
+offset_left = 42.0
+offset_top = 45.0
+offset_right = 178.0
+offset_bottom = 63.0
+mouse_filter = 2
+texture = ExtResource("2_bar_frame")
+expand_mode = 1
+
+[node name="ArmorIcon" type="TextureRect" parent="StatusPanel" unique_id=2052899808]
+z_index = 3
+layout_mode = 0
+offset_left = 14.0
+offset_top = 43.0
+offset_right = 35.0
+offset_bottom = 64.0
+mouse_filter = 2
+texture = ExtResource("7_armor_icon")
+expand_mode = 1
+
+[node name="ArmorText" type="Label" parent="StatusPanel" unique_id=329732876]
+z_index = 4
+layout_mode = 0
+offset_left = 76.0
+offset_top = 43.0
+offset_right = 150.0
+offset_bottom = 61.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 1
+
+[node name="ManaFill" type="TextureRect" parent="StatusPanel" unique_id=1808182254]
+z_index = 1
+layout_mode = 0
+offset_left = 44.0
+offset_top = 72.0
+offset_right = 176.0
+offset_bottom = 90.0
+mouse_filter = 2
+texture = ExtResource("5_mana_fill")
+expand_mode = 1
+
+[node name="ManaFrame" type="TextureRect" parent="StatusPanel" unique_id=1600202082]
+z_index = 2
+layout_mode = 0
+offset_left = 42.0
+offset_top = 72.0
+offset_right = 178.0
+offset_bottom = 90.0
+mouse_filter = 2
+texture = ExtResource("2_bar_frame")
+expand_mode = 1
+
+[node name="ManaIcon" type="TextureRect" parent="StatusPanel" unique_id=1130743496]
+z_index = 3
+layout_mode = 0
+offset_left = 14.0
+offset_top = 70.0
+offset_right = 35.0
+offset_bottom = 91.0
+mouse_filter = 2
+texture = ExtResource("8_mana_icon")
+expand_mode = 1
+
+[node name="ManaText" type="Label" parent="StatusPanel" unique_id=1549038113]
+z_index = 4
+layout_mode = 0
+offset_left = 76.0
+offset_top = 70.0
+offset_right = 150.0
+offset_bottom = 88.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 1
+
+[node name="BagButton" type="Control" parent="." unique_id=378679190]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 536.0
+offset_top = 14.0
+offset_right = 576.0
+offset_bottom = 58.0
+
+[node name="BagIcon" type="TextureRect" parent="BagButton" unique_id=488627411]
+layout_mode = 0
+offset_left = 2.0
+offset_right = 38.0
+offset_bottom = 36.0
+mouse_filter = 2
+texture = ExtResource("13_bag")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PracticePanel" type="TextureRect" parent="." unique_id=638008651]
+offset_left = 584.0
+offset_top = 14.0
+offset_right = 722.0
+offset_bottom = 64.0
+mouse_filter = 2
+texture = ExtResource("9_currency")
+expand_mode = 1
+
+[node name="PracticeIcon" type="TextureRect" parent="PracticePanel" unique_id=50597216]
+layout_mode = 0
+offset_left = 9.0
+offset_top = 8.0
+offset_right = 43.0
+offset_bottom = 42.0
+mouse_filter = 2
+texture = ExtResource("10_practice")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PracticeLabel" type="Label" parent="PracticePanel" unique_id=1679300660]
+layout_mode = 0
+offset_left = 48.0
+offset_top = 12.0
+offset_right = 126.0
+offset_bottom = 34.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+
+[node name="CoinPanel" type="TextureRect" parent="." unique_id=220435216]
+offset_left = 730.0
+offset_top = 14.0
+offset_right = 868.0
+offset_bottom = 64.0
+mouse_filter = 2
+texture = ExtResource("9_currency")
+expand_mode = 1
+
+[node name="CoinIcon" type="TextureRect" parent="CoinPanel" unique_id=812180693]
+layout_mode = 0
+offset_left = 9.0
+offset_top = 8.0
+offset_right = 43.0
+offset_bottom = 42.0
+mouse_filter = 2
+texture = ExtResource("11_coin")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CoinLabel" type="Label" parent="CoinPanel" unique_id=2067850609]
+layout_mode = 0
+offset_left = 48.0
+offset_top = 12.0
+offset_right = 126.0
+offset_bottom = 34.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+
+[node name="PauseButton" type="Control" parent="." unique_id=1263979053]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 902.0
+offset_top = 14.0
+offset_right = 946.0
+offset_bottom = 58.0
+
+[node name="PauseIcon" type="TextureRect" parent="PauseButton" unique_id=414418338]
+layout_mode = 0
+offset_right = 44.0
+offset_bottom = 44.0
+mouse_filter = 2
+texture = ExtResource("12_pause")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="KillBossTestButton" type="Button" parent="." unique_id=597966925]
+offset_left = 234.0
+offset_top = 17.0
+offset_right = 322.0
+offset_bottom = 47.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 15
+text = "秒杀Boss"
+
+[node name="InvincibleTestButton" type="Button" parent="." unique_id=2132295324]
+offset_left = 334.0
+offset_top = 18.0
+offset_right = 422.0
+offset_bottom = 48.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 15
+text = "无敌测试"
+
+[node name="BossTestButton" type="Button" parent="." unique_id=1732314658]
+offset_left = 433.0
+offset_top = 18.0
+offset_right = 521.0
+offset_bottom = 48.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 15
+text = "Boss测试"
+
+[node name="AttackIcon" type="Control" parent="." unique_id=713111163]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 716.0
+offset_top = 530.0
+offset_right = 766.67
+offset_bottom = 608.0
+
+[node name="SwitchIcon" type="Control" parent="." unique_id=474798394]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 646.0
+offset_top = 530.0
+offset_right = 696.67
+offset_bottom = 608.0
+
+[node name="DashIcon" type="Control" parent="." unique_id=1897395583]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 786.0
+offset_top = 530.0
+offset_right = 836.67
+offset_bottom = 608.0
+
+[node name="BerserkIcon" type="Control" parent="." unique_id=1721098216]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 856.0
+offset_top = 530.0
+offset_right = 906.67
+offset_bottom = 608.0
+
+[node name="BuffBar" type="Control" parent="." unique_id=1752861670]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 218.0
+offset_top = 22.0
+offset_right = 348.0
+offset_bottom = 50.0
+mouse_filter = 2
+
+[node name="MessagePanel" type="Control" parent="." unique_id=1190161580]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 742.0
+offset_top = 72.0
+offset_right = 940.0
+offset_bottom = 176.0
+
+[node name="MessageTitle" type="Label" parent="MessagePanel" unique_id=251819601]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 6.0
+offset_right = 188.0
+offset_bottom = 26.0
+theme_override_colors/font_color = Color(0.78, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "消息提示"
+
+[node name="MessageScroll" type="ScrollContainer" parent="MessagePanel" unique_id=1390936949]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 32.0
+offset_right = 190.0
+offset_bottom = 98.0
+mouse_filter = 0
+horizontal_scroll_mode = 0
+
+[node name="MessageList" type="VBoxContainer" parent="MessagePanel/MessageScroll" unique_id=954173747]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2

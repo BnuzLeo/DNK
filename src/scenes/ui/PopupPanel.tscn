@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
+
+[node name="PopupPanel" type="TextureRect"]
+offset_right = 750.0
+offset_bottom = 500.0
+texture = ExtResource("1_panel")
+expand_mode = 1
+stretch_mode = 0
+mouse_filter = 0

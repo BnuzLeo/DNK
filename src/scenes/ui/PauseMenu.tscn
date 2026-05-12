@@ -1,0 +1,86 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_header.png" id="2_header"]
+[ext_resource type="Texture2D" path="res://assets/export/gui/btn_pause.png" id="3_icon"]
+
+[node name="PauseMenu" type="CanvasLayer"]
+layer = 35
+process_mode = 3
+
+[node name="Overlay" type="ColorRect" parent="."]
+offset_right = 960.0
+offset_bottom = 640.0
+color = Color(0, 0, 0, 0.72)
+mouse_filter = 0
+
+[node name="Panel" type="TextureRect" parent="."]
+offset_left = 105.0
+offset_top = 70.0
+offset_right = 855.0
+offset_bottom = 570.0
+texture = ExtResource("1_panel")
+expand_mode = 1
+stretch_mode = 0
+mouse_filter = 0
+
+[node name="Header" type="TextureRect" parent="."]
+offset_left = 105.0
+offset_top = 70.0
+offset_right = 855.0
+offset_bottom = 134.0
+texture = ExtResource("2_header")
+expand_mode = 1
+stretch_mode = 0
+mouse_filter = 2
+
+[node name="TitleIcon" type="TextureRect" parent="."]
+offset_left = 137.0
+offset_top = 78.0
+offset_right = 185.0
+offset_bottom = 126.0
+texture = ExtResource("3_icon")
+expand_mode = 1
+stretch_mode = 5
+mouse_filter = 2
+
+[node name="TitleLabel" type="Label" parent="."]
+offset_left = 193.0
+offset_top = 70.0
+offset_right = 715.0
+offset_bottom = 134.0
+vertical_alignment = 1
+text = "已暂停"
+theme_override_colors/font_color = Color(0.98, 0.92, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 24
+mouse_filter = 2
+
+[node name="HintLabel" type="Label" parent="."]
+offset_left = 105.0
+offset_top = 220.0
+offset_right = 855.0
+offset_bottom = 248.0
+horizontal_alignment = 1
+text = "ESC / P 继续游戏"
+theme_override_colors/font_color = Color(0.82, 0.92, 1, 1)
+theme_override_font_sizes/font_size = 20
+mouse_filter = 2
+
+[node name="ContinueButton" type="Button" parent="."]
+offset_left = 391.0
+offset_top = 300.0
+offset_right = 571.0
+offset_bottom = 348.0
+text = "继续"
+focus_mode = 0
+
+[node name="ReturnLobbyButton" type="Button" parent="."]
+offset_left = 391.0
+offset_top = 366.0
+offset_right = 571.0
+offset_bottom = 414.0
+text = "返回大厅"
+focus_mode = 0

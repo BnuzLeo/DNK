@@ -2,11 +2,12 @@ extends Node
 
 ## 卡皮巴拉 — 武器商店面板
 
-const VS := preload("res://scripts/visual_spec.gd")
 const PopupGui := preload("res://scripts/popup_gui.gd")
+const SHOP_PANEL_SCENE := preload("res://scenes/ui/WeaponShopPanel.tscn")
 
 var _canvas: CanvasLayer
 var _player: Node
+var _panel_origin := Vector2.ZERO
 
 const SHOP_WEAPONS := ["jntm", "chicken_foot"]
 
@@ -24,32 +25,17 @@ func _build_ui() -> void:
 	for child in _canvas.get_children():
 		child.queue_free()
 
-	var panel_pos := PopupGui.panel_position()
-	PopupGui.add_overlay(_canvas)
-	PopupGui.add_panel(_canvas)
-	PopupGui.add_title(_canvas, "武器商店", "res://assets/export/gui/icon_shop.png")
-	PopupGui.add_close_button(_canvas, Callable(self, "_close"))
-
-	# 货币
-	var coin_icon := TextureRect.new()
-	coin_icon.texture = PopupGui.load_texture("res://assets/export/gui/hud_icon_kun_coin.png")
-	coin_icon.position = panel_pos + Vector2(548, 76)
-	coin_icon.size = Vector2(30, 30)
-	coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_canvas.add_child(coin_icon)
-
-	var currency := Label.new()
+	var shell := SHOP_PANEL_SCENE.instantiate() as Control
+	_canvas.add_child(shell)
+	_panel_origin = (shell.get_node("Panel") as Control).global_position
+	var close_button := shell.get_node("CloseButton") as Button
+	close_button.pressed.connect(GameAudio.play_button)
+	close_button.pressed.connect(_close)
+	var currency := shell.get_node("CoinLabel") as Label
 	currency.text = "%d" % GameManager.kun_coins
-	currency.position = panel_pos + Vector2(582, 82)
-	currency.size = Vector2(120, 22)
-	currency.add_theme_font_size_override("font_size", 16)
-	currency.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
-	currency.name = "CoinLabel"
-	_canvas.add_child(currency)
 
 	# 武器列表
-	var y_offset := panel_pos.y + 128.0
+	var y_offset := _panel_origin.y + 128.0
 	for key in SHOP_WEAPONS:
 		_create_weapon_row(key, y_offset)
 		y_offset += 95.0
@@ -60,9 +46,8 @@ func _create_weapon_row(key: String, y: float) -> void:
 	var price: int = GameManager.WEAPON_COSTS[key]
 	var owned: bool = key in GameManager.player_data.owned_weapons
 	var can_buy: bool = not owned and GameManager.kun_coins >= price
-	var panel_pos := PopupGui.panel_position()
-	var left_x := panel_pos.x + 58.0
-	var action_x := panel_pos.x + 558.0
+	var left_x := _panel_origin.x + 58.0
+	var action_x := _panel_origin.x + 558.0
 
 	var slot_bg := TextureRect.new()
 	slot_bg.texture = PopupGui.load_texture("res://assets/export/gui/ui_popup_slot.png")

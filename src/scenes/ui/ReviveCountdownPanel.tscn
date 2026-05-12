@@ -1,0 +1,92 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_header.png" id="2_header"]
+[ext_resource type="Texture2D" path="res://assets/export/gui/icon_talent_point.png" id="3_icon"]
+
+[node name="ReviveCountdownPanel" type="CanvasLayer"]
+layer = 28
+process_mode = 3
+
+[node name="Overlay" type="ColorRect" parent="."]
+offset_right = 960.0
+offset_bottom = 640.0
+color = Color(0, 0, 0, 0.72)
+mouse_filter = 0
+
+[node name="Panel" type="TextureRect" parent="."]
+offset_left = 105.0
+offset_top = 70.0
+offset_right = 855.0
+offset_bottom = 570.0
+texture = ExtResource("1_panel")
+expand_mode = 1
+stretch_mode = 0
+mouse_filter = 0
+
+[node name="Header" type="TextureRect" parent="."]
+offset_left = 105.0
+offset_top = 70.0
+offset_right = 855.0
+offset_bottom = 134.0
+texture = ExtResource("2_header")
+expand_mode = 1
+stretch_mode = 0
+mouse_filter = 2
+
+[node name="TitleIcon" type="TextureRect" parent="."]
+offset_left = 137.0
+offset_top = 78.0
+offset_right = 185.0
+offset_bottom = 126.0
+texture = ExtResource("3_icon")
+expand_mode = 1
+stretch_mode = 5
+mouse_filter = 2
+
+[node name="TitleLabel" type="Label" parent="."]
+offset_left = 193.0
+offset_top = 70.0
+offset_right = 715.0
+offset_bottom = 134.0
+vertical_alignment = 1
+text = "复活倒计时"
+theme_override_colors/font_color = Color(0.98, 0.92, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 24
+mouse_filter = 2
+
+[node name="PromptLabel" type="Label" parent="."]
+offset_left = 135.0
+offset_top = 188.0
+offset_right = 825.0
+offset_bottom = 220.0
+horizontal_alignment = 1
+text = "是否消耗复活币继续战斗？"
+theme_override_colors/font_color = Color(1, 0.84, 0, 1)
+theme_override_font_sizes/font_size = 24
+mouse_filter = 2
+
+[node name="CountdownLabel" type="Label" parent="."]
+offset_left = 105.0
+offset_top = 250.0
+offset_right = 855.0
+offset_bottom = 314.0
+horizontal_alignment = 1
+text = "10"
+theme_override_colors/font_color = Color(1, 0.41, 0.71, 1)
+theme_override_font_sizes/font_size = 48
+mouse_filter = 2
+
+[node name="HintLabel" type="Label" parent="."]
+offset_left = 135.0
+offset_top = 340.0
+offset_right = 825.0
+offset_bottom = 364.0
+horizontal_alignment = 1
+text = "点击复活 / ESC 放弃"
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 16
+mouse_filter = 2

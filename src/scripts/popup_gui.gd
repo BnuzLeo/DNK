@@ -11,6 +11,9 @@ const CLOSE_BUTTON_PATH := "res://assets/export/gui/ui_close_button.png"
 const CONFIRM_BUTTON_PATH := "res://assets/export/gui/ui_button_primary.png"
 const NORMAL_BUTTON_PATH := "res://assets/export/gui/ui_button_secondary.png"
 const DISABLED_BUTTON_PATH := "res://assets/export/gui/ui_button_disabled.png"
+const POPUP_PANEL_SCENE := preload("res://scenes/ui/PopupPanel.tscn")
+const POPUP_TITLE_SCENE := preload("res://scenes/ui/PopupTitle.tscn")
+const POPUP_BUTTON_SCENE := preload("res://scenes/ui/PopupButton.tscn")
 
 
 static func panel_position() -> Vector2:
@@ -27,7 +30,7 @@ static func add_overlay(parent: Node, mouse_filter: int = Control.MOUSE_FILTER_S
 
 
 static func add_panel(parent: Node) -> TextureRect:
-	var panel := TextureRect.new()
+	var panel := POPUP_PANEL_SCENE.instantiate() as TextureRect
 	panel.texture = load_texture(BACKGROUND_PATH)
 	panel.position = panel_position()
 	panel.size = PANEL_SIZE
@@ -39,42 +42,23 @@ static func add_panel(parent: Node) -> TextureRect:
 
 
 static func add_title(parent: Node, text: String, icon_path: String = "") -> Label:
-	var texture := load_texture(HEADER_PATH)
 	var title_size := HEADER_SIZE
 	var pos := panel_position() + Vector2(0.0, 0.0)
 
-	var title_bg := TextureRect.new()
-	title_bg.texture = texture
-	title_bg.position = pos
-	title_bg.size = title_size
-	title_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	title_bg.stretch_mode = TextureRect.STRETCH_SCALE
-	title_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(title_bg)
+	var title_root := POPUP_TITLE_SCENE.instantiate() as Control
+	title_root.position = pos
+	title_root.size = title_size
+	parent.add_child(title_root)
 
+	var icon := title_root.get_node("Icon") as TextureRect
 	if icon_path != "":
-		var icon := TextureRect.new()
 		icon.texture = load_texture(icon_path)
-		icon.position = pos + Vector2(32.0, 8.0)
-		icon.size = Vector2(48.0, 48.0)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		parent.add_child(icon)
+		icon.visible = true
+	else:
+		icon.visible = false
 
-	var label := Label.new()
+	var label := title_root.get_node("TitleLabel") as Label
 	label.text = text
-	label.position = pos + Vector2(88.0, 0.0)
-	label.size = title_size - Vector2(140.0, 0.0)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 24)
-	label.add_theme_color_override("font_color", Color(0.98, 0.92, 0.78))
-	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
-	label.add_theme_constant_override("shadow_offset_x", 2)
-	label.add_theme_constant_override("shadow_offset_y", 2)
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(label)
 	return label
 
 
@@ -116,31 +100,25 @@ static func add_image_button(
 	pressed: Callable,
 	enabled: bool = true
 ) -> Control:
-	var button := Control.new()
+	var button := POPUP_BUTTON_SCENE.instantiate() as Control
 	button.position = pos
 	button.size = size
 	button.mouse_filter = Control.MOUSE_FILTER_STOP if enabled else Control.MOUSE_FILTER_IGNORE
 	button.modulate = Color.WHITE if enabled else Color(0.45, 0.45, 0.45, 0.85)
 	parent.add_child(button)
 
-	var image := TextureRect.new()
+	var image := button.get_node("Background") as TextureRect
 	image.texture = texture
 	image.size = size
-	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	image.stretch_mode = TextureRect.STRETCH_SCALE
-	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	button.add_child(image)
 
+	var label := button.get_node("Text") as Label
+	label.size = size
 	if text != "":
-		var label := Label.new()
 		label.text = text
-		label.size = size
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		label.add_theme_font_size_override("font_size", 18)
 		label.add_theme_color_override("font_color", Color(0.98, 0.92, 0.68) if enabled else Color(0.55, 0.55, 0.55))
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		button.add_child(label)
+		label.visible = true
+	else:
+		label.visible = false
 
 	if enabled:
 		button.gui_input.connect(func(event: InputEvent) -> void:

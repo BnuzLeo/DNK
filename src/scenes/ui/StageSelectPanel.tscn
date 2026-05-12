@@ -1,0 +1,76 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
+[ext_resource type="Texture2D" path="res://assets/export/gui/icon_stage.png" id="2_icon"]
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_close_button.png" id="3_close"]
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_button_primary.png" id="4_button"]
+
+[node name="StageSelectPanel" type="CanvasLayer"]
+layer = 24
+process_mode = 3
+
+[node name="Backdrop" type="ColorRect" parent="."]
+offset_right = 960.0
+offset_bottom = 640.0
+color = Color(0, 0, 0, 0.58)
+mouse_filter = 0
+
+[node name="Window" type="Control" parent="."]
+offset_left = 144.0
+offset_top = 96.0
+offset_right = 816.0
+offset_bottom = 544.0
+clip_contents = true
+mouse_filter = 0
+
+[node name="WindowBg" type="TextureRect" parent="Window"]
+offset_right = 672.0
+offset_bottom = 448.0
+texture = ExtResource("1_panel")
+expand_mode = 1
+stretch_mode = 0
+mouse_filter = 2
+
+[node name="TitleIcon" type="TextureRect" parent="Window"]
+offset_left = 26.0
+offset_top = 20.0
+offset_right = 74.0
+offset_bottom = 68.0
+texture = ExtResource("2_icon")
+expand_mode = 1
+stretch_mode = 5
+mouse_filter = 2
+
+[node name="TitleLabel" type="Label" parent="Window"]
+offset_left = 84.0
+offset_top = 14.0
+offset_right = 360.0
+offset_bottom = 56.0
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.98, 0.92, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 26
+text = "关卡模式"
+mouse_filter = 2
+
+[node name="CloseButton" type="Button" parent="Window"]
+offset_left = 616.0
+offset_top = 10.0
+offset_right = 660.0
+offset_bottom = 54.0
+text = ""
+icon = ExtResource("3_close")
+expand_icon = true
+focus_mode = 0
+mouse_filter = 0
+
+[node name="StartButton" type="Button" parent="Window"]
+offset_left = 246.0
+offset_top = 318.0
+offset_right = 426.0
+offset_bottom = 356.0
+text = "开始游玩"
+theme_override_font_sizes/font_size = 22
+mouse_filter = 0

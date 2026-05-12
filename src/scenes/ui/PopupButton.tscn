@@ -1,0 +1,27 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_button_primary.png" id="1_primary"]
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_button_secondary.png" id="2_secondary"]
+[ext_resource type="Texture2D" path="res://assets/export/gui/ui_button_disabled.png" id="3_disabled"]
+
+[node name="PopupButton" type="Control"]
+offset_right = 180.0
+offset_bottom = 48.0
+mouse_filter = 0
+
+[node name="Background" type="TextureRect" parent="."]
+offset_right = 180.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("1_primary")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Text" type="Label" parent="."]
+offset_right = 180.0
+offset_bottom = 48.0
+mouse_filter = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.98, 0.92, 0.68, 1)
+theme_override_font_sizes/font_size = 18
