@@ -165,7 +165,7 @@ func _give_start_supply(player: Node) -> void:
 		if not player.has_weapon(key):
 			candidates.append(key)
 	if candidates.is_empty():
-		candidates = START_SUPPLY_WEAPON_KEYS.duplicate()
+a		candidates = START_SUPPLY_WEAPON_KEYS.duplicate()
 	candidates.shuffle()
 
 	var key: String = candidates[0]

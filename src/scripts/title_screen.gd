@@ -3,14 +3,18 @@ extends Node2D
 const VS := preload("res://scripts/visual_spec.gd")
 
 const TITLE_STINGER_PATH := "res://assets/music/dialogue/真的是你啊.MP3"
-const VIDEO_PATH := "res://assets/export/start/开场视频.ogv"
+const MENU_VIDEO_FRAME_DIR := "res://assets/export/start/start_video_frames"
+const MENU_VIDEO_FPS := 12.0
+const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/开场视频.ogv"
 const KUN_PARALLAX_RANGE := Vector2(36.0, 24.0)
 const SKIP_HOLD_TIME := 1.0
 
+@onready var _menu_video_layer: CanvasLayer = $MenuVideoLayer
+@onready var _menu_video_player: TextureRect = $MenuVideoLayer/MenuVideoPlayer
 @onready var _bg: TextureRect = $Background
 @onready var _kun: TextureRect = $KunParallax
 @onready var _title_root: Control = $Overlay/TitleRoot
-@onready var _start_button: Button = $Overlay/TitleRoot/StartButton
+@onready var _start_button: TextureButton = $Overlay/TitleRoot/StartButton
 @onready var _lobby_test_button: Button = $Overlay/TitleRoot/LobbyTestButton
 @onready var _dungeon_test_button: Button = $Overlay/TitleRoot/DungeonTestButton
 @onready var _video_overlay: CanvasLayer = $VideoOverlay
@@ -24,6 +28,9 @@ var _mouse_ratio := Vector2.ZERO
 var _video_started := false
 var _starting := false
 var _skip_hold := 0.0
+var _menu_video_frames: Array[Texture2D] = []
+var _menu_video_frame_index := 0
+var _menu_video_timer := 0.0
 var _title_stinger: AudioStreamPlayer
 var _impact_flash: ColorRect
 var _impact_band: ColorRect
@@ -39,11 +46,13 @@ func _ready() -> void:
 	_setup_feedback_nodes()
 	_update_title_style()
 	_update_skip_progress(0.0)
-	_play_title_stinger()
+	_prepare_title_stinger()
+	_play_menu_video()
 
 
 func _process(delta: float) -> void:
 	_update_kun_parallax(delta)
+	_update_menu_video(delta)
 	if not _video_started:
 		return
 	if Input.is_key_pressed(KEY_SPACE):
@@ -88,6 +97,7 @@ func _make_label_settings(font_size: int, font_color: Color, shadow_color: Color
 
 
 func _setup_feedback_nodes() -> void:
+	_menu_video_player.pivot_offset = VS.VIEWPORT_SIZE * 0.5
 	_bg.pivot_offset = VS.VIEWPORT_SIZE * 0.5
 	_kun.pivot_offset = VS.VIEWPORT_SIZE * 0.5
 	_start_button.pivot_offset = _start_button.size * 0.5
@@ -110,7 +120,7 @@ func _setup_feedback_nodes() -> void:
 	$Overlay.add_child(_impact_band)
 
 
-func _play_title_stinger() -> void:
+func _prepare_title_stinger() -> void:
 	var stream := _load_audio_stream(TITLE_STINGER_PATH)
 	if stream == null:
 		return
@@ -119,6 +129,15 @@ func _play_title_stinger() -> void:
 	_title_stinger.volume_db = 0.0
 	_title_stinger.stream = stream
 	add_child(_title_stinger)
+
+
+func _play_title_stinger() -> void:
+	if _title_stinger == null:
+		_prepare_title_stinger()
+	if _title_stinger == null:
+		return
+	if _title_stinger.playing:
+		_title_stinger.stop()
 	_title_stinger.play()
 
 
@@ -142,12 +161,12 @@ func _on_start_pressed() -> void:
 		return
 	_starting = true
 	_start_button.disabled = true
+	_play_title_stinger()
 	await _play_start_feedback()
-	if _title_stinger != null and _title_stinger.playing:
-		_title_stinger.stop()
 	_video_started = true
 	_starting = false
 	_title_root.visible = false
+	_menu_video_layer.visible = false
 	_video_overlay.visible = true
 	_skip_hold = 0.0
 	_update_skip_progress(0.0)
@@ -180,6 +199,7 @@ func _play_start_feedback() -> void:
 	tween.tween_property(_start_button, "scale", Vector2(0.92, 0.92), 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_start_button, "scale", Vector2(1.08, 1.08), 0.12).set_delay(0.06).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_start_button, "modulate:a", 0.0, 0.18).set_delay(0.14)
+	tween.tween_property(_menu_video_player, "scale", Vector2(1.035, 1.035), 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_bg, "scale", Vector2(1.035, 1.035), 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_kun, "scale", Vector2(1.085, 1.085), 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_kun, "modulate", Color(1.18, 1.12, 0.98, 1.0), 0.16)
@@ -191,18 +211,70 @@ func _play_start_feedback() -> void:
 	await tween.finished
 
 
+func _play_menu_video() -> void:
+	_menu_video_frames = _load_menu_video_frames()
+	if _menu_video_frames.is_empty():
+		_menu_video_layer.visible = false
+		return
+	_menu_video_layer.visible = true
+	_menu_video_frame_index = 0
+	_menu_video_timer = 0.0
+	_menu_video_player.texture = _menu_video_frames[_menu_video_frame_index]
+
+
+func _update_menu_video(delta: float) -> void:
+	if _menu_video_frames.is_empty() or not _menu_video_layer.visible:
+		return
+	_menu_video_timer += delta
+	var frame_time := 1.0 / MENU_VIDEO_FPS
+	while _menu_video_timer >= frame_time:
+		_menu_video_timer -= frame_time
+		_menu_video_frame_index = (_menu_video_frame_index + 1) % _menu_video_frames.size()
+		_menu_video_player.texture = _menu_video_frames[_menu_video_frame_index]
+
+
+func _load_menu_video_frames() -> Array[Texture2D]:
+	var frames: Array[Texture2D] = []
+	var dir := DirAccess.open(MENU_VIDEO_FRAME_DIR)
+	if dir == null:
+		return frames
+	var files := dir.get_files()
+	files.sort()
+	for file_name in files:
+		if not file_name.begins_with("frame_") or file_name.get_extension().to_lower() != "webp":
+			continue
+		var path := MENU_VIDEO_FRAME_DIR.path_join(file_name)
+		var texture := load(path) as Texture2D
+		if texture == null:
+			var image := Image.new()
+			if image.load(ProjectSettings.globalize_path(path)) != OK:
+				continue
+			texture = ImageTexture.create_from_image(image)
+		frames.append(texture)
+	return frames
+
+
 func _load_and_play_video() -> void:
-	var stream := load(VIDEO_PATH) as VideoStream
+	var stream := _load_video_stream(START_SEQUENCE_VIDEO_PATH)
 	if stream == null:
-		var absolute_path := ProjectSettings.globalize_path(VIDEO_PATH)
-		if not FileAccess.file_exists(absolute_path):
-			_finish_video_and_enter_lobby()
-			return
-		var theora_stream := VideoStreamTheora.new()
-		theora_stream.file = VIDEO_PATH
-		stream = theora_stream
+		_finish_video_and_enter_lobby()
+		return
 	_video_player.stream = stream
 	_video_player.play()
+
+
+func _load_video_stream(path: String) -> VideoStream:
+	var stream := load(path) as VideoStream
+	if stream != null:
+		return stream
+	var absolute_path := ProjectSettings.globalize_path(path)
+	if not FileAccess.file_exists(absolute_path):
+		return null
+	if path.get_extension().to_lower() == "ogv":
+		var theora_stream := VideoStreamTheora.new()
+		theora_stream.file = path
+		return theora_stream
+	return null
 
 
 func _on_video_finished() -> void:
