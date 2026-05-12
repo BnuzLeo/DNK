@@ -54,7 +54,7 @@ const HEAD_BANNER_OFFSET := Vector2(0.0, -60.0)
 const HEAD_BANNER_DURATION := 0.42
 const BASKETBALL_PROMPT_FLASH_DURATION := 0.65
 const BASKETBALL_AUTO_J_COUNT := 2
-const BASKETBALL_AUTO_J_INTERVAL := 1.0
+const BASKETBALL_AUTO_J_INTERVAL := 0.2
 const MAN_GUN_DIRECTION_STEP := PI / 4.0
 const MAN_GUN_BERSERK_SHOTGUN_COUNT := 5
 const MAN_GUN_BERSERK_SHOTGUN_SPREAD := 0.48
@@ -84,7 +84,7 @@ const WEAPONS := {
 	"basketball": {
 		"cooldown": 0.42, "damage": 3, "count": 5, "spread": 0.52,
 		"speed": 690.0, "mana": 0, "name": "篮球", "type": "basketball",
-		"berserk_cooldown": 1.0, "berserk_damage": 9
+		"berserk_cooldown": 0.2, "berserk_damage": 9
 	},
 	"jntm": {
 		"cooldown": 0.0, "damage": 2, "mana": 0, "name": "大族激光",
