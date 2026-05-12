@@ -4,7 +4,7 @@ const VS := preload("res://scripts/visual_spec.gd")
 
 const MOVE_SPEED := 120.0
 const CONTACT_COOLDOWN := 0.8
-const DISPLAY_SCALE_FACTOR := 1.0 / 3.0
+const DISPLAY_SCALE_FACTOR := 2.0 / 3.0
 
 const MINION_ANIMATIONS := {
 	"frame_size": 120,
@@ -118,27 +118,37 @@ func _resolve_enemy_overlap() -> void:
 	var separation: Vector2 = Vector2.ZERO
 	var overlaps: int = 0
 	var self_radius: float = get_separation_radius()
-	for other in get_tree().get_nodes_in_group("enemy"):
-		if other == self or not is_instance_valid(other):
-			continue
-		if not other.has_method("get_separation_radius"):
-			continue
-		if other.has_method("is_dying") and bool(other.call("is_dying")):
-			continue
-		var other_area: Area2D = other as Area2D
-		if other_area == null:
-			continue
-		var offset: Vector2 = global_position - other_area.global_position
-		var min_distance: float = self_radius + float(other.call("get_separation_radius"))
-		var dist_sq: float = offset.length_squared()
-		if dist_sq >= min_distance * min_distance:
-			continue
-		var dist: float = sqrt(dist_sq)
-		var normal: Vector2 = offset / dist if dist > 0.001 else Vector2.RIGHT
-		separation += normal * ((min_distance - dist) * 0.5)
-		overlaps += 1
+	for group_name in ["enemy", "chest", "player"]:
+		for other in get_tree().get_nodes_in_group(group_name):
+			if other == self or not is_instance_valid(other):
+				continue
+			if not other.has_method("get_separation_radius"):
+				continue
+			if other.has_method("is_dying") and bool(other.call("is_dying")):
+				continue
+			if other.has_method("is_solid_actor") and not bool(other.call("is_solid_actor")):
+				continue
+			var other_node := other as Node2D
+			if other_node == null:
+				continue
+			var offset: Vector2 = global_position - other_node.global_position
+			var min_distance: float = self_radius + float(other.call("get_separation_radius"))
+			var dist_sq: float = offset.length_squared()
+			if dist_sq >= min_distance * min_distance:
+				continue
+			var dist: float = sqrt(dist_sq)
+			var normal: Vector2 = offset / dist if dist > 0.001 else _get_fallback_separation_dir(other_node)
+			separation += normal * ((min_distance - dist) * 0.5)
+			overlaps += 1
 	if overlaps > 0:
 		global_position += separation / float(overlaps)
+
+
+func _get_fallback_separation_dir(other: Node) -> Vector2:
+	var self_bias := float(get_instance_id() & 1) * 2.0 - 1.0
+	var other_bias := float(other.get_instance_id() & 1) * 2.0 - 1.0
+	var dir := Vector2(self_bias, other_bias).normalized()
+	return dir if dir.length_squared() > 0.0 else Vector2.RIGHT
 
 
 func _setup_sprite() -> void:

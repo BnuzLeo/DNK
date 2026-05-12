@@ -47,6 +47,7 @@ const ACTION_CLICK_FEEDBACK_DURATION := 0.18
 const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
 const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_yellow_sheet.png"
 const DUNGEON_PORTAL_INTERACT_RADIUS := 58.0
+const BOSS_SETTLEMENT_RETURN_TIME := 9.0
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 
@@ -117,6 +118,10 @@ var _revive_canvas: CanvasLayer
 var _revive_countdown_label: Label
 var _revive_timer := 0.0
 var _pause_canvas: CanvasLayer
+var _settlement_canvas: CanvasLayer
+var _settlement_countdown_label: Label
+var _settlement_timer := 0.0
+var _settlement_reward_given := false
 
 # HUD
 var _fps_label: Label
@@ -216,6 +221,8 @@ func _generate_floor() -> void:
 	_boss_defeated = false
 	_portal_active = false
 	_return_portal_near = false
+	_settlement_timer = 0.0
+	_settlement_reward_given = false
 	_spawn_warning_positions.clear()
 	_spawn_warning_timer = 0.0
 
@@ -650,15 +657,36 @@ func _on_enemy_died(_enemy: Area2D, room: RoomData) -> void:
 func _on_boss_died(room: RoomData) -> void:
 	_boss_defeated = true
 	room.enemies = room.enemies.filter(func(e): return is_instance_valid(e) and not e._dying)
-	if room.enemies.is_empty():
-		_room_cleared(room)
-	# 在 boss 房间生成传送门
-	_show_boss_return_portal(Vector2(_boss_pos.x * CELL_W + CELL_W / 2, _boss_pos.y * CELL_H + CELL_H / 2))
+	_start_boss_settlement(room)
 	queue_redraw()
-	_show_hint("Boss 已击败！按 E 返回基地", Color(0.0, 0.898, 1.0))
+
+
+func _start_boss_settlement(room: RoomData) -> void:
+	if GameManager.state == GameManager.GameState.SETTLEMENT:
+		return
+	if room.state != RoomState.CLEARED:
+		room.state = RoomState.CLEARED
+		_rooms_cleared += 1
+	_portal_active = false
+	_return_portal_near = false
+	if _boss_portal_sprite != null and is_instance_valid(_boss_portal_sprite):
+		_boss_portal_sprite.queue_free()
+		_boss_portal_sprite = null
+	_show_boss_return_portal(Vector2(_boss_pos.x * CELL_W + CELL_W / 2, _boss_pos.y * CELL_H + CELL_H / 2))
+	_portal_active = false
+	if $BulletPool != null and $BulletPool.has_method("clear_all"):
+		$BulletPool.clear_all()
+	_settlement_timer = BOSS_SETTLEMENT_RETURN_TIME
+	GameManager.change_state(GameManager.GameState.SETTLEMENT)
+	_show_boss_settlement_ui()
+	_show_hint("Boss 已击败！正在结算", Color(0.0, 0.898, 1.0))
+	if _minimap:
+		_minimap.queue_redraw()
 
 
 func _room_cleared(room: RoomData) -> void:
+	if room.state == RoomState.CLEARED:
+		return
 	room.state = RoomState.CLEARED
 	_rooms_cleared += 1
 	_show_hint("房间已清理！", Color(0.0, 1.0, 0.53))
@@ -1532,6 +1560,10 @@ func _process(delta: float) -> void:
 			GameManager.change_state(GameManager.GameState.GAME_OVER)
 			_show_game_over()
 
+	if state == GameManager.GameState.SETTLEMENT:
+		_update_boss_settlement(delta)
+		return
+
 	if state != GameManager.GameState.PLAYING:
 		return
 
@@ -1620,6 +1652,70 @@ func _show_victory() -> void:
 	label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.0))
 	label.position = Vector2(380, 240)
 	canvas.add_child(label)
+
+
+func _show_boss_settlement_ui() -> void:
+	if _settlement_canvas != null:
+		_settlement_canvas.queue_free()
+	_settlement_canvas = CanvasLayer.new()
+	_settlement_canvas.layer = 40
+	add_child(_settlement_canvas)
+
+	var overlay := ColorRect.new()
+	overlay.color = Color(0, 0, 0, 0.48)
+	overlay.size = VS.VIEWPORT_SIZE
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_settlement_canvas.add_child(overlay)
+
+	var title := Label.new()
+	title.text = "通关结算"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 36)
+	title.add_theme_color_override("font_color", Color(1.0, 0.84, 0.18))
+	title.position = Vector2(330, 180)
+	title.size = Vector2(300, 46)
+	_settlement_canvas.add_child(title)
+
+	var summary := Label.new()
+	summary.text = "击杀: %d\n获得坤币 +1" % GameManager.total_kills
+	summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	summary.add_theme_font_size_override("font_size", 24)
+	summary.add_theme_color_override("font_color", Color.WHITE)
+	summary.position = Vector2(330, 245)
+	summary.size = Vector2(300, 80)
+	_settlement_canvas.add_child(summary)
+
+	_settlement_countdown_label = Label.new()
+	_settlement_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_settlement_countdown_label.add_theme_font_size_override("font_size", 24)
+	_settlement_countdown_label.add_theme_color_override("font_color", Color(0.0, 0.898, 1.0))
+	_settlement_countdown_label.position = Vector2(280, 355)
+	_settlement_countdown_label.size = Vector2(400, 40)
+	_settlement_canvas.add_child(_settlement_countdown_label)
+	_update_boss_settlement_label()
+
+
+func _update_boss_settlement(delta: float) -> void:
+	_settlement_timer = maxf(_settlement_timer - delta, 0.0)
+	_update_boss_settlement_label()
+	if _settlement_timer <= 0.0:
+		_finish_boss_settlement()
+
+
+func _update_boss_settlement_label() -> void:
+	if _settlement_countdown_label == null:
+		return
+	_settlement_countdown_label.text = "%ds 后自动返回大厅" % int(ceil(_settlement_timer))
+
+
+func _finish_boss_settlement() -> void:
+	if GameManager.state != GameManager.GameState.SETTLEMENT:
+		return
+	if not _settlement_reward_given:
+		_settlement_reward_given = true
+		GameManager.add_dungeon_clear()
+	GameManager.restore_lobby_weapons()
+	GameManager.return_to_lobby()
 
 
 # ── 去色效果 ──────────────────────────────────────────

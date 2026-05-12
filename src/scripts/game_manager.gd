@@ -1,6 +1,6 @@
 extends Node
 
-enum GameState { MAIN_MENU, LOBBY, PLAYING, PAUSED, DEAD, REVIVING, GAME_OVER }
+enum GameState { MAIN_MENU, LOBBY, PLAYING, PAUSED, DEAD, REVIVING, GAME_OVER, SETTLEMENT }
 
 signal state_changed(old_state: GameState, new_state: GameState)
 
@@ -72,6 +72,9 @@ func change_state(new_state: GameState) -> void:
 			get_tree().paused = true
 		GameState.GAME_OVER:
 			get_tree().paused = true
+		GameState.SETTLEMENT:
+			get_tree().paused = false
+			Engine.time_scale = 1.0
 	state_changed.emit(old, new_state)
 
 

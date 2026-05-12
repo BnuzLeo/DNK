@@ -344,31 +344,33 @@ func _resolve_enemy_overlap() -> Vector2:
 	var separation := Vector2.ZERO
 	var overlaps := 0
 
-	for other in tree.get_nodes_in_group("enemy"):
-		if other == self or not (other is Area2D):
-			continue
-		if not is_instance_valid(other):
-			continue
-		var other_enemy := other as Area2D
-		if other_enemy == null:
-			continue
-		if not other.has_method("get_separation_radius"):
-			continue
-		if other.has_method("is_dying") and bool(other.call("is_dying")):
-			continue
+	for group_name in ["enemy", "chest", "player"]:
+		for other in tree.get_nodes_in_group(group_name):
+			if other == self or not is_instance_valid(other):
+				continue
+			if not other.has_method("get_separation_radius"):
+				continue
+			if other.has_method("is_dying") and bool(other.call("is_dying")):
+				continue
+			if other.has_method("is_solid_actor") and not bool(other.call("is_solid_actor")):
+				continue
 
-		var offset: Vector2 = global_position - other_enemy.global_position
-		var other_radius := float(other_enemy.call("get_separation_radius"))
-		var min_distance: float = (self_radius + other_radius) * ENEMY_SEPARATION_FACTOR
-		var dist_sq := offset.length_squared()
-		if dist_sq >= min_distance * min_distance:
-			continue
+			var other_node := other as Node2D
+			if other_node == null:
+				continue
 
-		var dist := sqrt(dist_sq)
-		var normal := offset / dist if dist > 0.001 else _get_fallback_separation_dir(other_enemy)
-		var penetration := min_distance - dist
-		separation += normal * (penetration * 0.5)
-		overlaps += 1
+			var offset: Vector2 = global_position - other_node.global_position
+			var other_radius := float(other.call("get_separation_radius"))
+			var min_distance: float = (self_radius + other_radius) * ENEMY_SEPARATION_FACTOR
+			var dist_sq := offset.length_squared()
+			if dist_sq >= min_distance * min_distance:
+				continue
+
+			var dist := sqrt(dist_sq)
+			var normal := offset / dist if dist > 0.001 else _get_fallback_separation_dir(other_node)
+			var penetration := min_distance - dist
+			separation += normal * (penetration * 0.5)
+			overlaps += 1
 
 	if overlaps > 0:
 		var applied := separation / float(overlaps)

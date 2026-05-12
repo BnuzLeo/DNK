@@ -157,6 +157,7 @@ func _move_toward_player(delta: float) -> void:
 	if dir.length_squared() > 0.001:
 		_face_direction(dir)
 	global_position += dir * MOVE_SPEED * delta
+	_resolve_actor_overlap()
 	_clamp_bounds()
 
 
@@ -321,6 +322,8 @@ func _update_jump(delta: float) -> void:
 	if _jump_timer > 0.0:
 		return
 	global_position = _jump_to
+	_resolve_actor_overlap()
+	_clamp_bounds()
 	_create_landing_shockwave()
 	_damage_on_landing()
 	_summon_minions()
@@ -424,6 +427,51 @@ func take_damage(amount: int) -> void:
 
 func is_dying() -> bool:
 	return _dying
+
+
+func get_separation_radius() -> float:
+	return VS.BOSS_DISPLAY_SIZE * 0.55
+
+
+func _resolve_actor_overlap() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	var self_radius := get_separation_radius()
+	var separation := Vector2.ZERO
+	var overlaps := 0
+	for group_name in ["enemy", "chest", "player"]:
+		for other in tree.get_nodes_in_group(group_name):
+			if other == self or not is_instance_valid(other):
+				continue
+			if not other.has_method("get_separation_radius"):
+				continue
+			if other.has_method("is_dying") and bool(other.call("is_dying")):
+				continue
+			if other.has_method("is_solid_actor") and not bool(other.call("is_solid_actor")):
+				continue
+			var other_node := other as Node2D
+			if other_node == null:
+				continue
+			var other_radius := float(other.call("get_separation_radius"))
+			var min_distance := self_radius + other_radius
+			var offset := global_position - other_node.global_position
+			var dist_sq := offset.length_squared()
+			if dist_sq >= min_distance * min_distance:
+				continue
+			var dist := sqrt(dist_sq)
+			var normal := offset / dist if dist > 0.001 else _get_fallback_separation_dir(other_node)
+			separation += normal * ((min_distance - dist) * 0.5)
+			overlaps += 1
+	if overlaps > 0:
+		global_position += separation / float(overlaps)
+
+
+func _get_fallback_separation_dir(other: Node) -> Vector2:
+	var self_bias := float(get_instance_id() & 1) * 2.0 - 1.0
+	var other_bias := float(other.get_instance_id() & 1) * 2.0 - 1.0
+	var dir := Vector2(self_bias, other_bias).normalized()
+	return dir if dir.length_squared() > 0.0 else Vector2.RIGHT
 
 
 func _die() -> void:

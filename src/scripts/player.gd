@@ -11,6 +11,7 @@ const PLAYER_SPRITE_PATH := "res://assets/export/effects/sprite.webp"
 const PLAYER_SPRITE_FRAME_SIZE := Vector2i(192, 208)
 const PLAYER_SPRITE_FRAME_COUNTS := [6, 8, 8, 4, 5, 8, 6, 6, 6]
 const PLAYER_SPRITE_DISPLAY_HEIGHT := 88.0
+const PLAYER_SEPARATION_RADIUS := 22.0
 const MAN_GUN_TEXTURE_PATH := "res://assets/export/weapon/weapon_02/瓦克恩冲锋枪.png"
 const MAN_GUN_NORMAL_FRAME_PATHS: Array[String] = [MAN_GUN_TEXTURE_PATH]
 const MAN_GUN_BERSERK_FRAME_PATHS: Array[String] = [MAN_GUN_TEXTURE_PATH]
@@ -261,6 +262,7 @@ func _physics_process(delta: float) -> void:
 		_invuln_timer = max(_invuln_timer, DASH_INVULN)
 		_dash_invuln_visual_timer = max(_dash_invuln_visual_timer, _dash_timer)
 		move_and_slide()
+		_resolve_solid_actor_overlaps()
 		_last_move_input = _dash_dir
 		_update_sprite_animation(delta)
 		_update_dash_afterimages(delta)
@@ -315,6 +317,7 @@ func _physics_process(delta: float) -> void:
 	var move_speed: float = SPEED * (1.0 + get_buff_stacks(BuffType.SPEED) * 0.2)
 	velocity = input * move_speed
 	move_and_slide()
+	_resolve_solid_actor_overlaps()
 	_last_move_input = input
 
 	# 面朝方向只跟随左右输入，纯上下移动不改变朝向
@@ -914,6 +917,53 @@ func is_test_invincible() -> bool:
 
 func get_weapon_name() -> String:
 	return WEAPONS[_weapon_keys[_weapon_index]].name
+
+
+func get_separation_radius() -> float:
+	return PLAYER_SEPARATION_RADIUS
+
+
+func _resolve_solid_actor_overlaps() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	var self_radius := get_separation_radius()
+	var separation := Vector2.ZERO
+	var overlaps := 0
+	for group_name in ["enemy", "chest"]:
+		for other in tree.get_nodes_in_group(group_name):
+			if other == self or not is_instance_valid(other):
+				continue
+			if not other.has_method("get_separation_radius"):
+				continue
+			if other.has_method("is_dying") and bool(other.call("is_dying")):
+				continue
+			if other.has_method("is_solid_actor") and not bool(other.call("is_solid_actor")):
+				continue
+			var other_node := other as Node2D
+			if other_node == null:
+				continue
+			var other_radius := float(other.call("get_separation_radius"))
+			if other_radius <= 0.0:
+				continue
+			var min_distance := self_radius + other_radius
+			var offset := global_position - other_node.global_position
+			var dist_sq := offset.length_squared()
+			if dist_sq >= min_distance * min_distance:
+				continue
+			var dist := sqrt(dist_sq)
+			var normal := offset / dist if dist > 0.001 else _get_actor_fallback_separation_dir(other_node)
+			separation += normal * (min_distance - dist)
+			overlaps += 1
+	if overlaps > 0:
+		move_and_collide(separation / float(overlaps))
+
+
+func _get_actor_fallback_separation_dir(other: Node) -> Vector2:
+	var self_bias := float(get_instance_id() & 1) * 2.0 - 1.0
+	var other_bias := float(other.get_instance_id() & 1) * 2.0 - 1.0
+	var dir := Vector2(self_bias, other_bias).normalized()
+	return dir if dir.length_squared() > 0.0 else Vector2.RIGHT
 
 
 func _setup_sprite() -> void:

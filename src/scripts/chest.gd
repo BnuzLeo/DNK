@@ -44,6 +44,7 @@ const BUFF_DURATION_MAX := 40.0
 func _ready() -> void:
 	collision_layer = 32  # PICKUP 层
 	collision_mask = 1    # 碰撞玩家
+	add_to_group("chest")
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 	if is_start_supply:
@@ -90,6 +91,14 @@ func get_buff_display_name(type: int) -> String:
 		2: return "复活币"
 		3: return "弹道强化"
 		_: return "未知"
+
+
+func is_solid_actor() -> bool:
+	return not _opened
+
+
+func get_separation_radius() -> float:
+	return 30.0 if is_start_supply else 18.0
 
 
 func _physics_process(delta: float) -> void:
@@ -165,7 +174,7 @@ func _give_start_supply(player: Node) -> void:
 		if not player.has_weapon(key):
 			candidates.append(key)
 	if candidates.is_empty():
-a		candidates = START_SUPPLY_WEAPON_KEYS.duplicate()
+		candidates = START_SUPPLY_WEAPON_KEYS.duplicate()
 	candidates.shuffle()
 
 	var key: String = candidates[0]

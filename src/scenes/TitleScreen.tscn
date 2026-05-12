@@ -22,10 +22,9 @@ shadow_size = 4
 [node name="TitleScreen" type="Node2D" unique_id=1839049520]
 script = ExtResource("1")
 
-[node name="MenuVideoLayer" type="CanvasLayer" parent="."]
-layer = 1
+[node name="MenuVideoLayer" type="CanvasLayer" parent="." unique_id=1392569361]
 
-[node name="MenuVideoPlayer" type="TextureRect" parent="MenuVideoLayer"]
+[node name="MenuVideoPlayer" type="TextureRect" parent="MenuVideoLayer" unique_id=525210025]
 offset_right = 960.0
 offset_bottom = 640.0
 mouse_filter = 2
