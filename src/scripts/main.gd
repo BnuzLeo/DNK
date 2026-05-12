@@ -49,8 +49,6 @@ const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_yellow_sh
 const DUNGEON_PORTAL_INTERACT_RADIUS := 58.0
 const BOSS_SETTLEMENT_RETURN_TIME := 10.0
 const SYSTEM_HINT_DURATION := 1.8
-const MESSAGE_HINT_DURATION := 4.0
-const MESSAGE_PANEL_MAX_ITEMS := 4
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 
@@ -127,6 +125,7 @@ var _boss_clear_return_timer := 0.0
 var _boss_clear_notice_second := -1
 var _system_countdown_canvas: CanvasLayer
 var _system_countdown_label: Label
+var _boss_portal_retry_timer := 0.0
 
 # HUD
 var _fps_label: Label
@@ -158,7 +157,8 @@ var _invincible_test_button: Button
 var _equipment_panel: Node = null
 var _action_button_feedback: Dictionary = {}
 var _message_panel: Control
-var _message_entries: Array[Dictionary] = []
+var _message_scroll: ScrollContainer
+var _message_list: VBoxContainer
 
 # 提示消息系统
 var _active_hints: Array[CanvasLayer] = []
@@ -201,7 +201,8 @@ func _create_transfer_portal(pos: Vector2, display_size: float, node_name: Strin
 	var portal: TransferPortal = TransferPortal.new()
 	portal.name = node_name
 	portal.position = pos
-	portal.z_index = 5
+	portal.z_index = 40
+	portal.visible = true
 	portal.setup(display_size)
 	add_child(portal)
 	return portal
@@ -217,7 +218,19 @@ func _show_boss_return_portal(pos: Vector2) -> void:
 	_portal_active = true
 	if _boss_portal_sprite != null and is_instance_valid(_boss_portal_sprite):
 		_boss_portal_sprite.queue_free()
-	_boss_portal_sprite = _create_transfer_portal(_portal_pos, VS.PORTAL_DUNGEON_DISPLAY_SIZE * 2.5, "BossReturnPortal")
+	_boss_portal_sprite = _create_transfer_portal(_portal_pos, VS.PORTAL_DUNGEON_DISPLAY_SIZE * 3.0, "BossReturnPortal")
+	_boss_portal_sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	_boss_portal_retry_timer = 0.0
+
+
+func _ensure_boss_return_portal_visible() -> void:
+	if not _portal_active or not _boss_defeated:
+		return
+	if _boss_portal_sprite == null or not is_instance_valid(_boss_portal_sprite):
+		_boss_portal_sprite = _create_transfer_portal(_portal_pos, VS.PORTAL_DUNGEON_DISPLAY_SIZE * 3.0, "BossReturnPortal")
+	_boss_portal_sprite.visible = true
+	_boss_portal_sprite.global_position = _portal_pos
+	_boss_portal_sprite.z_index = 40
 
 
 # ── 地牢生成 ──────────────────────────────────────────
@@ -232,6 +245,7 @@ func _generate_floor() -> void:
 	_boss_clear_return_active = false
 	_boss_clear_return_timer = 0.0
 	_boss_clear_notice_second = -1
+	_boss_portal_retry_timer = 0.0
 	_hide_system_countdown_hint()
 	_spawn_warning_positions.clear()
 	_spawn_warning_timer = 0.0
@@ -512,7 +526,7 @@ func _close_doors(pos: Vector2i) -> void:
 			_set_door_locked(door, true)
 			locked_any = true
 	if locked_any:
-		_show_hint("房门已锁，清理怪物后开启", Color(1.0, 0.8, 0.0))
+		_show_system_hint("房门已锁，清理怪物后开启", Color(1.0, 0.8, 0.0))
 
 func _update_camera_bounds(pos: Vector2i) -> void:
 	var rx: float = pos.x * CELL_W + ROOM_PAD_X
@@ -654,8 +668,14 @@ func _spawn_boss(pos: Vector2, room: RoomData, bounds: Rect2) -> void:
 	add_child(boss)
 	room.enemies.append(boss)
 	boss.tree_exiting.connect(_on_boss_died.bind(room))
+	if boss.has_signal("phase_changed"):
+		boss.connect("phase_changed", Callable(self, "_on_boss_phase_changed"))
 	# 显示 Boss 血条
 	_show_boss_hp(boss)
+
+
+func _on_boss_phase_changed(phase_number: int) -> void:
+	_show_system_hint("Boss 进入第 %d 阶段" % phase_number, Color(1.0, 0.84, 0.18))
 
 
 func _on_enemy_died(_enemy: Area2D, room: RoomData) -> void:
@@ -686,8 +706,7 @@ func _start_boss_settlement(room: RoomData) -> void:
 		$BulletPool.clear_all()
 	_grant_boss_settlement_reward()
 	_start_boss_clear_return_countdown()
-	_show_message_hint("Boss 已击败，房门保持关闭", Color(1.0, 0.84, 0.18))
-	_show_message_hint("通关奖励：坤币 +1", Color(0.0, 0.898, 1.0))
+	_show_system_hint("Boss 已击败，房门保持关闭", Color(1.0, 0.84, 0.18))
 	if _minimap:
 		_minimap.queue_redraw()
 
@@ -697,7 +716,7 @@ func _room_cleared(room: RoomData) -> void:
 		return
 	room.state = RoomState.CLEARED
 	_rooms_cleared += 1
-	_show_message_hint("房间已清理", Color(0.0, 1.0, 0.53))
+	_show_system_hint("房间已清理", Color(0.0, 1.0, 0.53))
 	# 延迟 0.5 秒后开门
 	await get_tree().create_timer(0.5).timeout
 	if room.grid_pos in _doors:
@@ -707,7 +726,7 @@ func _room_cleared(room: RoomData) -> void:
 				_set_door_locked(door, false)
 				door.queue_free()
 		_doors[room.grid_pos] = {}
-	_show_message_hint("门已开启", Color(0.0, 1.0, 0.53))
+	_show_system_hint("门已开启", Color(0.0, 1.0, 0.53))
 	queue_redraw()
 	if _minimap:
 		_minimap.queue_redraw()
@@ -1123,6 +1142,15 @@ func _create_hud() -> void:
 	_bag_button.gui_input.connect(_on_bag_button_input)
 	canvas.add_child(_bag_button)
 
+	var kill_boss_test_button := Button.new()
+	kill_boss_test_button.text = "秒杀Boss"
+	kill_boss_test_button.position = Vector2(306, 16)
+	kill_boss_test_button.size = Vector2(88, 30)
+	kill_boss_test_button.focus_mode = Control.FOCUS_NONE
+	kill_boss_test_button.add_theme_font_size_override("font_size", 15)
+	kill_boss_test_button.pressed.connect(_on_kill_boss_test_pressed)
+	canvas.add_child(kill_boss_test_button)
+
 	_invincible_test_button = Button.new()
 	_invincible_test_button.text = "无敌测试"
 	_invincible_test_button.position = Vector2(410, 16)
@@ -1200,7 +1228,7 @@ func _create_message_panel(canvas: CanvasLayer) -> void:
 	_message_panel = Control.new()
 	_message_panel.position = Vector2(742, 72)
 	_message_panel.size = Vector2(198, 104)
-	_message_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_message_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_message_panel.draw.connect(_draw_message_panel)
 	canvas.add_child(_message_panel)
 
@@ -1213,6 +1241,25 @@ func _create_message_panel(canvas: CanvasLayer) -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_message_panel.add_child(title)
 
+	_message_scroll = ScrollContainer.new()
+	_message_scroll.position = Vector2(8, 32)
+	_message_scroll.size = Vector2(182, 66)
+	_message_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_message_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_message_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	_message_panel.add_child(_message_scroll)
+
+	_message_list = VBoxContainer.new()
+	_message_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_message_list.add_theme_constant_override("separation", 2)
+	_message_scroll.add_child(_message_list)
+
+	if not GameManager.message_added.is_connected(_on_message_added):
+		GameManager.message_added.connect(_on_message_added)
+	for entry in GameManager.message_log:
+		_append_message_label(String(entry.get("text", "")), entry.get("color", Color.WHITE), false)
+	_scroll_messages_to_bottom()
+
 
 func _draw_message_panel() -> void:
 	if _message_panel == null:
@@ -1224,58 +1271,35 @@ func _draw_message_panel() -> void:
 
 
 func _show_message_hint(text: String, color: Color = Color.WHITE) -> void:
-	if _message_panel == null:
-		return
-	while _message_entries.size() >= MESSAGE_PANEL_MAX_ITEMS:
-		var oldest: Dictionary = _message_entries[0]
-		if is_instance_valid(oldest.label):
-			oldest.label.queue_free()
-		_message_entries.remove_at(0)
+	GameManager.post_message(text, color)
 
+
+func _on_message_added(text: String, color: Color) -> void:
+	_append_message_label(text, color)
+
+
+func _append_message_label(text: String, color: Color = Color.WHITE, scroll_to_bottom: bool = true) -> void:
+	if _message_list == null:
+		return
 	var label := Label.new()
 	label.text = text
-	label.size = Vector2(178, 18)
+	label.custom_minimum_size = Vector2(168, 0)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.add_theme_font_size_override("font_size", 12)
 	label.add_theme_color_override("font_color", color)
-	label.clip_text = true
-	_message_panel.add_child(label)
-	_message_entries.append({"label": label, "time": MESSAGE_HINT_DURATION, "base_color": color})
-	_reposition_message_hints()
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_message_list.add_child(label)
+	if scroll_to_bottom:
+		call_deferred("_scroll_messages_to_bottom")
 
 
-func _reposition_message_hints() -> void:
-	for i in _message_entries.size():
-		var entry: Dictionary = _message_entries[i]
-		var label: Label = entry.label
-		if not is_instance_valid(label):
-			continue
-		label.position = Vector2(10, 33 + i * 17)
-
-
-func _update_message_hints(delta: float) -> void:
-	var i := _message_entries.size() - 1
-	var changed := false
-	while i >= 0:
-		var entry: Dictionary = _message_entries[i]
-		var label: Label = entry.label
-		if not is_instance_valid(label):
-			_message_entries.remove_at(i)
-			changed = true
-			i -= 1
-			continue
-		entry.time -= delta
-		if entry.time <= 0.0:
-			label.queue_free()
-			_message_entries.remove_at(i)
-			changed = true
-		else:
-			var color: Color = entry.base_color
-			color.a = clampf(entry.time / 0.5, 0.0, 1.0) if entry.time < 0.5 else 1.0
-			label.add_theme_color_override("font_color", color)
-			_message_entries[i] = entry
-		i -= 1
-	if changed:
-		_reposition_message_hints()
+func _scroll_messages_to_bottom() -> void:
+	if _message_scroll == null:
+		return
+	await get_tree().process_frame
+	var bar := _message_scroll.get_v_scroll_bar()
+	if bar != null:
+		_message_scroll.scroll_vertical = int(bar.max_value)
 
 
 func _draw_stats_frame() -> void:
@@ -1539,6 +1563,48 @@ func _on_boss_test_pressed() -> void:
 	_jump_to_boss_room_for_test()
 
 
+func _on_kill_boss_test_pressed() -> void:
+	if GameManager.state == GameManager.GameState.PAUSED:
+		_hide_pause_menu()
+		GameManager.change_state(GameManager.GameState.PLAYING)
+	if GameManager.state != GameManager.GameState.PLAYING:
+		return
+	var boss := _get_active_boss_for_test()
+	if boss == null:
+		_show_system_hint("测试：未找到可秒杀的 Boss", Color(1.0, 0.55, 0.2))
+		return
+	var armor_value: int = int(boss.get("armor"))
+	var hp_value: int = int(boss.get("hp"))
+	var damage := maxi(999999, hp_value + armor_value + 1)
+	boss.call("take_damage", damage)
+	_show_system_hint("测试：已秒杀 Boss", Color(1.0, 0.84, 0.18))
+
+
+func _get_active_boss_for_test() -> Area2D:
+	_spawn_pending_boss_for_test()
+	if _boss_ref != null and is_instance_valid(_boss_ref) and _boss_ref.has_method("take_damage"):
+		if not (_boss_ref.has_method("is_dying") and bool(_boss_ref.call("is_dying"))):
+			return _boss_ref
+	if _boss_pos in _rooms:
+		var boss_room: RoomData = _rooms[_boss_pos]
+		for enemy in boss_room.enemies:
+			if is_instance_valid(enemy) and enemy.has_method("take_damage"):
+				if enemy.has_method("is_dying") and bool(enemy.call("is_dying")):
+					continue
+				return enemy
+	return null
+
+
+func _spawn_pending_boss_for_test() -> void:
+	if _spawn_warning_room != _boss_pos or _spawn_warning_positions.is_empty():
+		return
+	_spawn_warning_timer = 0.0
+	if _boss_pos in _rooms:
+		_spawn_enemies_with_positions(_boss_pos)
+	_spawn_warning_positions.clear()
+	queue_redraw()
+
+
 func _jump_to_boss_room_for_test() -> void:
 	if _boss_pos not in _rooms:
 		return
@@ -1623,7 +1689,6 @@ func _show_boss_hp(boss: Area2D) -> void:
 func _process(delta: float) -> void:
 	var state := GameManager.state
 	_update_action_button_feedback(delta)
-	_update_message_hints(delta)
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 	_kills_label.text = ""
 	_practice_label.text = str(GameManager.practice_time)
@@ -1676,6 +1741,14 @@ func _process(delta: float) -> void:
 	# 摄像机震动
 	if _cam_mgr:
 		_cam_mgr.update(delta)
+
+	if _portal_active and _boss_defeated:
+		if not _boss_clear_return_active:
+			_start_boss_clear_return_countdown()
+		_boss_portal_retry_timer -= delta
+		if _boss_portal_retry_timer <= 0.0:
+			_boss_portal_retry_timer = 0.25
+			_ensure_boss_return_portal_visible()
 
 	# 复活倒计时（真实时间，不受暂停影响）
 	if state == GameManager.GameState.REVIVING:

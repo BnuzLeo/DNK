@@ -3,6 +3,7 @@ extends Node
 enum GameState { MAIN_MENU, LOBBY, PLAYING, PAUSED, DEAD, REVIVING, GAME_OVER, SETTLEMENT }
 
 signal state_changed(old_state: GameState, new_state: GameState)
+signal message_added(text: String, color: Color)
 
 const LOBBY_TEST_WEAPONS := ["basketball", "jntm", "chicken_foot"]
 
@@ -16,6 +17,7 @@ var revive_coins: int = 1
 # ── 经济系统 ──
 var practice_time: int = 1000
 var kun_coins: int = 100
+var message_log: Array[Dictionary] = []
 
 # ── 持久化玩家数据（跨场景保持）──
 var player_data: Dictionary = {
@@ -83,6 +85,7 @@ func restart_game() -> void:
 	revive_coins = 1
 	practice_time = 0
 	kun_coins = 0
+	message_log.clear()
 	player_data = {
 		"owned_weapons": ["basketball"],
 		"equipped_weapons": ["basketball"],
@@ -119,6 +122,13 @@ func add_kill() -> void:
 
 func add_dungeon_clear() -> void:
 	kun_coins += 1
+	post_message("获得坤币 +1", Color(0.0, 0.898, 1.0))
+
+
+func post_message(text: String, color: Color = Color.WHITE) -> void:
+	var entry := {"text": text, "color": color}
+	message_log.append(entry)
+	message_added.emit(text, color)
 
 
 # ── 升级系统 ──
@@ -139,8 +149,11 @@ func can_afford_upgrade(stat: String) -> bool:
 func purchase_upgrade(stat: String) -> bool:
 	if not can_afford_upgrade(stat):
 		return false
-	practice_time -= get_upgrade_cost(stat)
+	var cost := get_upgrade_cost(stat)
+	practice_time -= cost
 	player_data["upgrade_%s_level" % stat] += 1
+	post_message("消耗练习时长 -%d" % cost, Color(1.0, 0.78, 0.25))
+	post_message("升级成功：%s Lv.%d" % [_get_upgrade_name(stat), int(player_data["upgrade_%s_level" % stat])], Color(0.0, 0.898, 1.0))
 	return true
 
 
@@ -153,8 +166,11 @@ func purchase_weapon(key: String) -> bool:
 		return false
 	if kun_coins < WEAPON_COSTS[key]:
 		return false
-	kun_coins -= WEAPON_COSTS[key]
+	var cost: int = WEAPON_COSTS[key]
+	kun_coins -= cost
 	player_data.owned_weapons.append(key)
+	post_message("消耗坤币 -%d" % cost, Color(1.0, 0.78, 0.25))
+	post_message("获得物品：%s" % _get_weapon_name(key), Color(0.0, 0.898, 1.0))
 	return true
 
 
@@ -170,7 +186,33 @@ func unlock_weapon_slot() -> bool:
 		return false
 	kun_coins -= cost
 	player_data.max_weapon_slots = next_slot
+	post_message("消耗坤币 -%d" % cost, Color(1.0, 0.78, 0.25))
+	post_message("解锁装备槽：第 %d 格" % next_slot, Color(0.0, 0.898, 1.0))
 	return true
+
+
+func _get_upgrade_name(stat: String) -> String:
+	match stat:
+		"hp":
+			return "生命"
+		"speed":
+			return "速度"
+		"mana":
+			return "蓝量"
+		"regen":
+			return "回蓝"
+	return stat
+
+
+func _get_weapon_name(key: String) -> String:
+	match key:
+		"basketball":
+			return "篮球"
+		"jntm":
+			return "大族激光"
+		"chicken_foot":
+			return "真正的MAN"
+	return key
 
 
 func save_lobby_weapons() -> void:

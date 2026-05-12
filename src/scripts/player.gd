@@ -1226,6 +1226,7 @@ func add_weapon(key: String) -> bool:
 	if key not in WEAPONS or key in _weapon_keys:
 		return false
 	_weapon_keys.append(key)
+	GameManager.post_message("获得物品：%s" % WEAPONS[key].name, Color(0.0, 0.898, 1.0))
 	return true
 
 
@@ -1298,6 +1299,8 @@ func add_buff(type: int, duration: float) -> void:
 		_active_buffs[type].stacks += 1
 	else:
 		_active_buffs[type] = {"time": duration, "stacks": 1}
+	var info: Dictionary = BUFF_INFO.get(type, {"name": "未知"})
+	GameManager.post_message("获得状态：%s" % String(info.get("name", "未知")), Color(0.3, 0.85, 1.0))
 
 
 func get_buff_stacks(type: int) -> int:

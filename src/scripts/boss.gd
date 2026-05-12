@@ -6,6 +6,8 @@ const VS := preload("res://scripts/visual_spec.gd")
 const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
 const BOSS_MINION_SCRIPT := preload("res://scripts/boss_minion.gd")
 
+signal phase_changed(phase_number: int)
+
 enum Phase { P1, P2, P3 }
 enum AttackType { BIG_SNOWBALLS, SNOW_STORM, JUMP_SUMMON }
 
@@ -150,6 +152,7 @@ func _update_phase() -> void:
 		_phase = next_phase
 		_phase_visual_time = 0.0
 		_create_phase_transition_effect()
+		phase_changed.emit(_phase + 1)
 
 
 func _move_toward_player(delta: float) -> void:

@@ -299,6 +299,8 @@ func _try_upgrade(node_def: Dictionary) -> void:
 	# 购买
 	GameManager.practice_time -= cost
 	_node_levels[key] = level + 1
+	GameManager.post_message("消耗练习时长 -%d" % cost, Color(1.0, 0.78, 0.25))
+	GameManager.post_message("学习天赋：%s Lv.%d" % [node_def.name, level + 1], Color(0.0, 0.898, 1.0))
 	_save_levels()
 	_apply_talents()
 	_build_ui()
@@ -327,6 +329,8 @@ func _reset_talents() -> void:
 			refund += costs[i]
 		_node_levels[key] = 0
 	GameManager.practice_time += refund
+	if refund > 0:
+		GameManager.post_message("返还练习时长 +%d" % refund, Color(0.0, 0.898, 1.0))
 	_save_levels()
 	_apply_talents()
 	_build_ui()

@@ -70,6 +70,9 @@ var _coin_panel: Control
 var _practice_panel: Control
 var _bag_button: Control
 var _action_button_feedback: Dictionary = {}
+var _message_panel: Control
+var _message_scroll: ScrollContainer
+var _message_list: VBoxContainer
 
 # 地图选择
 var _map_select_open := false
@@ -418,6 +421,8 @@ func _create_hud() -> void:
 	_buff_bar.draw.connect(_draw_buff_bar)
 	_hud_canvas.add_child(_buff_bar)
 
+	_create_message_panel(_hud_canvas)
+
 
 func _process(delta: float) -> void:
 	_anim_timer += delta
@@ -477,6 +482,84 @@ func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
 	label.add_theme_constant_override("shadow_offset_x", 1)
 	label.add_theme_constant_override("shadow_offset_y", 1)
 	return label
+
+
+func _create_message_panel(canvas: CanvasLayer) -> void:
+	_message_panel = Control.new()
+	_message_panel.position = Vector2(742, 72)
+	_message_panel.size = Vector2(198, 104)
+	_message_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_message_panel.draw.connect(_draw_message_panel)
+	canvas.add_child(_message_panel)
+
+	var title := Label.new()
+	title.text = "消息提示"
+	title.position = Vector2(10, 7)
+	title.size = Vector2(178, 18)
+	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_color_override("font_color", Color(0.86, 0.94, 0.98))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_message_panel.add_child(title)
+
+	_message_scroll = ScrollContainer.new()
+	_message_scroll.position = Vector2(8, 32)
+	_message_scroll.size = Vector2(182, 66)
+	_message_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_message_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_message_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	_message_panel.add_child(_message_scroll)
+
+	_message_list = VBoxContainer.new()
+	_message_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_message_list.add_theme_constant_override("separation", 2)
+	_message_scroll.add_child(_message_list)
+
+	if not GameManager.message_added.is_connected(_on_message_added):
+		GameManager.message_added.connect(_on_message_added)
+	for entry in GameManager.message_log:
+		_append_message_label(String(entry.get("text", "")), entry.get("color", Color.WHITE), false)
+	_scroll_messages_to_bottom()
+
+
+func _draw_message_panel() -> void:
+	if _message_panel == null:
+		return
+	var r := Rect2(Vector2.ZERO, _message_panel.size)
+	_message_panel.draw_rect(r, Color(0.03, 0.05, 0.07, 0.58))
+	_message_panel.draw_rect(r.grow(-2), Color(0.08, 0.11, 0.13, 0.62))
+	_message_panel.draw_line(Vector2(10, 28), Vector2(_message_panel.size.x - 10, 28), Color(0.4, 0.65, 0.72, 0.55), 1.0)
+
+
+func _show_message_hint(text: String, color: Color = Color.WHITE) -> void:
+	GameManager.post_message(text, color)
+
+
+func _on_message_added(text: String, color: Color) -> void:
+	_append_message_label(text, color)
+
+
+func _append_message_label(text: String, color: Color = Color.WHITE, scroll_to_bottom: bool = true) -> void:
+	if _message_list == null:
+		return
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(168, 0)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", color)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_message_list.add_child(label)
+	if scroll_to_bottom:
+		call_deferred("_scroll_messages_to_bottom")
+
+
+func _scroll_messages_to_bottom() -> void:
+	if _message_scroll == null:
+		return
+	await get_tree().process_frame
+	var bar := _message_scroll.get_v_scroll_bar()
+	if bar != null:
+		_message_scroll.scroll_vertical = int(bar.max_value)
 
 
 func _draw_stats_frame() -> void:

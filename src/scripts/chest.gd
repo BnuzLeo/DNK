@@ -154,6 +154,7 @@ func _give_reward(player: Node) -> void:
 		player.add_buff(buff_type, duration)
 		if buff_type == 2:  # REVIVE
 			GameManager.revive_coins += 1
+			GameManager.post_message("获得复活币 +1", Color(1.0, 0.84, 0.0))
 
 	opened.emit(_reward_type, _reward_key)
 	_spawn_label()
