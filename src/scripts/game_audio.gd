@@ -11,15 +11,50 @@ const DOOR := "res://assets/music/音效/fx_door #310031.wav"
 const ENERGY := "res://assets/music/音效/fx_energy #310029.wav"
 const SWITCH := "res://assets/music/音效/fx_switch #310025.wav"
 const DASH := "res://assets/music/音效/fx_sword2 #310027.wav"
-const HIT := "res://assets/music/音效/fx_show_up #310028.wav"
+const SHOOT := "res://assets/music/音效/fx_show_up #310028.wav"
 const PLAYER_DEAD := "res://assets/music/dialogue/你干嘛.wav"
+const DUNGEON_BGM := "res://assets/music/音效/bgm_1Low #310032.wav"
 
 var _cache: Dictionary = {}
 var _last_played_msec: Dictionary = {}
+var _lobby_music_player: AudioStreamPlayer = null
+var _dungeon_bgm_player: AudioStreamPlayer = null
 
 
 func play_lobby_entry() -> void:
-	play_voice(LOBBY_ENTRY)
+	start_lobby_music()
+
+
+func start_lobby_music() -> void:
+	stop_dungeon_bgm()
+	if _lobby_music_player != null and is_instance_valid(_lobby_music_player):
+		if not _lobby_music_player.playing:
+			_lobby_music_player.play()
+		return
+	_lobby_music_player = _create_loop_player(LOBBY_ENTRY, -4.0)
+
+
+func stop_lobby_music() -> void:
+	if _lobby_music_player != null and is_instance_valid(_lobby_music_player):
+		_lobby_music_player.stop()
+		_lobby_music_player.queue_free()
+	_lobby_music_player = null
+
+
+func start_dungeon_bgm() -> void:
+	stop_lobby_music()
+	if _dungeon_bgm_player != null and is_instance_valid(_dungeon_bgm_player):
+		if not _dungeon_bgm_player.playing:
+			_dungeon_bgm_player.play()
+		return
+	_dungeon_bgm_player = _create_loop_player(DUNGEON_BGM, -8.0)
+
+
+func stop_dungeon_bgm() -> void:
+	if _dungeon_bgm_player != null and is_instance_valid(_dungeon_bgm_player):
+		_dungeon_bgm_player.stop()
+		_dungeon_bgm_player.queue_free()
+	_dungeon_bgm_player = null
 
 
 func play_button() -> void:
@@ -62,8 +97,8 @@ func play_dash() -> void:
 	play_sfx(DASH, -4.0, 0.04)
 
 
-func play_hit() -> void:
-	play_sfx(HIT, -8.0, 0.025)
+func play_shoot() -> void:
+	play_sfx(SHOOT, -8.0, 0.08)
 
 
 func play_player_dead() -> void:
@@ -99,6 +134,24 @@ func _play(path: String, volume_db: float, pitch_scale: float, throttle_seconds:
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
+
+
+func _create_loop_player(path: String, volume_db: float) -> AudioStreamPlayer:
+	var stream := _get_stream(path)
+	if stream == null:
+		return null
+	var player := AudioStreamPlayer.new()
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	player.bus = "Master"
+	player.stream = stream
+	player.volume_db = volume_db
+	add_child(player)
+	player.finished.connect(func() -> void:
+		if player != null and is_instance_valid(player):
+			player.play()
+	)
+	player.play()
+	return player
 
 
 func _get_stream(path: String) -> AudioStream:

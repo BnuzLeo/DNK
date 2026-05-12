@@ -115,7 +115,7 @@ var _map_cards: Array[Control] = []
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameManager.change_state(GameManager.GameState.LOBBY)
-	GameAudio.play_lobby_entry()
+	GameAudio.start_lobby_music()
 	_start_lobby_music()
 	_create_walls()
 	_setup_lobby_object_collisions()
@@ -124,6 +124,10 @@ func _ready() -> void:
 	_setup_npcs()
 	_setup_lobby_portal()
 	_create_hud()
+
+
+func _exit_tree() -> void:
+	GameAudio.stop_lobby_music()
 
 
 func _start_lobby_music() -> void:
@@ -744,12 +748,10 @@ func _draw_buff_bar() -> void:
 func _on_action_button_input(event: InputEvent, action: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			GameAudio.play_button()
 			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 	elif event is InputEventScreenTouch:
 		if event.pressed:
-			GameAudio.play_button()
 			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 
@@ -785,11 +787,11 @@ func _update_action_button_feedback(delta: float) -> void:
 
 func _on_bag_button_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		GameAudio.play_button()
-		_open_equipment_panel()
+		if _open_equipment_panel():
+			GameAudio.play_button()
 	elif event is InputEventScreenTouch and event.pressed:
-		GameAudio.play_button()
-		_open_equipment_panel()
+		if _open_equipment_panel():
+			GameAudio.play_button()
 
 
 func _emit_virtual_action(action: String, pressed: bool) -> void:
@@ -814,7 +816,8 @@ func _input(event: InputEvent) -> void:
 	# B键打开装备背包
 	if event is InputEventKey and event.pressed and event.keycode == KEY_B:
 		get_viewport().set_input_as_handled()
-		_open_equipment_panel()
+		if _open_equipment_panel():
+			GameAudio.play_button()
 		return
 
 	# 副本入口 — 打开地图选择
@@ -928,7 +931,6 @@ func _open_map_select() -> void:
 	start_button.add_theme_stylebox_override("normal", _make_flat_style(Color(0.16, 0.78, 0.02), Color(0.02, 0.18, 0.0), 0, 3))
 	start_button.add_theme_stylebox_override("hover", _make_flat_style(Color(0.22, 0.94, 0.04), Color(0.02, 0.20, 0.0), 0, 3))
 	start_button.add_theme_stylebox_override("pressed", _make_flat_style(Color(0.10, 0.52, 0.02), Color(0.0, 0.12, 0.0), 0, 3))
-	start_button.pressed.connect(GameAudio.play_button)
 	start_button.pressed.connect(_enter_dungeon)
 	window.add_child(start_button)
 
@@ -1106,9 +1108,9 @@ func _close_map_select() -> void:
 		GameManager.change_state(GameManager.GameState.LOBBY)
 
 
-func _open_equipment_panel() -> void:
+func _open_equipment_panel() -> bool:
 	if _equipment_panel:
-		return
+		return false
 	GameManager.change_state(GameManager.GameState.PAUSED)
 	_equipment_panel = EQUIPMENT_PANEL_SCRIPT.new()
 	_equipment_panel.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -1119,12 +1121,16 @@ func _open_equipment_panel() -> void:
 	)
 	add_child(_equipment_panel)
 	_equipment_panel.show_panel(_player)
+	return true
 
 
 func _enter_dungeon() -> void:
 	_map_select_open = false
 	if _map_select_canvas:
 		_map_select_canvas.queue_free()
+	GameAudio.play_button()
+	GameAudio.stop_lobby_music()
+	GameAudio.start_dungeon_bgm()
 	GameManager.save_lobby_weapons()
 	_player.save_to_game_manager()
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")

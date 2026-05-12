@@ -191,6 +191,7 @@ var _message_list: VBoxContainer
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameManager.change_state(GameManager.GameState.PLAYING)
+	GameAudio.start_dungeon_bgm()
 	$Player.hp_changed.connect(_on_player_hp_changed)
 	$Player.player_died.connect(_on_player_died)
 	$Player.player_hit.connect(_on_player_hit)
@@ -219,6 +220,10 @@ func _ready() -> void:
 	# 初始摄像机边界
 	_update_camera_bounds(CENTER)
 	_play_player_spawn_warning($Player)
+
+
+func _exit_tree() -> void:
+	GameAudio.stop_dungeon_bgm()
 
 
 func _create_transfer_portal(pos: Vector2, display_size: float, node_name: String) -> TransferPortal:
@@ -1471,12 +1476,10 @@ func _draw_buff_bar() -> void:
 func _on_action_button_input(event: InputEvent, action: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			GameAudio.play_button()
 			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 	elif event is InputEventScreenTouch:
 		if event.pressed:
-			GameAudio.play_button()
 			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 
@@ -1519,20 +1522,20 @@ func _emit_virtual_action(action: String, pressed: bool) -> void:
 
 func _on_pause_button_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		GameAudio.play_button()
-		_toggle_pause_from_hud()
+		if _toggle_pause_from_hud():
+			GameAudio.play_button()
 	elif event is InputEventScreenTouch and event.pressed:
-		GameAudio.play_button()
-		_toggle_pause_from_hud()
+		if _toggle_pause_from_hud():
+			GameAudio.play_button()
 
 
 func _on_bag_button_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		GameAudio.play_button()
-		_open_equipment_panel()
+		if _open_equipment_panel():
+			GameAudio.play_button()
 	elif event is InputEventScreenTouch and event.pressed:
-		GameAudio.play_button()
-		_open_equipment_panel()
+		if _open_equipment_panel():
+			GameAudio.play_button()
 
 
 func _on_invincible_test_pressed() -> void:
@@ -1545,17 +1548,16 @@ func _on_invincible_test_pressed() -> void:
 
 
 func _on_boss_test_pressed() -> void:
-	GameAudio.play_button()
 	if GameManager.state == GameManager.GameState.PAUSED:
 		_hide_pause_menu()
 		GameManager.change_state(GameManager.GameState.PLAYING)
 	if GameManager.state != GameManager.GameState.PLAYING:
 		return
+	GameAudio.play_button()
 	_jump_to_boss_room_for_test()
 
 
 func _on_kill_boss_test_pressed() -> void:
-	GameAudio.play_button()
 	if GameManager.state == GameManager.GameState.PAUSED:
 		_hide_pause_menu()
 		GameManager.change_state(GameManager.GameState.PLAYING)
@@ -1565,6 +1567,7 @@ func _on_kill_boss_test_pressed() -> void:
 	if boss == null:
 		_show_system_hint("测试：未找到可秒杀的 Boss", Color(1.0, 0.55, 0.2))
 		return
+	GameAudio.play_button()
 	var armor_value: int = int(boss.get("armor"))
 	var hp_value: int = int(boss.get("hp"))
 	var damage := maxi(999999, hp_value + armor_value + 1)
@@ -1644,13 +1647,16 @@ func _open_all_doors_for_test() -> void:
 				_set_door_locked(door, false)
 
 
-func _toggle_pause_from_hud() -> void:
+func _toggle_pause_from_hud() -> bool:
 	if GameManager.state == GameManager.GameState.PLAYING:
 		GameManager.change_state(GameManager.GameState.PAUSED)
 		_show_pause_menu()
+		return true
 	elif GameManager.state == GameManager.GameState.PAUSED:
 		_hide_pause_menu()
 		GameManager.change_state(GameManager.GameState.PLAYING)
+		return true
+	return false
 
 
 func _show_boss_hp(boss: Area2D) -> void:
@@ -2031,7 +2037,8 @@ func _input(event: InputEvent) -> void:
 
 	if GameManager.state == GameManager.GameState.PLAYING and event is InputEventKey and event.pressed and event.keycode == KEY_B:
 		get_viewport().set_input_as_handled()
-		_open_equipment_panel()
+		if _open_equipment_panel():
+			GameAudio.play_button()
 		return
 
 	if _game_over and event is InputEventKey and event.pressed and event.keycode == KEY_R:
@@ -2089,9 +2096,9 @@ func _hide_pause_menu() -> void:
 		_pause_canvas = null
 
 
-func _open_equipment_panel() -> void:
+func _open_equipment_panel() -> bool:
 	if _equipment_panel != null or GameManager.state != GameManager.GameState.PLAYING:
-		return
+		return false
 	GameManager.change_state(GameManager.GameState.PAUSED)
 	_equipment_panel = load("res://scripts/equipment_panel.gd").new()
 	_equipment_panel.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -2102,6 +2109,7 @@ func _open_equipment_panel() -> void:
 	)
 	add_child(_equipment_panel)
 	_equipment_panel.show_panel($Player)
+	return true
 
 
 func _resume_from_pause_menu() -> void:
@@ -2295,7 +2303,7 @@ func _get_hit_spark_color(projectile_type: String) -> Color:
 
 
 func _play_hit_sfx(projectile_type: String, is_kill: bool, is_boss: bool) -> void:
-	GameAudio.play_hit()
+	pass
 
 
 func _ensure_hit_sfx_cache() -> void:
@@ -2377,7 +2385,7 @@ func _create_minimap() -> void:
 	add_child(canvas)
 
 	var minimap_control := Control.new()
-	minimap_control.position = Vector2(830, 154)
+	minimap_control.position = Vector2(830, 214)
 	minimap_control.size = Vector2(118, 132)
 	minimap_control.name = "Minimap"
 	minimap_control.mouse_filter = Control.MOUSE_FILTER_IGNORE

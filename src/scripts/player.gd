@@ -115,6 +115,7 @@ var _weapon_aim_dir := Vector2.RIGHT
 var _laser_visual: Node2D = null
 var _laser_segments: Array[Dictionary] = []
 var _laser_damage_timer := 0.0
+var _laser_audio_active := false
 
 # 闪避状态
 var _dash_timer := 0.0
@@ -430,33 +431,35 @@ func _fire_weapon(weapon: Dictionary, ignore_cooldown: bool = false) -> void:
 		return
 	if not ignore_cooldown and _fire_cooldown > 0.0:
 		return
+	if not _activate_weapon(weapon):
+		return
 	mana -= mana_cost
-	_activate_weapon(weapon)
+	GameAudio.play_shoot()
 	if weapon.get("type", "") != "man_gun":
 		_sprite_action_timer = 0.22
 	_fire_cooldown = 0.0 if ignore_cooldown else _get_weapon_cooldown(weapon)
 
 
-func _activate_weapon(weapon: Dictionary) -> void:
+func _activate_weapon(weapon: Dictionary) -> bool:
 	match weapon.type:
 		"basketball":
-			_shoot_basketball(weapon)
+			return _shoot_basketball(weapon)
 		"room_blast":
-			_start_room_blast(weapon)
+			return _start_room_blast(weapon)
 		"rooster":
-			_spawn_roosters(weapon)
+			return _spawn_roosters(weapon)
 		"man_gun":
-			_shoot_man_gun(weapon)
+			return _shoot_man_gun(weapon)
 		"laser_gun":
-			pass
+			return false
+	return false
 
 
-func _shoot_basketball(weapon: Dictionary) -> void:
+func _shoot_basketball(weapon: Dictionary) -> bool:
 	if bullet_pool == null:
-		return
+		return false
 	if _is_basketball_tap_berserk(weapon):
-		_shoot_basketball_berserk(weapon)
-		return
+		return _shoot_basketball_berserk(weapon)
 	var count: int = weapon.get("count", 1) + get_buff_stacks(BuffType.BULLET)
 	var spread: float = weapon.get("spread", 0.0)
 	var speed: float = weapon.get("speed", 620.0)
@@ -476,18 +479,20 @@ func _shoot_basketball(weapon: Dictionary) -> void:
 			0.0,
 			"basketball"
 		)
+	return true
 
 
-func _shoot_basketball_berserk(weapon: Dictionary) -> void:
+func _shoot_basketball_berserk(weapon: Dictionary) -> bool:
 	if bullet_pool == null:
-		return
+		return false
 	_trigger_basketball_prompt_flash()
 	var damage: int = weapon.get("berserk_damage", weapon.damage) + damage_bonus
 	var targets: Array[Area2D] = _get_basketball_berserk_targets()
 	if targets.is_empty():
-		return
+		return false
 	var enemy: Area2D = targets[randi() % targets.size()]
 	bullet_pool.call("spawn_basketball_slam", enemy, enemy.global_position, damage)
+	return true
 
 
 func _get_basketball_berserk_targets() -> Array[Area2D]:
@@ -532,13 +537,14 @@ func _update_basketball_auto_j(delta: float) -> void:
 		_basketball_auto_j_timer += BASKETBALL_AUTO_J_INTERVAL
 
 
-func _start_room_blast(weapon: Dictionary) -> void:
+func _start_room_blast(weapon: Dictionary) -> bool:
 	var hits: int = weapon.get("berserk_hits", 1) if _berserk_active else 1
 	_room_blast_damage = weapon.damage + damage_bonus
 	_room_blast_interval = weapon.get("berserk_interval", weapon.cooldown)
 	_room_blast_pending = maxi(hits - 1, 0)
 	_room_blast_timer = _room_blast_interval
 	_deal_room_blast(_room_blast_damage)
+	return true
 
 
 func _update_room_blast_combo(delta: float) -> void:
@@ -588,7 +594,6 @@ func _get_current_room_enemies() -> Array[Area2D]:
 func _deal_damage_to_enemy(enemy: Area2D, amount: int) -> void:
 	var was_dying: bool = "_dying" in enemy and enemy._dying
 	enemy.take_damage(amount)
-	GameAudio.play_hit()
 	if enemy.has_method("apply_hit_feedback"):
 		var dir: Vector2 = (enemy.global_position - global_position).normalized()
 		if dir == Vector2.ZERO:
@@ -632,10 +637,10 @@ func _show_room_blast_fx(amount: int, target_count: int) -> void:
 	tween.tween_callback(canvas.queue_free)
 
 
-func _spawn_roosters(weapon: Dictionary) -> void:
+func _spawn_roosters(weapon: Dictionary) -> bool:
 	var scene := get_tree().current_scene
 	if scene == null:
-		return
+		return false
 	var count: int = weapon.get("berserk_count", weapon.get("count", 1)) if _berserk_active else weapon.get("count", 1)
 	var damage: int = weapon.damage + damage_bonus
 	var speed: float = weapon.get("speed", 280.0)
@@ -653,11 +658,12 @@ func _spawn_roosters(weapon: Dictionary) -> void:
 		var projectile: Area2D = ROOSTER_PROJECTILE.new()
 		scene.add_child(projectile)
 		projectile.setup(spawn_pos, dir, damage, speed, lifetime, monitor_range, _berserk_active)
+	return true
 
 
-func _shoot_man_gun(weapon: Dictionary) -> void:
+func _shoot_man_gun(weapon: Dictionary) -> bool:
 	if bullet_pool == null:
-		return
+		return false
 	var targets: Array[Area2D] = _get_man_targets(weapon)
 	if targets.is_empty():
 		var dir := _snap_man_gun_dir(_weapon_aim_dir)
@@ -666,7 +672,8 @@ func _shoot_man_gun(weapon: Dictionary) -> void:
 		_weapon_aim_dir = dir
 		var muzzle_pos := _get_man_muzzle_position()
 		_spawn_man_bullet(muzzle_pos, dir, weapon)
-		return
+		return true
+	var fired := false
 	for enemy in targets:
 		if enemy == null or not is_instance_valid(enemy):
 			continue
@@ -676,6 +683,8 @@ func _shoot_man_gun(weapon: Dictionary) -> void:
 		_weapon_aim_dir = dir
 		var muzzle_pos := _get_man_muzzle_position()
 		_spawn_man_bullet(muzzle_pos, dir, weapon)
+		fired = true
+	return fired
 
 
 func _spawn_man_bullet(muzzle_pos: Vector2, dir: Vector2, weapon: Dictionary) -> void:
@@ -691,6 +700,7 @@ func _update_laser_gun(delta: float) -> void:
 	if weapon.get("type", "") != "laser_gun" or not Input.is_action_pressed("shoot"):
 		_clear_laser_visual()
 		_laser_damage_timer = 0.0
+		_laser_audio_active = false
 		return
 	var dir := _snap_man_gun_dir(_weapon_aim_dir)
 	if dir == Vector2.ZERO:
@@ -698,6 +708,9 @@ func _update_laser_gun(delta: float) -> void:
 	_weapon_aim_dir = dir
 	_laser_segments = _build_laser_segments(_get_laser_muzzle_position(), dir, 2 if _berserk_active else 0)
 	_update_laser_visual()
+	if not _laser_audio_active:
+		GameAudio.play_shoot()
+		_laser_audio_active = true
 	_laser_damage_timer -= delta
 	if _laser_damage_timer <= 0.0:
 		_laser_damage_timer += LASER_DAMAGE_INTERVAL

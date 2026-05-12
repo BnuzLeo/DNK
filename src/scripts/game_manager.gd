@@ -101,6 +101,7 @@ func restart_game() -> void:
 
 
 func return_to_lobby() -> void:
+	GameAudio.stop_dungeon_bgm()
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	change_state(GameState.LOBBY)
