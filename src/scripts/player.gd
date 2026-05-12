@@ -943,7 +943,6 @@ func _setup_carried_weapon_sprite() -> void:
 	_weapon_sprite.z_index = 4
 	_weapon_sprite.visible = false
 	add_child(_weapon_sprite)
-	_ensure_laser_visual()
 	_update_carried_weapon_visual()
 
 
