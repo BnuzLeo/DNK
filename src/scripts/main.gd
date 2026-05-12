@@ -18,6 +18,11 @@ const BASKETBALL_HIT_EFFECT := preload("res://scripts/basketball_hit_effect.gd")
 const BASKETBALL_BERSERK_HIT_EFFECT := preload("res://scripts/basketball_berserk_hit_effect.gd")
 const MAN_NORMAL_HIT_EFFECT := preload("res://scripts/man_normal_hit_effect.gd")
 const MAN_BERSERK_EXPLOSION_PATH := "res://assets/export/weapon/weapon_02/狂暴模式爆炸.png"
+const HIT_SFX_PATHS := [
+	"res://assets/music/音效/fx_hit #310030.wav",
+	"res://assets/music/音效/fx_hit_p13.wav",
+	"res://assets/music/音效/fx_hit_p13 #184072.wav"
+]
 const EXPLOSION_EFFECT_SCRIPT := preload("res://scripts/explosion_effect.gd")
 const ICE_FLOOR_TILES := [
 	preload("res://assets/export/map/冰封篮球场/地砖_01.png"),
@@ -49,6 +54,14 @@ const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_yellow_sh
 const DUNGEON_PORTAL_INTERACT_RADIUS := 58.0
 const BOSS_SETTLEMENT_RETURN_TIME := 10.0
 const SYSTEM_HINT_DURATION := 1.8
+const MAP_COLOR_ROOM := Color(0.25, 0.40, 0.45)
+const MAP_COLOR_ROOM_START := Color(0.20, 0.34, 0.28)
+const MAP_COLOR_ROOM_BOSS := Color(0.34, 0.25, 0.38)
+const MAP_COLOR_CORRIDOR := Color(0.18, 0.28, 0.30)
+const MAP_COLOR_WALL := Color(0.84, 0.91, 0.96)
+const MAP_COLOR_WALL_EDGE := Color(0.58, 0.72, 0.80)
+const MAP_COLOR_PATH := Color(0.84, 0.95, 1.0, 0.6)
+const MAP_COLOR_GRID := Color(1.0, 1.0, 1.0, 0.08)
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 
@@ -107,6 +120,7 @@ var _hit_stop_until := 0
 var _damage_numbers: Array[Dictionary] = []
 const MAX_DAMAGE_NUMBERS := 20
 var _basketball_texture_cache: Dictionary = {}
+var _hit_sfx_cache: Array[AudioStream] = []
 
 # Boss 血条
 var _boss_hp_bar_bg: ColorRect
@@ -126,6 +140,7 @@ var _boss_clear_notice_second := -1
 var _system_countdown_canvas: CanvasLayer
 var _system_countdown_label: Label
 var _boss_portal_retry_timer := 0.0
+var _system_hint_generation := 0
 
 # HUD
 var _fps_label: Label
@@ -159,9 +174,6 @@ var _action_button_feedback: Dictionary = {}
 var _message_panel: Control
 var _message_scroll: ScrollContainer
 var _message_list: VBoxContainer
-
-# 提示消息系统
-var _active_hints: Array[CanvasLayer] = []
 
 
 func _ready() -> void:
@@ -913,48 +925,25 @@ func _show_hint(text: String, color: Color = Color.WHITE) -> void:
 
 func _show_system_hint(text: String, color: Color = Color.WHITE, duration: float = SYSTEM_HINT_DURATION) -> void:
 	var display_text := text if text.begins_with("【系统提示】") else "【系统提示】%s" % text
-	var label := Label.new()
-	label.text = display_text
-	label.add_theme_font_size_override("font_size", 22)
-	label.add_theme_color_override("font_color", color)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.size = Vector2(200, 30)
-
-	var canvas := CanvasLayer.new()
-	canvas.layer = 30
-	canvas.add_child(label)
-	add_child(canvas)
-
-	_active_hints.append(canvas)
-	_reposition_hints()
-
-	# 淡出后移除
+	_system_hint_generation += 1
+	var generation := _system_hint_generation
+	_set_system_banner(display_text, color)
 	await get_tree().create_timer(duration).timeout
-	if not is_instance_valid(canvas):
+	if generation != _system_hint_generation:
 		return
-	var tween := create_tween()
-	tween.tween_property(label, "modulate:a", 0.0, 0.3)
-	await tween.finished
-	_active_hints.erase(canvas)
-	if is_instance_valid(canvas):
-		canvas.queue_free()
-	_reposition_hints()
-
-
-func _reposition_hints() -> void:
-	var base_y := 55
-	for i in _active_hints.size():
-		var canvas: CanvasLayer = _active_hints[i]
-		if not is_instance_valid(canvas):
-			continue
-		for child in canvas.get_children():
-			if child is Label:
-				var target_y := base_y + i * 32
-				child.position = Vector2(380, target_y)
+	if _boss_clear_return_active:
+		_update_boss_clear_return_notice()
+	else:
+		_clear_system_banner()
 
 
 func _show_system_countdown_hint(text: String) -> void:
 	var display_text := text if text.begins_with("【系统提示】") else "【系统提示】%s" % text
+	_system_hint_generation += 1
+	_set_system_banner(display_text, Color(1.0, 0.84, 0.18))
+
+
+func _set_system_banner(text: String, color: Color) -> void:
 	if _system_countdown_canvas == null or not is_instance_valid(_system_countdown_canvas):
 		_system_countdown_canvas = CanvasLayer.new()
 		_system_countdown_canvas.layer = 32
@@ -968,12 +957,19 @@ func _show_system_countdown_hint(text: String) -> void:
 		_system_countdown_label.add_theme_color_override("font_shadow_color", Color.BLACK)
 		_system_countdown_label.add_theme_constant_override("shadow_offset_x", 2)
 		_system_countdown_label.add_theme_constant_override("shadow_offset_y", 2)
-		_system_countdown_label.position = Vector2(220, 54)
-		_system_countdown_label.size = Vector2(520, 34)
+		_system_countdown_label.position = Vector2(180, 58)
+		_system_countdown_label.size = Vector2(600, 34)
 		_system_countdown_canvas.add_child(_system_countdown_label)
 	if _system_countdown_label != null:
-		_system_countdown_label.text = display_text
+		_system_countdown_label.text = text
+		_system_countdown_label.add_theme_color_override("font_color", color)
+		_system_countdown_label.modulate.a = 1.0
 		_system_countdown_label.visible = true
+
+
+func _clear_system_banner() -> void:
+	if _system_countdown_label != null and is_instance_valid(_system_countdown_label):
+		_system_countdown_label.visible = false
 
 
 func _hide_system_countdown_hint() -> void:
@@ -981,6 +977,7 @@ func _hide_system_countdown_hint() -> void:
 		_system_countdown_canvas.queue_free()
 	_system_countdown_canvas = null
 	_system_countdown_label = null
+	_system_hint_generation += 1
 
 
 # ── 物理更新 ──────────────────────────────────────────
@@ -2162,6 +2159,8 @@ func _on_pause_lobby_input(event: InputEvent) -> void:
 # ── 打击反馈 ──────────────────────────────────────────
 
 func _on_bullet_hit_feedback(pos: Vector2, damage: int, is_kill: bool, is_boss: bool, projectile_type: String) -> void:
+	_spawn_hit_spark(pos, projectile_type, is_kill, is_boss)
+	_play_hit_sfx(projectile_type, is_kill, is_boss)
 	if projectile_type == "basketball":
 		_spawn_basketball_hit_fx(pos)
 		var normal_path := BASKETBALL_HEAD_NORMAL_1_PATH if randi() % 2 == 0 else BASKETBALL_HEAD_NORMAL_2_PATH
@@ -2273,6 +2272,85 @@ func _spawn_man_hit_fx(pos: Vector2, is_berserk: bool) -> void:
 	fallback.setup(0.24, 38.0)
 
 
+func _spawn_hit_spark(pos: Vector2, projectile_type: String, is_kill: bool, is_boss: bool) -> void:
+	var spark := Node2D.new()
+	spark.global_position = pos
+	spark.z_index = 140
+	var duration := 0.14
+	var size := _get_hit_spark_size(projectile_type, is_kill, is_boss)
+	add_child(spark)
+	spark.draw.connect(func():
+		var color := _get_hit_spark_color(projectile_type)
+		spark.draw_circle(Vector2.ZERO, size * 0.28, Color(color.r, color.g, color.b, 0.62))
+		spark.draw_line(Vector2(-size, 0.0), Vector2(size, 0.0), color, 3.0)
+		spark.draw_line(Vector2(0.0, -size * 0.62), Vector2(0.0, size * 0.62), color, 2.0)
+		spark.draw_arc(Vector2.ZERO, size * 0.48, 0.0, TAU, 24, Color(color.r, color.g, color.b, 0.72), 2.0)
+	)
+	spark.queue_redraw()
+	var tween := spark.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(spark, "scale", Vector2.ONE * 1.85, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(spark, "modulate:a", 0.0, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(spark.queue_free)
+
+
+func _get_hit_spark_size(projectile_type: String, is_kill: bool, is_boss: bool) -> float:
+	var size := 12.0
+	match projectile_type:
+		"basketball":
+			size = 16.0
+		"basketball_berserk":
+			size = 30.0
+		"man_bullet":
+			size = 18.0
+		"man_bullet_berserk":
+			size = 24.0
+	if is_boss:
+		size *= 1.25
+	if is_kill:
+		size *= 1.35
+	return size
+
+
+func _get_hit_spark_color(projectile_type: String) -> Color:
+	match projectile_type:
+		"basketball", "basketball_berserk":
+			return Color(1.0, 0.78, 0.24, 0.95)
+		"man_bullet", "man_bullet_berserk":
+			return Color(1.0, 0.18, 0.08, 0.95)
+	return Color(1.0, 1.0, 1.0, 0.95)
+
+
+func _play_hit_sfx(projectile_type: String, is_kill: bool, is_boss: bool) -> void:
+	_ensure_hit_sfx_cache()
+	if _hit_sfx_cache.is_empty():
+		return
+	var stream: AudioStream = _hit_sfx_cache[randi() % _hit_sfx_cache.size()]
+	if stream == null:
+		return
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.volume_db = -3.0 if not is_boss else -1.0
+	player.pitch_scale = randf_range(0.94, 1.08)
+	if projectile_type == "basketball_berserk" or projectile_type == "man_bullet_berserk":
+		player.volume_db += 2.0
+		player.pitch_scale *= 0.92
+	if is_kill:
+		player.volume_db += 1.5
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
+
+
+func _ensure_hit_sfx_cache() -> void:
+	if not _hit_sfx_cache.is_empty():
+		return
+	for path in HIT_SFX_PATHS:
+		var stream := load(path) as AudioStream
+		if stream != null:
+			_hit_sfx_cache.append(stream)
+
+
 func _load_basketball_texture(path: String) -> Texture2D:
 	if _basketball_texture_cache.has(path):
 		return _basketball_texture_cache[path]
@@ -2303,9 +2381,12 @@ func spawn_damage_number(pos: Vector2, amount: int, color: Color = Color.WHITE, 
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	label.position = pos + Vector2(randf_range(-10.0, 10.0), -16.0)
+	label.scale = Vector2.ONE * 1.35
 	label.z_index = 100
 	add_child(label)
-	_damage_numbers.append({"node": label, "alpha": 1.0, "base_color": color})
+	var pop_tween := label.create_tween()
+	pop_tween.tween_property(label, "scale", Vector2.ONE, 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_damage_numbers.append({"node": label, "alpha": 1.0, "base_color": color, "velocity": Vector2(randf_range(-8.0, 8.0), -52.0)})
 
 
 func _update_damage_numbers(delta: float) -> void:
@@ -2317,7 +2398,10 @@ func _update_damage_numbers(delta: float) -> void:
 			_damage_numbers.remove_at(i)
 			i -= 1
 			continue
-		label.position.y -= 30.0 * delta
+		var velocity: Vector2 = entry.get("velocity", Vector2(0.0, -30.0))
+		label.position += velocity * delta
+		velocity.y += 85.0 * delta
+		entry["velocity"] = velocity
 		entry.alpha -= 2.0 * delta
 		if entry.alpha <= 0.0:
 			label.queue_free()
@@ -2476,20 +2560,55 @@ func _draw_tiled_textures(rect: Rect2, textures: Array, seed: int, tint: Color =
 
 
 func _draw_floor_tiles(rect: Rect2, room: RoomData, seed: int) -> void:
-	var tint := Color.WHITE
+	var base := MAP_COLOR_ROOM
 	if room.is_start:
-		tint = Color(1.0, 1.0, 1.0)
+		base = MAP_COLOR_ROOM_START
 	elif room.is_boss:
-		tint = Color(0.88, 0.95, 1.0)
-	_draw_tiled_textures(rect, ICE_FLOOR_TILES, seed, tint)
+		base = MAP_COLOR_ROOM_BOSS
+	draw_rect(rect, base)
+	draw_rect(rect.grow(-7.0), base.lightened(0.08))
+	draw_rect(rect.grow(-10.0), Color(0.0, 0.0, 0.0, 0.08), false, 2.0)
+
+	var tile_step := 64.0
+	var start_x := rect.position.x + fmod(float(seed), tile_step)
+	var x := start_x
+	while x < rect.end.x:
+		draw_line(Vector2(x, rect.position.y + 10.0), Vector2(x, rect.end.y - 10.0), MAP_COLOR_GRID, 1.0)
+		x += tile_step
+	var start_y := rect.position.y + fmod(float(seed * 3), tile_step)
+	var y := start_y
+	while y < rect.end.y:
+		draw_line(Vector2(rect.position.x + 10.0, y), Vector2(rect.end.x - 10.0, y), MAP_COLOR_GRID, 1.0)
+		y += tile_step
+
+	var center := rect.get_center()
+	draw_line(Vector2(rect.position.x + 36.0, center.y), Vector2(rect.end.x - 36.0, center.y), MAP_COLOR_PATH, 2.0)
+	draw_line(Vector2(center.x, rect.position.y + 34.0), Vector2(center.x, rect.end.y - 34.0), MAP_COLOR_PATH.darkened(0.15), 1.5)
+	draw_arc(center, min(rect.size.x, rect.size.y) * 0.18, 0.0, TAU, 48, MAP_COLOR_PATH, 2.0)
+
+	if room.is_boss:
+		draw_rect(rect.grow(-18.0), Color(1.0, 0.25, 0.45, 0.12), false, 3.0)
+	elif room.is_start:
+		draw_rect(rect.grow(-18.0), Color(0.35, 1.0, 0.58, 0.12), false, 3.0)
 
 
 func _draw_corridor_tiles(rect: Rect2, seed: int) -> void:
-	_draw_tiled_textures(rect, ICE_FLOOR_TILES, seed, Color(0.94, 0.98, 1.0))
+	draw_rect(rect, MAP_COLOR_CORRIDOR)
+	draw_rect(rect.grow(-5.0), MAP_COLOR_CORRIDOR.lightened(0.12))
+	if rect.size.y > rect.size.x:
+		var x := rect.get_center().x
+		draw_line(Vector2(x, rect.position.y + 8.0), Vector2(x, rect.end.y - 8.0), MAP_COLOR_PATH, 2.0)
+	else:
+		var y := rect.get_center().y
+		draw_line(Vector2(rect.position.x + 8.0, y), Vector2(rect.end.x - 8.0, y), MAP_COLOR_PATH, 2.0)
 
 
 func _draw_wall_tiles(rect: Rect2, seed: int) -> void:
-	_draw_tiled_textures(rect, ICE_WALL_TILES, seed, Color(0.96, 0.99, 1.0), true)
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	draw_rect(rect, MAP_COLOR_WALL)
+	draw_rect(rect.grow(-3.0), MAP_COLOR_WALL.lightened(0.08))
+	draw_rect(rect, MAP_COLOR_WALL_EDGE, false, 2.0)
 
 
 func _draw_room_corner_tiles(rx: float, ry: float, seed: int) -> void:

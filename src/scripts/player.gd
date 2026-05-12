@@ -558,30 +558,37 @@ func _deal_room_blast(amount: int) -> void:
 	_show_room_blast_fx(amount, targets.size())
 
 
-func _get_current_room_enemies() -> Array:
-	var enemies_in_room: Array = []
+func _get_current_room_enemies() -> Array[Area2D]:
+	var enemies_in_room: Array[Area2D] = []
 	var player_cell := Vector2i(
 		int(floor(global_position.x / VS.CELL_SIZE.x)),
 		int(floor(global_position.y / VS.CELL_SIZE.y))
 	)
-	var enemies := get_tree().get_nodes_in_group("enemy")
-	for enemy in enemies:
-		if not is_instance_valid(enemy) or not enemy.has_method("take_damage"):
+	for enemy in get_tree().get_nodes_in_group("enemy"):
+		var enemy_area := enemy as Area2D
+		if enemy_area == null or not is_instance_valid(enemy_area):
 			continue
-		if "_dying" in enemy and enemy._dying:
+		if not enemy_area.has_method("take_damage"):
+			continue
+		if "_dying" in enemy_area and enemy_area._dying:
 			continue
 		var enemy_cell := Vector2i(
-			int(floor(enemy.global_position.x / VS.CELL_SIZE.x)),
-			int(floor(enemy.global_position.y / VS.CELL_SIZE.y))
+			int(floor(enemy_area.global_position.x / VS.CELL_SIZE.x)),
+			int(floor(enemy_area.global_position.y / VS.CELL_SIZE.y))
 		)
 		if enemy_cell == player_cell:
-			enemies_in_room.append(enemy)
+			enemies_in_room.append(enemy_area)
 	return enemies_in_room
 
 
-func _deal_damage_to_enemy(enemy: Node, amount: int) -> void:
+func _deal_damage_to_enemy(enemy: Area2D, amount: int) -> void:
 	var was_dying: bool = "_dying" in enemy and enemy._dying
 	enemy.take_damage(amount)
+	if enemy.has_method("apply_hit_feedback"):
+		var dir: Vector2 = (enemy.global_position - global_position).normalized()
+		if dir == Vector2.ZERO:
+			dir = _facing
+		enemy.call("apply_hit_feedback", dir, 9.0 if _berserk_active else 6.0, "room_blast")
 	if not was_dying and "hp" in enemy and enemy.hp <= 0:
 		GameManager.add_kill()
 	var scene := get_tree().current_scene

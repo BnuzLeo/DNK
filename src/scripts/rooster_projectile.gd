@@ -143,6 +143,11 @@ func _on_area_entered(area: Area2D) -> void:
 		return
 	var was_dying: bool = "_dying" in area and area._dying
 	area.take_damage(_damage)
+	if area.has_method("apply_hit_feedback"):
+		var dir := (area.global_position - global_position).normalized()
+		if dir == Vector2.ZERO:
+			dir = Vector2.RIGHT.rotated(rotation)
+		area.call("apply_hit_feedback", dir, 10.0 if _berserk else 7.0, "rooster")
 	if not was_dying and "hp" in area and area.hp <= 0:
 		GameManager.add_kill()
 

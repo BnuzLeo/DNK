@@ -26,9 +26,13 @@ var _dying := false
 var _contact_cooldown := 0.0
 var _flash_timer := 0.0
 var _sprite: AnimatedSprite2D = null
+var _sprite_base_scale := Vector2.ONE
 var _current_animation := ""
 var _facing := 1.0
 var _moving_this_frame := false
+var _hit_recoil := Vector2.ZERO
+var _hit_squash_timer := 0.0
+var _hit_squash_duration := 0.11
 
 
 func _ready() -> void:
@@ -60,6 +64,7 @@ func _physics_process(delta: float) -> void:
 		_flash_timer -= delta
 		if _flash_timer <= 0.0:
 			modulate = Color.WHITE
+	_update_hit_recoil(delta)
 
 	var start_pos: Vector2 = global_position
 	var dir: Vector2 = (_player.global_position - global_position).normalized()
@@ -83,6 +88,39 @@ func take_damage(amount: int) -> void:
 	modulate = Color.WHITE * 3.0
 	if hp <= 0:
 		_die()
+
+
+func apply_hit_feedback(direction: Vector2, strength: float = 8.0, projectile_type: String = "") -> void:
+	if _dying:
+		return
+	var dir := direction.normalized()
+	if dir == Vector2.ZERO and _player != null:
+		dir = (global_position - _player.global_position).normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT
+	_hit_recoil += dir * minf(strength, 24.0)
+	_hit_squash_duration = 0.15 if projectile_type == "basketball_berserk" or projectile_type == "man_bullet_berserk" else 0.10
+	_hit_squash_timer = _hit_squash_duration
+	_apply_hit_squash(1.0)
+
+
+func _update_hit_recoil(delta: float) -> void:
+	if _hit_recoil.length_squared() > 0.01:
+		global_position += _hit_recoil
+		_hit_recoil = _hit_recoil.move_toward(Vector2.ZERO, 170.0 * delta)
+	if _hit_squash_timer > 0.0:
+		_hit_squash_timer = maxf(_hit_squash_timer - delta, 0.0)
+		var ratio := _hit_squash_timer / maxf(_hit_squash_duration, 0.001)
+		_apply_hit_squash(ratio)
+	elif _sprite != null and _sprite.scale != _sprite_base_scale:
+		_sprite.scale = _sprite_base_scale
+
+
+func _apply_hit_squash(ratio: float) -> void:
+	if _sprite == null:
+		return
+	var punch := sin(ratio * PI)
+	_sprite.scale = Vector2(_sprite_base_scale.x * (1.0 + punch * 0.14), _sprite_base_scale.y * (1.0 - punch * 0.09))
 
 
 func is_dying() -> bool:
@@ -166,6 +204,7 @@ func _setup_sprite() -> void:
 	if frame_size > 0.0:
 		var scale_factor: float = VS.ENEMY_STANDARD_DISPLAY_SIZE / frame_size * DISPLAY_SCALE_FACTOR
 		_sprite.scale = Vector2(scale_factor, scale_factor)
+		_sprite_base_scale = _sprite.scale
 	_set_animation("idle", true)
 
 

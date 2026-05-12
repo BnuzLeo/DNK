@@ -52,6 +52,8 @@ func _do_impact() -> void:
 		var old_hp: int = damage_target.hp if "hp" in damage_target else 1
 		is_boss = damage_target.max_hp > 50 if "max_hp" in damage_target else false
 		damage_target.take_damage(_damage)
+		if damage_target.has_method("apply_hit_feedback"):
+			damage_target.call("apply_hit_feedback", Vector2.DOWN, 24.0, PROJECTILE_TYPE)
 		is_kill = not was_dying and old_hp > 0 and "hp" in damage_target and damage_target.hp <= 0
 		if is_kill:
 			GameManager.add_kill()
