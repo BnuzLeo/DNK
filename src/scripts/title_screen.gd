@@ -9,6 +9,7 @@ const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/宣发视频.ogv"
 const KUN_PARALLAX_RANGE := Vector2(36.0, 24.0)
 const SKIP_HOLD_TIME := 1.0
 const ENABLE_DIALOGUE_AUDIO := false
+const ENABLE_START_SEQUENCE_AUDIO := true
 const MUTED_DIALOGUE_VOLUME_DB := -80.0
 
 @onready var _menu_video_layer: CanvasLayer = $MenuVideoLayer
@@ -44,7 +45,7 @@ func _ready() -> void:
 	_lobby_test_button.pressed.connect(_go_to_lobby)
 	_dungeon_test_button.pressed.connect(_go_to_dungeon)
 	_video_player.finished.connect(_on_video_finished)
-	if not ENABLE_DIALOGUE_AUDIO:
+	if not ENABLE_START_SEQUENCE_AUDIO:
 		_video_player.volume_db = MUTED_DIALOGUE_VOLUME_DB
 	_video_overlay.visible = false
 	_setup_feedback_nodes()
@@ -272,8 +273,10 @@ func _load_and_play_video() -> void:
 		_finish_video_and_enter_lobby()
 		return
 	_video_player.stream = stream
-	if not ENABLE_DIALOGUE_AUDIO:
+	if not ENABLE_START_SEQUENCE_AUDIO:
 		_video_player.volume_db = MUTED_DIALOGUE_VOLUME_DB
+	else:
+		_video_player.volume_db = 0.0
 	_video_player.play()
 
 
