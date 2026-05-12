@@ -47,7 +47,10 @@ const ACTION_CLICK_FEEDBACK_DURATION := 0.18
 const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
 const YELLOW_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_yellow_sheet.png"
 const DUNGEON_PORTAL_INTERACT_RADIUS := 58.0
-const BOSS_SETTLEMENT_RETURN_TIME := 9.0
+const BOSS_SETTLEMENT_RETURN_TIME := 10.0
+const SYSTEM_HINT_DURATION := 1.8
+const MESSAGE_HINT_DURATION := 4.0
+const MESSAGE_PANEL_MAX_ITEMS := 4
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
 
@@ -118,10 +121,12 @@ var _revive_canvas: CanvasLayer
 var _revive_countdown_label: Label
 var _revive_timer := 0.0
 var _pause_canvas: CanvasLayer
-var _settlement_canvas: CanvasLayer
-var _settlement_countdown_label: Label
-var _settlement_timer := 0.0
 var _settlement_reward_given := false
+var _boss_clear_return_active := false
+var _boss_clear_return_timer := 0.0
+var _boss_clear_notice_second := -1
+var _system_countdown_canvas: CanvasLayer
+var _system_countdown_label: Label
 
 # HUD
 var _fps_label: Label
@@ -152,6 +157,8 @@ var _bag_button: Control
 var _invincible_test_button: Button
 var _equipment_panel: Node = null
 var _action_button_feedback: Dictionary = {}
+var _message_panel: Control
+var _message_entries: Array[Dictionary] = []
 
 # 提示消息系统
 var _active_hints: Array[CanvasLayer] = []
@@ -221,8 +228,11 @@ func _generate_floor() -> void:
 	_boss_defeated = false
 	_portal_active = false
 	_return_portal_near = false
-	_settlement_timer = 0.0
 	_settlement_reward_given = false
+	_boss_clear_return_active = false
+	_boss_clear_return_timer = 0.0
+	_boss_clear_notice_second = -1
+	_hide_system_countdown_hint()
 	_spawn_warning_positions.clear()
 	_spawn_warning_timer = 0.0
 
@@ -662,24 +672,22 @@ func _on_boss_died(room: RoomData) -> void:
 
 
 func _start_boss_settlement(room: RoomData) -> void:
-	if GameManager.state == GameManager.GameState.SETTLEMENT:
+	if _boss_clear_return_active:
 		return
 	if room.state != RoomState.CLEARED:
 		room.state = RoomState.CLEARED
 		_rooms_cleared += 1
-	_portal_active = false
 	_return_portal_near = false
 	if _boss_portal_sprite != null and is_instance_valid(_boss_portal_sprite):
 		_boss_portal_sprite.queue_free()
 		_boss_portal_sprite = null
 	_show_boss_return_portal(Vector2(_boss_pos.x * CELL_W + CELL_W / 2, _boss_pos.y * CELL_H + CELL_H / 2))
-	_portal_active = false
 	if $BulletPool != null and $BulletPool.has_method("clear_all"):
 		$BulletPool.clear_all()
-	_settlement_timer = BOSS_SETTLEMENT_RETURN_TIME
-	GameManager.change_state(GameManager.GameState.SETTLEMENT)
-	_show_boss_settlement_ui()
-	_show_hint("Boss 已击败！正在结算", Color(0.0, 0.898, 1.0))
+	_grant_boss_settlement_reward()
+	_start_boss_clear_return_countdown()
+	_show_message_hint("Boss 已击败，房门保持关闭", Color(1.0, 0.84, 0.18))
+	_show_message_hint("通关奖励：坤币 +1", Color(0.0, 0.898, 1.0))
 	if _minimap:
 		_minimap.queue_redraw()
 
@@ -689,7 +697,7 @@ func _room_cleared(room: RoomData) -> void:
 		return
 	room.state = RoomState.CLEARED
 	_rooms_cleared += 1
-	_show_hint("房间已清理！", Color(0.0, 1.0, 0.53))
+	_show_message_hint("房间已清理", Color(0.0, 1.0, 0.53))
 	# 延迟 0.5 秒后开门
 	await get_tree().create_timer(0.5).timeout
 	if room.grid_pos in _doors:
@@ -699,7 +707,7 @@ func _room_cleared(room: RoomData) -> void:
 				_set_door_locked(door, false)
 				door.queue_free()
 		_doors[room.grid_pos] = {}
-	_show_hint("门已开启", Color(0.0, 1.0, 0.53))
+	_show_message_hint("门已开启", Color(0.0, 1.0, 0.53))
 	queue_redraw()
 	if _minimap:
 		_minimap.queue_redraw()
@@ -730,7 +738,7 @@ func _spawn_start_supply_chest(room_pos: Vector2i) -> void:
 	chest.position = Vector2(cx, cy)
 	chest.is_start_supply = true
 	add_child(chest)
-	_show_hint("按 E 获取补给", Color(1.0, 0.84, 0.0))
+	_show_message_hint("起始补给已出现", Color(1.0, 0.84, 0.0))
 
 
 # ── 房间物件生成 ──────────────────────────────────────────
@@ -878,8 +886,13 @@ func _get_floor_hp_multiplier() -> float:
 
 
 func _show_hint(text: String, color: Color = Color.WHITE) -> void:
+	_show_system_hint(text, color)
+
+
+func _show_system_hint(text: String, color: Color = Color.WHITE, duration: float = SYSTEM_HINT_DURATION) -> void:
+	var display_text := text if text.begins_with("【系统提示】") else "【系统提示】%s" % text
 	var label := Label.new()
-	label.text = text
+	label.text = display_text
 	label.add_theme_font_size_override("font_size", 22)
 	label.add_theme_color_override("font_color", color)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -894,7 +907,7 @@ func _show_hint(text: String, color: Color = Color.WHITE) -> void:
 	_reposition_hints()
 
 	# 淡出后移除
-	await get_tree().create_timer(1.8).timeout
+	await get_tree().create_timer(duration).timeout
 	if not is_instance_valid(canvas):
 		return
 	var tween := create_tween()
@@ -916,6 +929,36 @@ func _reposition_hints() -> void:
 			if child is Label:
 				var target_y := base_y + i * 32
 				child.position = Vector2(380, target_y)
+
+
+func _show_system_countdown_hint(text: String) -> void:
+	var display_text := text if text.begins_with("【系统提示】") else "【系统提示】%s" % text
+	if _system_countdown_canvas == null or not is_instance_valid(_system_countdown_canvas):
+		_system_countdown_canvas = CanvasLayer.new()
+		_system_countdown_canvas.layer = 32
+		_system_countdown_canvas.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(_system_countdown_canvas)
+
+		_system_countdown_label = Label.new()
+		_system_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_system_countdown_label.add_theme_font_size_override("font_size", 22)
+		_system_countdown_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.18))
+		_system_countdown_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+		_system_countdown_label.add_theme_constant_override("shadow_offset_x", 2)
+		_system_countdown_label.add_theme_constant_override("shadow_offset_y", 2)
+		_system_countdown_label.position = Vector2(220, 54)
+		_system_countdown_label.size = Vector2(520, 34)
+		_system_countdown_canvas.add_child(_system_countdown_label)
+	if _system_countdown_label != null:
+		_system_countdown_label.text = display_text
+		_system_countdown_label.visible = true
+
+
+func _hide_system_countdown_hint() -> void:
+	if _system_countdown_canvas != null and is_instance_valid(_system_countdown_canvas):
+		_system_countdown_canvas.queue_free()
+	_system_countdown_canvas = null
+	_system_countdown_label = null
 
 
 # ── 物理更新 ──────────────────────────────────────────
@@ -1137,6 +1180,8 @@ func _create_hud() -> void:
 	_buff_bar.draw.connect(_draw_buff_bar)
 	canvas.add_child(_buff_bar)
 
+	_create_message_panel(canvas)
+
 
 func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
 	var label := Label.new()
@@ -1149,6 +1194,88 @@ func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
 	label.add_theme_constant_override("shadow_offset_x", 1)
 	label.add_theme_constant_override("shadow_offset_y", 1)
 	return label
+
+
+func _create_message_panel(canvas: CanvasLayer) -> void:
+	_message_panel = Control.new()
+	_message_panel.position = Vector2(742, 72)
+	_message_panel.size = Vector2(198, 104)
+	_message_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_message_panel.draw.connect(_draw_message_panel)
+	canvas.add_child(_message_panel)
+
+	var title := Label.new()
+	title.text = "消息提示"
+	title.position = Vector2(10, 7)
+	title.size = Vector2(178, 18)
+	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_color_override("font_color", Color(0.86, 0.94, 0.98))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_message_panel.add_child(title)
+
+
+func _draw_message_panel() -> void:
+	if _message_panel == null:
+		return
+	var r := Rect2(Vector2.ZERO, _message_panel.size)
+	_message_panel.draw_rect(r, Color(0.03, 0.05, 0.07, 0.58))
+	_message_panel.draw_rect(r.grow(-2), Color(0.08, 0.11, 0.13, 0.62))
+	_message_panel.draw_line(Vector2(10, 28), Vector2(_message_panel.size.x - 10, 28), Color(0.4, 0.65, 0.72, 0.55), 1.0)
+
+
+func _show_message_hint(text: String, color: Color = Color.WHITE) -> void:
+	if _message_panel == null:
+		return
+	while _message_entries.size() >= MESSAGE_PANEL_MAX_ITEMS:
+		var oldest: Dictionary = _message_entries[0]
+		if is_instance_valid(oldest.label):
+			oldest.label.queue_free()
+		_message_entries.remove_at(0)
+
+	var label := Label.new()
+	label.text = text
+	label.size = Vector2(178, 18)
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", color)
+	label.clip_text = true
+	_message_panel.add_child(label)
+	_message_entries.append({"label": label, "time": MESSAGE_HINT_DURATION, "base_color": color})
+	_reposition_message_hints()
+
+
+func _reposition_message_hints() -> void:
+	for i in _message_entries.size():
+		var entry: Dictionary = _message_entries[i]
+		var label: Label = entry.label
+		if not is_instance_valid(label):
+			continue
+		label.position = Vector2(10, 33 + i * 17)
+
+
+func _update_message_hints(delta: float) -> void:
+	var i := _message_entries.size() - 1
+	var changed := false
+	while i >= 0:
+		var entry: Dictionary = _message_entries[i]
+		var label: Label = entry.label
+		if not is_instance_valid(label):
+			_message_entries.remove_at(i)
+			changed = true
+			i -= 1
+			continue
+		entry.time -= delta
+		if entry.time <= 0.0:
+			label.queue_free()
+			_message_entries.remove_at(i)
+			changed = true
+		else:
+			var color: Color = entry.base_color
+			color.a = clampf(entry.time / 0.5, 0.0, 1.0) if entry.time < 0.5 else 1.0
+			label.add_theme_color_override("font_color", color)
+			_message_entries[i] = entry
+		i -= 1
+	if changed:
+		_reposition_message_hints()
 
 
 func _draw_stats_frame() -> void:
@@ -1496,6 +1623,7 @@ func _show_boss_hp(boss: Area2D) -> void:
 func _process(delta: float) -> void:
 	var state := GameManager.state
 	_update_action_button_feedback(delta)
+	_update_message_hints(delta)
 	_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 	_kills_label.text = ""
 	_practice_label.text = str(GameManager.practice_time)
@@ -1560,9 +1688,10 @@ func _process(delta: float) -> void:
 			GameManager.change_state(GameManager.GameState.GAME_OVER)
 			_show_game_over()
 
-	if state == GameManager.GameState.SETTLEMENT:
-		_update_boss_settlement(delta)
-		return
+	if _boss_clear_return_active:
+		_update_boss_clear_return_countdown(delta)
+		if GameManager.state == GameManager.GameState.LOBBY:
+			return
 
 	if state != GameManager.GameState.PLAYING:
 		return
@@ -1654,66 +1783,79 @@ func _show_victory() -> void:
 	canvas.add_child(label)
 
 
-func _show_boss_settlement_ui() -> void:
-	if _settlement_canvas != null:
-		_settlement_canvas.queue_free()
-	_settlement_canvas = CanvasLayer.new()
-	_settlement_canvas.layer = 40
-	add_child(_settlement_canvas)
-
-	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.48)
-	overlay.size = VS.VIEWPORT_SIZE
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_settlement_canvas.add_child(overlay)
-
-	var title := Label.new()
-	title.text = "通关结算"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 36)
-	title.add_theme_color_override("font_color", Color(1.0, 0.84, 0.18))
-	title.position = Vector2(330, 180)
-	title.size = Vector2(300, 46)
-	_settlement_canvas.add_child(title)
-
-	var summary := Label.new()
-	summary.text = "击杀: %d\n获得坤币 +1" % GameManager.total_kills
-	summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	summary.add_theme_font_size_override("font_size", 24)
-	summary.add_theme_color_override("font_color", Color.WHITE)
-	summary.position = Vector2(330, 245)
-	summary.size = Vector2(300, 80)
-	_settlement_canvas.add_child(summary)
-
-	_settlement_countdown_label = Label.new()
-	_settlement_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_settlement_countdown_label.add_theme_font_size_override("font_size", 24)
-	_settlement_countdown_label.add_theme_color_override("font_color", Color(0.0, 0.898, 1.0))
-	_settlement_countdown_label.position = Vector2(280, 355)
-	_settlement_countdown_label.size = Vector2(400, 40)
-	_settlement_canvas.add_child(_settlement_countdown_label)
-	_update_boss_settlement_label()
+func _grant_boss_settlement_reward() -> void:
+	if _settlement_reward_given:
+		return
+	_settlement_reward_given = true
+	GameManager.add_dungeon_clear()
 
 
-func _update_boss_settlement(delta: float) -> void:
-	_settlement_timer = maxf(_settlement_timer - delta, 0.0)
-	_update_boss_settlement_label()
-	if _settlement_timer <= 0.0:
+func _start_boss_clear_return_countdown() -> void:
+	_boss_clear_return_active = true
+	_boss_clear_return_timer = BOSS_SETTLEMENT_RETURN_TIME
+	_boss_clear_notice_second = -1
+	_update_boss_clear_return_notice()
+
+
+func _reset_boss_clear_return_countdown() -> void:
+	if not _boss_clear_return_active:
+		return
+	_boss_clear_return_timer = BOSS_SETTLEMENT_RETURN_TIME
+	_update_boss_clear_return_notice()
+
+
+func _update_boss_clear_return_countdown(delta: float) -> void:
+	if not _boss_clear_return_active:
+		return
+	if GameManager.state == GameManager.GameState.PLAYING and _has_active_player_input():
+		_reset_boss_clear_return_countdown()
+	_boss_clear_return_timer = maxf(_boss_clear_return_timer - delta, 0.0)
+	_update_boss_clear_return_notice()
+	if _boss_clear_return_timer <= 0.0:
 		_finish_boss_settlement()
 
 
-func _update_boss_settlement_label() -> void:
-	if _settlement_countdown_label == null:
+func _update_boss_clear_return_notice() -> void:
+	var remaining := maxi(0, int(ceil(_boss_clear_return_timer)))
+	if remaining == _boss_clear_notice_second:
 		return
-	_settlement_countdown_label.text = "%ds 后自动返回大厅" % int(ceil(_settlement_timer))
+	_boss_clear_notice_second = remaining
+	_show_system_countdown_hint("%d 秒内无操作将自动返回大厅" % remaining)
+
+
+func _has_active_player_input() -> bool:
+	var move_input := Vector2(
+		Input.get_axis("move_left", "move_right"),
+		Input.get_axis("move_up", "move_down")
+	)
+	return move_input.length() > 0.1 \
+		or Input.is_action_pressed("shoot") \
+		or Input.is_action_pressed("dash") \
+		or Input.is_action_pressed("berserk") \
+		or Input.is_action_pressed("switch_weapon") \
+		or Input.is_action_pressed("interact")
+
+
+func _is_player_operation_event(event: InputEvent) -> bool:
+	if event is InputEventKey:
+		return event.pressed
+	if event is InputEventMouseButton:
+		return event.pressed
+	if event is InputEventJoypadButton:
+		return event.pressed
+	if event is InputEventJoypadMotion:
+		return absf(event.axis_value) > 0.25
+	if event is InputEventMouseMotion:
+		return event.relative.length() > 0.1
+	return false
 
 
 func _finish_boss_settlement() -> void:
-	if GameManager.state != GameManager.GameState.SETTLEMENT:
+	if not _boss_defeated:
 		return
-	if not _settlement_reward_given:
-		_settlement_reward_given = true
-		GameManager.add_dungeon_clear()
+	_boss_clear_return_active = false
+	_hide_system_countdown_hint()
+	_grant_boss_settlement_reward()
 	GameManager.restore_lobby_weapons()
 	GameManager.return_to_lobby()
 
@@ -1795,10 +1937,13 @@ func _do_revive() -> void:
 		room.state = RoomState.INACTIVE
 	GameManager.change_state(GameManager.GameState.PLAYING)
 	_play_player_spawn_warning($Player)
-	_show_hint("已复活！", Color(1.0, 0.84, 0.0))
+	_show_message_hint("已复活", Color(1.0, 0.84, 0.0))
 
 
 func _input(event: InputEvent) -> void:
+	if _boss_clear_return_active and _is_player_operation_event(event):
+		_reset_boss_clear_return_countdown()
+
 	# 复活状态
 	if GameManager.state == GameManager.GameState.REVIVING:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -1836,13 +1981,17 @@ func _input(event: InputEvent) -> void:
 	# E 键进入传送门
 	if GameManager.state == GameManager.GameState.PLAYING and event.is_action_pressed("interact"):
 		if $Player.global_position.distance_to(_start_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
+			_boss_clear_return_active = false
+			_hide_system_countdown_hint()
 			GameManager.restore_lobby_weapons()
 			GameManager.return_to_lobby()
 			return
 		if _portal_active and $Player.global_position.distance_to(_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
 			_portal_active = false
+			_boss_clear_return_active = false
+			_hide_system_countdown_hint()
 			GameManager.restore_lobby_weapons()
-			GameManager.add_dungeon_clear()
+			_grant_boss_settlement_reward()
 			GameManager.return_to_lobby()
 			return
 
@@ -1926,6 +2075,10 @@ func _on_pause_continue_input(event: InputEvent) -> void:
 func _on_pause_lobby_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_hide_pause_menu()
+		if _boss_defeated:
+			_grant_boss_settlement_reward()
+		_boss_clear_return_active = false
+		_hide_system_countdown_hint()
 		GameManager.restore_lobby_weapons()
 		GameManager.return_to_lobby()
 
@@ -2354,8 +2507,8 @@ func _draw() -> void:
 	# 传送门提示
 	if is_instance_valid($Player):
 		if $Player.global_position.distance_to(_start_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
-			draw_string(ThemeDB.fallback_font, _start_portal_pos + Vector2(-34, -100), "按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
+			draw_string(ThemeDB.fallback_font, _start_portal_pos + Vector2(-58, -100), "交互提示：按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
 		if _portal_active and $Player.global_position.distance_to(_portal_pos) < DUNGEON_PORTAL_INTERACT_RADIUS:
-			draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-34, -100), "按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
+			draw_string(ThemeDB.fallback_font, _portal_pos + Vector2(-58, -100), "交互提示：按 E 交互", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 1.0, 0.6))
 
 	# 怪物出生预警由黄色震荡波节点播放。
