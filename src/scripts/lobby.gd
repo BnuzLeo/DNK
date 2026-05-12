@@ -115,6 +115,7 @@ var _map_cards: Array[Control] = []
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameManager.change_state(GameManager.GameState.LOBBY)
+	GameAudio.play_lobby_entry()
 	_start_lobby_music()
 	_create_walls()
 	_setup_lobby_object_collisions()
@@ -743,10 +744,12 @@ func _draw_buff_bar() -> void:
 func _on_action_button_input(event: InputEvent, action: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			GameAudio.play_button()
 			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 	elif event is InputEventScreenTouch:
 		if event.pressed:
+			GameAudio.play_button()
 			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 
@@ -782,8 +785,10 @@ func _update_action_button_feedback(delta: float) -> void:
 
 func _on_bag_button_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		GameAudio.play_button()
 		_open_equipment_panel()
 	elif event is InputEventScreenTouch and event.pressed:
+		GameAudio.play_button()
 		_open_equipment_panel()
 
 
@@ -875,6 +880,7 @@ func _open_map_select() -> void:
 	close_button.add_theme_stylebox_override("normal", _make_flat_style(Color(0.26, 0.18, 0.18, 0.0), Color(0.0, 0, 0, 0), 0, 0))
 	close_button.add_theme_stylebox_override("hover", _make_flat_style(Color(0.26, 0.18, 0.18, 0.0), Color(0.0, 0, 0, 0), 0, 0))
 	close_button.add_theme_stylebox_override("pressed", _make_flat_style(Color(0.26, 0.18, 0.18, 0.0), Color(0.0, 0, 0, 0), 0, 0))
+	close_button.pressed.connect(GameAudio.play_button)
 	close_button.pressed.connect(_close_map_select)
 	window.add_child(close_button)
 
@@ -922,6 +928,7 @@ func _open_map_select() -> void:
 	start_button.add_theme_stylebox_override("normal", _make_flat_style(Color(0.16, 0.78, 0.02), Color(0.02, 0.18, 0.0), 0, 3))
 	start_button.add_theme_stylebox_override("hover", _make_flat_style(Color(0.22, 0.94, 0.04), Color(0.02, 0.20, 0.0), 0, 3))
 	start_button.add_theme_stylebox_override("pressed", _make_flat_style(Color(0.10, 0.52, 0.02), Color(0.0, 0.12, 0.0), 0, 3))
+	start_button.pressed.connect(GameAudio.play_button)
 	start_button.pressed.connect(_enter_dungeon)
 	window.add_child(start_button)
 

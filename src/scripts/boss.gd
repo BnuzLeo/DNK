@@ -155,6 +155,7 @@ func _update_phase() -> void:
 	elif ratio <= 0.6:
 		next_phase = Phase.P2
 	if next_phase != _phase:
+		GameAudio.play_boss_phase()
 		_phase = next_phase
 		_phase_visual_time = 0.0
 		_create_phase_transition_effect()
@@ -521,6 +522,7 @@ func _die() -> void:
 	if _dying:
 		return
 	_dying = true
+	GameAudio.play_boss_dead()
 	died.emit()
 	if _has_animation("death"):
 		modulate = _get_base_modulate()

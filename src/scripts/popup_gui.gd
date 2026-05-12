@@ -145,6 +145,7 @@ static func add_image_button(
 	if enabled:
 		button.gui_input.connect(func(event: InputEvent) -> void:
 			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				GameAudio.play_button()
 				pressed.call()
 		)
 

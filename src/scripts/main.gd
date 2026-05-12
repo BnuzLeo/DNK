@@ -550,6 +550,7 @@ func _close_doors(pos: Vector2i) -> void:
 			_set_door_locked(door, true)
 			locked_any = true
 	if locked_any:
+		GameAudio.play_door()
 		_show_system_hint("房门已锁，清理怪物后开启", Color(1.0, 0.8, 0.0))
 
 func _update_camera_bounds(pos: Vector2i) -> void:
@@ -746,13 +747,17 @@ func _room_cleared(room: RoomData) -> void:
 	_show_system_hint("房间已清理", Color(0.0, 1.0, 0.53))
 	# 延迟 0.5 秒后开门
 	await get_tree().create_timer(0.5).timeout
+	var opened_any := false
 	if room.grid_pos in _doors:
 		for key in _doors[room.grid_pos]:
 			var door: StaticBody2D = _doors[room.grid_pos][key]
 			if is_instance_valid(door):
 				_set_door_locked(door, false)
 				door.queue_free()
+				opened_any = true
 		_doors[room.grid_pos] = {}
+	if opened_any:
+		GameAudio.play_door()
 	_show_system_hint("门已开启", Color(0.0, 1.0, 0.53))
 	queue_redraw()
 	if _minimap:
@@ -1466,10 +1471,12 @@ func _draw_buff_bar() -> void:
 func _on_action_button_input(event: InputEvent, action: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			GameAudio.play_button()
 			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 	elif event is InputEventScreenTouch:
 		if event.pressed:
+			GameAudio.play_button()
 			_trigger_action_button_feedback(action)
 		_emit_virtual_action(action, event.pressed)
 
@@ -1512,19 +1519,24 @@ func _emit_virtual_action(action: String, pressed: bool) -> void:
 
 func _on_pause_button_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		GameAudio.play_button()
 		_toggle_pause_from_hud()
 	elif event is InputEventScreenTouch and event.pressed:
+		GameAudio.play_button()
 		_toggle_pause_from_hud()
 
 
 func _on_bag_button_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		GameAudio.play_button()
 		_open_equipment_panel()
 	elif event is InputEventScreenTouch and event.pressed:
+		GameAudio.play_button()
 		_open_equipment_panel()
 
 
 func _on_invincible_test_pressed() -> void:
+	GameAudio.play_button()
 	var enabled := not bool($Player.call("is_test_invincible"))
 	$Player.call("set_test_invincible", enabled)
 	if _invincible_test_button != null:
@@ -1533,6 +1545,7 @@ func _on_invincible_test_pressed() -> void:
 
 
 func _on_boss_test_pressed() -> void:
+	GameAudio.play_button()
 	if GameManager.state == GameManager.GameState.PAUSED:
 		_hide_pause_menu()
 		GameManager.change_state(GameManager.GameState.PLAYING)
@@ -1542,6 +1555,7 @@ func _on_boss_test_pressed() -> void:
 
 
 func _on_kill_boss_test_pressed() -> void:
+	GameAudio.play_button()
 	if GameManager.state == GameManager.GameState.PAUSED:
 		_hide_pause_menu()
 		GameManager.change_state(GameManager.GameState.PLAYING)
@@ -2281,24 +2295,7 @@ func _get_hit_spark_color(projectile_type: String) -> Color:
 
 
 func _play_hit_sfx(projectile_type: String, is_kill: bool, is_boss: bool) -> void:
-	_ensure_hit_sfx_cache()
-	if _hit_sfx_cache.is_empty():
-		return
-	var stream: AudioStream = _hit_sfx_cache[randi() % _hit_sfx_cache.size()]
-	if stream == null:
-		return
-	var player := AudioStreamPlayer.new()
-	player.stream = stream
-	player.volume_db = -3.0 if not is_boss else -1.0
-	player.pitch_scale = randf_range(0.94, 1.08)
-	if projectile_type == "basketball_berserk" or projectile_type == "man_bullet_berserk":
-		player.volume_db += 2.0
-		player.pitch_scale *= 0.92
-	if is_kill:
-		player.volume_db += 1.5
-	add_child(player)
-	player.finished.connect(player.queue_free)
-	player.play()
+	GameAudio.play_hit()
 
 
 func _ensure_hit_sfx_cache() -> void:

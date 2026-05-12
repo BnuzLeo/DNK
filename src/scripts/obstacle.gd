@@ -44,6 +44,7 @@ func take_damage(amount: int) -> void:
 
 func _die() -> void:
 	_dying = true
+	GameAudio.play_box_destroy()
 	# 30% 概率掉宝箱
 	if _main and randf() < 0.3:
 		_main._spawn_chest(global_position)

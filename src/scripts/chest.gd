@@ -146,9 +146,11 @@ func _input(event: InputEvent) -> void:
 
 
 func _give_reward(player: Node) -> void:
+	GameAudio.play_box_destroy()
 	if _reward_type == "weapon":
 		player.add_weapon(_reward_key)
 	else:
+		GameAudio.play_energy()
 		var buff_type: int = int(_reward_key)
 		var duration := randf_range(BUFF_DURATION_MIN, BUFF_DURATION_MAX)
 		player.add_buff(buff_type, duration)
@@ -169,6 +171,7 @@ func _give_reward(player: Node) -> void:
 
 
 func _give_start_supply(player: Node) -> void:
+	GameAudio.play_box_destroy()
 	var candidates: Array[String] = []
 	for key in START_SUPPLY_WEAPON_KEYS:
 		if not player.has_weapon(key):
@@ -355,6 +358,8 @@ func _create_weapon_panel(canvas: CanvasLayer, weapon: Dictionary, key: String, 
 
 func _on_weapon_panel_input(event: InputEvent, key: String, player: Node, canvas: CanvasLayer) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		GameAudio.play_button()
+		GameAudio.play_box_destroy()
 		var added: bool = player.add_weapon(key)
 		var weapon_name: String = player.WEAPONS[key].name
 		if added:

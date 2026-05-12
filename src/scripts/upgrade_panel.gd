@@ -168,6 +168,7 @@ func _refresh_ui() -> void:
 
 func _on_buy_input(event: InputEvent, stat: String) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		GameAudio.play_button()
 		if GameManager.purchase_upgrade(stat):
 			if _player:
 				_player._load_from_game_manager()
@@ -179,6 +180,7 @@ func _on_buy_input(event: InputEvent, stat: String) -> void:
 
 func _on_close_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		GameAudio.play_button()
 		_close()
 
 

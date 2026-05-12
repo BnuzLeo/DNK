@@ -153,6 +153,7 @@ func purchase_upgrade(stat: String) -> bool:
 	var cost := get_upgrade_cost(stat)
 	practice_time -= cost
 	player_data["upgrade_%s_level" % stat] += 1
+	GameAudio.play_coin()
 	post_message("消耗练习时长 -%d" % cost, Color(1.0, 0.78, 0.25))
 	post_message("升级成功：%s Lv.%d" % [_get_upgrade_name(stat), int(player_data["upgrade_%s_level" % stat])], Color(0.0, 0.898, 1.0))
 	return true
@@ -170,6 +171,7 @@ func purchase_weapon(key: String) -> bool:
 	var cost: int = WEAPON_COSTS[key]
 	kun_coins -= cost
 	player_data.owned_weapons.append(key)
+	GameAudio.play_coin()
 	post_message("消耗坤币 -%d" % cost, Color(1.0, 0.78, 0.25))
 	post_message("获得物品：%s" % _get_weapon_name(key), Color(0.0, 0.898, 1.0))
 	return true
@@ -187,6 +189,7 @@ func unlock_weapon_slot() -> bool:
 		return false
 	kun_coins -= cost
 	player_data.max_weapon_slots = next_slot
+	GameAudio.play_coin()
 	post_message("消耗坤币 -%d" % cost, Color(1.0, 0.78, 0.25))
 	post_message("解锁装备槽：第 %d 格" % next_slot, Color(0.0, 0.898, 1.0))
 	return true

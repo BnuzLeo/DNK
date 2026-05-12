@@ -317,6 +317,7 @@ func _try_upgrade(node_def: Dictionary) -> void:
 	# 购买
 	GameManager.practice_time -= cost
 	_node_levels[key] = level + 1
+	GameAudio.play_coin()
 	GameManager.post_message("消耗练习时长 -%d" % cost, Color(1.0, 0.78, 0.25))
 	GameManager.post_message("学习天赋：%s Lv.%d" % [node_def.name, level + 1], Color(0.0, 0.898, 1.0))
 	_save_levels()

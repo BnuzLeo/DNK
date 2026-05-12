@@ -290,6 +290,7 @@ func _physics_process(delta: float) -> void:
 
 	# 闪避输入（Shift）
 	if Input.is_action_just_pressed("dash") and _dash_cooldown <= 0.0:
+		GameAudio.play_dash()
 		_dash_timer = DASH_DURATION
 		_dash_cooldown = 0.0 if s == GameManager.GameState.LOBBY else DASH_COOLDOWN - _talent_dash_cd_reduction
 		# 有移动输入就用移动方向，否则用朝向
@@ -370,6 +371,7 @@ func _input(event: InputEvent) -> void:
 func _cycle_weapon() -> void:
 	if _weapon_keys.size() <= 1:
 		return
+	GameAudio.play_switch()
 	var previous_type: String = WEAPONS[_weapon_keys[_weapon_index]].get("type", "")
 	_weapon_index = (_weapon_index + 1) % _weapon_keys.size()
 	GameManager.player_data.weapon_index = _weapon_index
@@ -387,6 +389,8 @@ func _trigger_berserk() -> void:
 		_berserk_active = true
 		_berserk_timer = BERSERK_DURATION
 	_berserk_flash_timer = 0.25
+	if _berserk_active:
+		GameAudio.play_berserk()
 	if not was_active and _berserk_active:
 		_play_berserk_awakening_fx()
 	if _berserk_active and _weapon_keys[_weapon_index] == "basketball":
@@ -584,6 +588,7 @@ func _get_current_room_enemies() -> Array[Area2D]:
 func _deal_damage_to_enemy(enemy: Area2D, amount: int) -> void:
 	var was_dying: bool = "_dying" in enemy and enemy._dying
 	enemy.take_damage(amount)
+	GameAudio.play_hit()
 	if enemy.has_method("apply_hit_feedback"):
 		var dir: Vector2 = (enemy.global_position - global_position).normalized()
 		if dir == Vector2.ZERO:
@@ -904,6 +909,7 @@ func take_damage(amount: int) -> void:
 	player_hit.emit()
 	_invuln_timer = 0.5
 	if hp <= 0:
+		GameAudio.play_player_dead()
 		player_died.emit()
 
 

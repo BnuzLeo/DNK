@@ -5,7 +5,7 @@ const VS := preload("res://scripts/visual_spec.gd")
 const TITLE_STINGER_PATH := "res://assets/music/dialogue/真的是你啊.MP3"
 const MENU_VIDEO_FRAME_DIR := "res://assets/export/start/start_video_frames"
 const MENU_VIDEO_FPS := 12.0
-const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/宣发视频.mp4"
+const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/宣发视频.ogv"
 const KUN_PARALLAX_RANGE := Vector2(36.0, 24.0)
 const SKIP_HOLD_TIME := 1.0
 const ENABLE_DIALOGUE_AUDIO := false
@@ -167,6 +167,7 @@ func _load_audio_stream(path: String) -> AudioStream:
 func _on_start_pressed() -> void:
 	if _video_started or _starting:
 		return
+	GameAudio.play_button()
 	_starting = true
 	_start_button.disabled = true
 	_play_title_stinger()
@@ -184,6 +185,7 @@ func _on_start_pressed() -> void:
 func _go_to_lobby() -> void:
 	if _video_started or _starting:
 		return
+	GameAudio.play_button()
 	GameManager.change_state(GameManager.GameState.LOBBY)
 	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
 
@@ -191,6 +193,7 @@ func _go_to_lobby() -> void:
 func _go_to_dungeon() -> void:
 	if _video_started or _starting:
 		return
+	GameAudio.play_button()
 	GameManager.change_state(GameManager.GameState.PLAYING)
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
 
@@ -265,6 +268,7 @@ func _load_menu_video_frames() -> Array[Texture2D]:
 func _load_and_play_video() -> void:
 	var stream := _load_video_stream(START_SEQUENCE_VIDEO_PATH)
 	if stream == null:
+		push_warning("Start sequence video could not be loaded: %s" % START_SEQUENCE_VIDEO_PATH)
 		_finish_video_and_enter_lobby()
 		return
 	_video_player.stream = stream
