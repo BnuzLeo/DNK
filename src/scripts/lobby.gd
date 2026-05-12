@@ -3,6 +3,7 @@ extends Node2D
 ## 练习生基地 — 游戏大厅
 
 const VS := preload("res://scripts/visual_spec.gd")
+const PopupGui := preload("res://scripts/popup_gui.gd")
 const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
 const LOBBY_MUSIC := preload("res://assets/music/dialogue/鸡你太美.wav")
 const BULLET_POOL_SCRIPT := preload("res://scripts/bullet_pool.gd")
@@ -11,17 +12,45 @@ const EQUIPMENT_PANEL_SCRIPT := preload("res://scripts/equipment_panel.gd")
 const ENABLE_DIALOGUE_AUDIO := false
 
 const BLUE_SHOCKWAVE_SHEET := "res://assets/export/effects/shockwave_blue_sheet.png"
-const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
+const GUI_STATUS_BAR := preload("res://assets/export/gui/hud_status_panel.png")
+const GUI_HUD_BAR_FRAME := preload("res://assets/export/gui/hud_bar_frame.png")
+const GUI_HUD_BAR_FILL_HP := preload("res://assets/export/gui/hud_bar_fill_hp.png")
+const GUI_HUD_BAR_FILL_MANA := preload("res://assets/export/gui/hud_bar_fill_mana.png")
+const GUI_HUD_BAR_FILL_ARMOR := preload("res://assets/export/gui/hud_bar_fill_armor.png")
+const GUI_HUD_ICON_HP := preload("res://assets/export/gui/hud_icon_hp.png")
+const GUI_HUD_ICON_MANA := preload("res://assets/export/gui/hud_icon_mana.png")
+const GUI_HUD_ICON_ARMOR := preload("res://assets/export/gui/hud_icon_armor.png")
+const GUI_HUD_CURRENCY_PANEL := preload("res://assets/export/gui/hud_currency_panel.png")
+const GUI_HUD_ICON_PRACTICE := preload("res://assets/export/gui/hud_icon_practice.png")
+const GUI_HUD_ICON_KUN_COIN := preload("res://assets/export/gui/hud_icon_kun_coin.png")
+const GUI_BAG_ICON := preload("res://assets/export/gui/icon_bag.png")
+const GUI_POPUP_PANEL := preload("res://assets/export/gui/ui_popup_panel.png")
+const GUI_POPUP_SLOT := preload("res://assets/export/gui/ui_popup_slot.png")
+const GUI_POPUP_SLOT_SELECTED := preload("res://assets/export/gui/ui_popup_slot_selected.png")
+const GUI_TAB_ACTIVE := preload("res://assets/export/gui/ui_tab_active.png")
+const GUI_TAB_INACTIVE := preload("res://assets/export/gui/ui_tab_inactive.png")
+const GUI_CLOSE_BUTTON := preload("res://assets/export/gui/ui_close_button.png")
+const GUI_STAGE_ICON := preload("res://assets/export/gui/icon_stage.png")
+const GUI_STAGE_NORMAL_ICON := preload("res://assets/export/gui/icon_stage_normal.png")
+const GUI_STAGE_HARD_ICON := preload("res://assets/export/gui/icon_stage_hard.png")
+const GUI_LOCK_BADGE := preload("res://assets/export/gui/ui_badge_locked.png")
 const GUI_ACTION_ATTACK_ICON := preload("res://assets/export/gui/btn-攻击.png")
 const GUI_ACTION_DASH_ICON := preload("res://assets/export/gui/btn-滑行.png")
 const GUI_ACTION_BERSERK_ICON := preload("res://assets/export/gui/btn-狂暴.png")
 const GUI_WEAPON_BASKETBALL_ICON := preload("res://assets/export/gui/btn-weapon1.png")
 const GUI_WEAPON_MAN_GUN_ICON := preload("res://assets/export/gui/btn-weapon2.png")
 const GUI_WEAPON_LASER_GUN_ICON := preload("res://assets/export/gui/btn-weapon3.png")
-const STATUS_SCALE := 1.73
-const STATUS_POS := Vector2(24.0, 20.0)
-const STATUS_FILL_W := 59.0 * STATUS_SCALE
-const STATUS_FILL_H := 5.5 * STATUS_SCALE
+const STATUS_POS := Vector2(18.0, 16.0)
+const STATUS_PANEL_SIZE := Vector2(190.0, 99.0)
+const STATUS_BAR_POS_X := 42.0
+const STATUS_BAR_FILL_OFFSET_X := 2.0
+const STATUS_BAR_FILL_OFFSET_Y := 0.0
+const STATUS_BAR_FRAME_SIZE := Vector2(136.0, 18.0)
+const STATUS_FILL_W := 132.0
+const STATUS_FILL_H := 18.0
+const STATUS_ICON_SIZE := Vector2(21.0, 21.0)
+const HUD_CURRENCY_PANEL_SIZE := Vector2(138.0, 50.0)
+const HUD_CURRENCY_ICON_SIZE := Vector2(34.0, 34.0)
 const ACTION_FRAME_SIZE := Vector2(50.67, 50.67)
 const ACTION_CONTROL_SIZE := Vector2(50.67, 78.0)
 const ACTION_ROW_Y := 530.0
@@ -52,14 +81,14 @@ var _coin_label: Label
 var _fps_label: Label
 var _kills_label: Label
 var _weapon_label: Label
-var _hp_bar: ColorRect
-var _hp_bar_bg: ColorRect
+var _hp_bar: TextureRect
+var _hp_bar_bg: TextureRect
 var _hp_text: Label
-var _shield_bar: ColorRect
-var _shield_bar_bg: ColorRect
+var _shield_bar: TextureRect
+var _shield_bar_bg: TextureRect
 var _shield_text: Label
-var _mana_bar: ColorRect
-var _mana_bar_bg: ColorRect
+var _mana_bar: TextureRect
+var _mana_bar_bg: TextureRect
 var _mana_text: Label
 var _dash_icon: Control
 var _berserk_icon: Control
@@ -286,64 +315,31 @@ func _create_hud() -> void:
 
 	_hud_frame = Control.new()
 	_hud_frame.position = STATUS_POS
-	_hud_frame.size = Vector2(79, 39) * STATUS_SCALE
-	_hud_frame.z_index = 2
+	_hud_frame.size = STATUS_PANEL_SIZE
+	_hud_frame.z_index = 0
 	_hud_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud_frame.draw.connect(_draw_stats_frame)
 	_hud_canvas.add_child(_hud_frame)
 
-	_hp_bar_bg = ColorRect.new()
-	_hp_bar_bg.position = STATUS_POS + Vector2(15, 4) * STATUS_SCALE
-	_hp_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
-	_hp_bar_bg.z_index = 0
-	_hp_bar_bg.color = Color(0.08, 0.04, 0.03, 0.55)
-	_hud_canvas.add_child(_hp_bar_bg)
-
-	_hp_bar = ColorRect.new()
-	_hp_bar.position = _hp_bar_bg.position
-	_hp_bar.size = _hp_bar_bg.size
-	_hp_bar.z_index = 0
-	_hp_bar.color = Color(0.88, 0.07, 0.15)
-	_hud_canvas.add_child(_hp_bar)
-
-	_hp_text = _make_hud_value_label(STATUS_POS + Vector2(60, 3), Color.WHITE)
-	_hp_text.z_index = 1
+	_hp_bar = _add_hud_texture(_hud_canvas, GUI_HUD_BAR_FILL_HP, STATUS_POS + Vector2(STATUS_BAR_POS_X + STATUS_BAR_FILL_OFFSET_X, 18.0 + STATUS_BAR_FILL_OFFSET_Y), Vector2(STATUS_FILL_W, STATUS_FILL_H), 1)
+	_hp_bar_bg = _add_hud_texture(_hud_canvas, GUI_HUD_BAR_FRAME, STATUS_POS + Vector2(STATUS_BAR_POS_X, 18.0), STATUS_BAR_FRAME_SIZE, 2)
+	_add_hud_texture(_hud_canvas, GUI_HUD_ICON_HP, STATUS_POS + Vector2(14.0, 16.0), STATUS_ICON_SIZE, 3)
+	_hp_text = _make_hud_value_label(STATUS_POS + Vector2(76.0, 16.0), Color.WHITE)
+	_hp_text.z_index = 4
 	_hud_canvas.add_child(_hp_text)
 
-	_shield_bar_bg = ColorRect.new()
-	_shield_bar_bg.position = STATUS_POS + Vector2(15, 16) * STATUS_SCALE
-	_shield_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
-	_shield_bar_bg.z_index = 0
-	_shield_bar_bg.color = Color(0.06, 0.07, 0.08, 0.55)
-	_hud_canvas.add_child(_shield_bar_bg)
-
-	_shield_bar = ColorRect.new()
-	_shield_bar.position = _shield_bar_bg.position
-	_shield_bar.size = _shield_bar_bg.size
-	_shield_bar.z_index = 0
-	_shield_bar.color = Color(0.78, 0.85, 0.9)
-	_hud_canvas.add_child(_shield_bar)
-
-	_shield_text = _make_hud_value_label(STATUS_POS + Vector2(60, 34), Color.WHITE)
-	_shield_text.z_index = 1
+	_shield_bar = _add_hud_texture(_hud_canvas, GUI_HUD_BAR_FILL_ARMOR, STATUS_POS + Vector2(STATUS_BAR_POS_X + STATUS_BAR_FILL_OFFSET_X, 45.0 + STATUS_BAR_FILL_OFFSET_Y), Vector2(STATUS_FILL_W, STATUS_FILL_H), 1)
+	_shield_bar_bg = _add_hud_texture(_hud_canvas, GUI_HUD_BAR_FRAME, STATUS_POS + Vector2(STATUS_BAR_POS_X, 45.0), STATUS_BAR_FRAME_SIZE, 2)
+	_add_hud_texture(_hud_canvas, GUI_HUD_ICON_ARMOR, STATUS_POS + Vector2(14.0, 43.0), STATUS_ICON_SIZE, 3)
+	_shield_text = _make_hud_value_label(STATUS_POS + Vector2(76.0, 43.0), Color.WHITE)
+	_shield_text.z_index = 4
 	_hud_canvas.add_child(_shield_text)
 
-	_mana_bar_bg = ColorRect.new()
-	_mana_bar_bg.position = STATUS_POS + Vector2(15, 28) * STATUS_SCALE
-	_mana_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
-	_mana_bar_bg.z_index = 0
-	_mana_bar_bg.color = Color(0.04, 0.05, 0.12, 0.55)
-	_hud_canvas.add_child(_mana_bar_bg)
-
-	_mana_bar = ColorRect.new()
-	_mana_bar.position = _mana_bar_bg.position
-	_mana_bar.size = _mana_bar_bg.size
-	_mana_bar.z_index = 0
-	_mana_bar.color = Color(0.22, 0.33, 0.9)
-	_hud_canvas.add_child(_mana_bar)
-
-	_mana_text = _make_hud_value_label(STATUS_POS + Vector2(60, 65), Color.WHITE)
-	_mana_text.z_index = 1
+	_mana_bar = _add_hud_texture(_hud_canvas, GUI_HUD_BAR_FILL_MANA, STATUS_POS + Vector2(STATUS_BAR_POS_X + STATUS_BAR_FILL_OFFSET_X, 72.0 + STATUS_BAR_FILL_OFFSET_Y), Vector2(STATUS_FILL_W, STATUS_FILL_H), 1)
+	_mana_bar_bg = _add_hud_texture(_hud_canvas, GUI_HUD_BAR_FRAME, STATUS_POS + Vector2(STATUS_BAR_POS_X, 72.0), STATUS_BAR_FRAME_SIZE, 2)
+	_add_hud_texture(_hud_canvas, GUI_HUD_ICON_MANA, STATUS_POS + Vector2(14.0, 70.0), STATUS_ICON_SIZE, 3)
+	_mana_text = _make_hud_value_label(STATUS_POS + Vector2(76.0, 70.0), Color.WHITE)
+	_mana_text.z_index = 4
 	_hud_canvas.add_child(_mana_text)
 
 	_weapon_label = Label.new()
@@ -351,38 +347,38 @@ func _create_hud() -> void:
 	_hud_canvas.add_child(_weapon_label)
 
 	_practice_panel = Control.new()
-	_practice_panel.position = Vector2(656, 16)
-	_practice_panel.size = Vector2(144, 36)
+	_practice_panel.position = Vector2(622, 14)
+	_practice_panel.size = HUD_CURRENCY_PANEL_SIZE
 	_practice_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_practice_panel.draw.connect(_draw_practice_panel)
 	_hud_canvas.add_child(_practice_panel)
 
 	_practice_label = Label.new()
-	_practice_label.position = Vector2(694, 18)
-	_practice_label.size = Vector2(96, 22)
+	_practice_label.position = Vector2(670, 26)
+	_practice_label.size = Vector2(78, 22)
 	_practice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_practice_label.add_theme_font_size_override("font_size", 18)
 	_practice_label.add_theme_color_override("font_color", Color.WHITE)
 	_hud_canvas.add_child(_practice_label)
 
 	_coin_panel = Control.new()
-	_coin_panel.position = Vector2(814, 16)
-	_coin_panel.size = Vector2(96, 36)
+	_coin_panel.position = Vector2(768, 14)
+	_coin_panel.size = HUD_CURRENCY_PANEL_SIZE
 	_coin_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_coin_panel.draw.connect(_draw_coin_panel)
 	_hud_canvas.add_child(_coin_panel)
 
 	_coin_label = Label.new()
-	_coin_label.position = Vector2(846, 18)
-	_coin_label.size = Vector2(56, 22)
+	_coin_label.position = Vector2(816, 26)
+	_coin_label.size = Vector2(78, 22)
 	_coin_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_coin_label.add_theme_font_size_override("font_size", 18)
 	_coin_label.add_theme_color_override("font_color", Color.WHITE)
 	_hud_canvas.add_child(_coin_label)
 
 	_bag_button = Control.new()
-	_bag_button.position = Vector2(622, 14)
-	_bag_button.size = Vector2(28, 36)
+	_bag_button.position = Vector2(574, 14)
+	_bag_button.size = Vector2(40, 44)
 	_bag_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	_bag_button.draw.connect(_draw_bag_button)
 	_bag_button.gui_input.connect(_on_bag_button_input)
@@ -421,7 +417,7 @@ func _create_hud() -> void:
 	_hud_canvas.add_child(_berserk_icon)
 
 	_buff_bar = Control.new()
-	_buff_bar.position = Vector2(182, 22)
+	_buff_bar.position = Vector2(218, 22)
 	_buff_bar.size = Vector2(130, 28)
 	_buff_bar.draw.connect(_draw_buff_bar)
 	_hud_canvas.add_child(_buff_bar)
@@ -442,12 +438,12 @@ func _process(delta: float) -> void:
 		_mana_bar.size.x = STATUS_FILL_W * clampf(mana_ratio, 0.0, 1.0)
 		var hp_ratio: float = float(_player.hp) / float(_player.MAX_HP)
 		_hp_bar.size.x = STATUS_FILL_W * clampf(hp_ratio, 0.0, 1.0)
-		_hp_bar.color = Color(0.88, 0.07, 0.15)
+		_hp_bar.modulate = Color.WHITE
 		var armor_ratio := 0.0 if _player.max_armor <= 0 else float(_player.armor) / float(_player.max_armor)
 		_shield_bar.size.x = STATUS_FILL_W * clampf(armor_ratio, 0.0, 1.0)
-		_shield_bar.visible = _player.max_armor > 0
-		_shield_bar_bg.visible = _player.max_armor > 0
-		_shield_text.visible = _player.max_armor > 0
+		_shield_bar.visible = _player.armor > 0
+		_shield_bar_bg.visible = true
+		_shield_text.visible = true
 		_portal_near = _player.global_position.distance_to(_get_portal_position()) < 50.0
 
 		if _attack_icon:
@@ -479,7 +475,7 @@ func _process(delta: float) -> void:
 func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
 	var label := Label.new()
 	label.position = pos
-	label.size = Vector2(96, 16)
+	label.size = Vector2(74, 18)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 12)
 	label.add_theme_color_override("font_color", color)
@@ -487,6 +483,19 @@ func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
 	label.add_theme_constant_override("shadow_offset_x", 1)
 	label.add_theme_constant_override("shadow_offset_y", 1)
 	return label
+
+
+func _add_hud_texture(canvas: CanvasLayer, texture: Texture2D, pos: Vector2, size: Vector2, z_index: int) -> TextureRect:
+	var node := TextureRect.new()
+	node.texture = texture
+	node.position = pos
+	node.size = size
+	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	node.stretch_mode = TextureRect.STRETCH_SCALE
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	node.z_index = z_index
+	canvas.add_child(node)
+	return node
 
 
 func _create_message_panel(canvas: CanvasLayer) -> void:
@@ -573,27 +582,18 @@ func _draw_stats_frame() -> void:
 
 func _draw_practice_panel() -> void:
 	var r := Rect2(Vector2.ZERO, _practice_panel.size)
-	_practice_panel.draw_rect(r, Color(0.22, 0.22, 0.24))
-	_practice_panel.draw_rect(r.grow(-3), Color(0.34, 0.34, 0.36))
-	_practice_panel.draw_circle(Vector2(20, 18), 8.0, Color(1.0, 0.86, 0.12))
-	_practice_panel.draw_arc(Vector2(20, 18), 8.0, 0, TAU, 18, Color(0.25, 0.12, 0.02), 2.0)
+	_practice_panel.draw_texture_rect(GUI_HUD_CURRENCY_PANEL, r, false)
+	_practice_panel.draw_texture_rect(GUI_HUD_ICON_PRACTICE, Rect2(Vector2(9, 8), HUD_CURRENCY_ICON_SIZE), false)
 
 
 func _draw_coin_panel() -> void:
 	var r := Rect2(Vector2.ZERO, _coin_panel.size)
-	_coin_panel.draw_rect(r, Color(0.22, 0.22, 0.24))
-	_coin_panel.draw_rect(r.grow(-3), Color(0.34, 0.34, 0.36))
-	_coin_panel.draw_circle(Vector2(18, 18), 8.0, Color(1.0, 0.86, 0.12))
-	_coin_panel.draw_arc(Vector2(18, 18), 8.0, 0, TAU, 18, Color(0.25, 0.12, 0.02), 2.0)
+	_coin_panel.draw_texture_rect(GUI_HUD_CURRENCY_PANEL, r, false)
+	_coin_panel.draw_texture_rect(GUI_HUD_ICON_KUN_COIN, Rect2(Vector2(9, 8), HUD_CURRENCY_ICON_SIZE), false)
 
 
 func _draw_bag_button() -> void:
-	var r := Rect2(Vector2.ZERO, _bag_button.size)
-	_bag_button.draw_rect(r, Color(0.30, 0.24, 0.16))
-	_bag_button.draw_rect(r.grow(-3), Color(0.59, 0.46, 0.28))
-	_bag_button.draw_rect(Rect2(7, 10, 14, 14), Color(0.79, 0.66, 0.42))
-	_bag_button.draw_rect(Rect2(9, 7, 10, 5), Color(0.79, 0.66, 0.42))
-	_bag_button.draw_arc(Vector2(14, 11), 4.0, PI, TAU, 10, Color(0.35, 0.22, 0.10), 1.5)
+	_bag_button.draw_texture_rect(GUI_BAG_ICON, Rect2(Vector2(2, 0), Vector2(36, 36)), false)
 	_draw_button_key(_bag_button, "B", Color(0.98, 0.90, 0.62))
 
 
@@ -830,7 +830,7 @@ func _open_map_select() -> void:
 	add_child(_map_select_canvas)
 
 	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0)
+	bg.color = Color(0, 0, 0, 0.58)
 	bg.size = VS.VIEWPORT_SIZE
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	_map_select_canvas.add_child(bg)
@@ -847,26 +847,34 @@ func _open_map_select() -> void:
 
 	var title := Label.new()
 	title.text = "关卡模式"
-	title.position = Vector2((window_size.x - 180.0) * 0.5, 14)
-	title.size = Vector2(180, 42)
+	title.position = Vector2(84, 14)
+	title.size = Vector2(280, 42)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 26)
-	title.add_theme_color_override("font_color", Color.WHITE)
+	title.add_theme_color_override("font_color", Color(0.98, 0.92, 0.78))
 	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
 	title.add_theme_constant_override("shadow_offset_x", 2)
 	title.add_theme_constant_override("shadow_offset_y", 2)
 	window.add_child(title)
 
+	var title_icon := TextureRect.new()
+	title_icon.texture = GUI_STAGE_ICON
+	title_icon.position = Vector2(26, 20)
+	title_icon.size = Vector2(48, 48)
+	title_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	title_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	window.add_child(title_icon)
+
 	var close_button := Button.new()
-	close_button.text = "X"
-	close_button.position = Vector2(window_size.x - 48, 14)
-	close_button.size = Vector2(34, 34)
+	close_button.text = ""
+	close_button.icon = GUI_CLOSE_BUTTON
+	close_button.expand_icon = true
+	close_button.position = Vector2(window_size.x - 56, 10)
+	close_button.size = Vector2(44, 44)
 	close_button.focus_mode = Control.FOCUS_NONE
-	close_button.add_theme_font_size_override("font_size", 22)
-	close_button.add_theme_color_override("font_color", Color.WHITE)
-	close_button.add_theme_stylebox_override("normal", _make_flat_style(Color(0.72, 0.04, 0.12), Color(0.18, 0.0, 0.02), 0, 3))
-	close_button.add_theme_stylebox_override("hover", _make_flat_style(Color(0.95, 0.08, 0.16), Color(0.22, 0.0, 0.02), 0, 3))
-	close_button.add_theme_stylebox_override("pressed", _make_flat_style(Color(0.48, 0.02, 0.08), Color(0.10, 0.0, 0.02), 0, 3))
+	close_button.add_theme_stylebox_override("normal", _make_flat_style(Color(0.26, 0.18, 0.18, 0.0), Color(0.0, 0, 0, 0), 0, 0))
+	close_button.add_theme_stylebox_override("hover", _make_flat_style(Color(0.26, 0.18, 0.18, 0.0), Color(0.0, 0, 0, 0), 0, 0))
+	close_button.add_theme_stylebox_override("pressed", _make_flat_style(Color(0.26, 0.18, 0.18, 0.0), Color(0.0, 0, 0, 0), 0, 0))
 	close_button.pressed.connect(_close_map_select)
 	window.add_child(close_button)
 
@@ -925,9 +933,8 @@ func _draw_map_card(card: Control, index: int) -> void:
 	var h := card.size.y
 	var available := index == 0
 
-	var bg_color := Color(0.08, 0.095, 0.13, 0.97) if available else Color(0.01, 0.012, 0.018, 0.91)
-	card.draw_rect(Rect2(Vector2.ZERO, card.size), bg_color)
-	card.draw_rect(Rect2(Vector2(4, 4), card.size - Vector2(8, 8)), Color(0.11, 0.125, 0.16, 0.55) if available else Color(0, 0, 0, 0.45), false, 2.0)
+	card.draw_texture_rect(GUI_POPUP_SLOT_SELECTED if available else GUI_POPUP_SLOT, Rect2(Vector2.ZERO, card.size), false)
+	card.draw_rect(Rect2(Vector2(4, 4), card.size - Vector2(8, 8)), Color(0.11, 0.125, 0.16, 0.35) if available else Color(0, 0, 0, 0.35), false, 2.0)
 	_draw_corner_caps(card, Rect2(Vector2.ZERO, card.size), available)
 
 	var star_col := Color(0.92, 0.93, 0.94) if available else Color(0.18, 0.18, 0.20)
@@ -949,7 +956,7 @@ func _draw_map_card(card: Control, index: int) -> void:
 	else:
 		card.draw_rect(thumb_rect, Color(0.02, 0.025, 0.035, 0.95))
 		_draw_frozen_court_thumbnail(card, thumb_rect)
-		card.draw_rect(Rect2(Vector2.ZERO, card.size), Color(0, 0, 0, 0.62))
+		card.draw_rect(Rect2(Vector2.ZERO, card.size), Color(0, 0, 0, 0.46))
 		_draw_lock(card, Vector2(w * 0.5, h * 0.48), 36.0)
 		var req := "敬请期待"
 		var req_size := ThemeDB.fallback_font.get_string_size(req, HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
@@ -960,28 +967,18 @@ func _draw_map_card(card: Control, index: int) -> void:
 
 func _draw_map_select_backdrop(ctrl: Control) -> void:
 	var size := ctrl.size
-	ctrl.draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.06, 0.075, 1.0))
-	var stripe_h := size.y / 12.0
-	for i in range(12):
-		var t := float(i) / 11.0
-		var col := Color(0.05 + t * 0.04, 0.12 + t * 0.12, 0.16 + t * 0.16, 0.24)
-		ctrl.draw_rect(Rect2(0, i * stripe_h, size.x, stripe_h), col)
-	ctrl.draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.18))
-	ctrl.draw_rect(Rect2(Vector2.ZERO, size), Color(0.74, 0.84, 0.90, 0.95), false, 2.0)
+	ctrl.draw_texture_rect(GUI_POPUP_PANEL, Rect2(Vector2.ZERO, size), false)
+	ctrl.draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.24))
+	ctrl.draw_rect(Rect2(Vector2.ZERO, size), Color(0.64, 0.72, 0.78, 0.72), false, 2.0)
 
 
 func _draw_mode_tab(ctrl: Control, label: String, selected: bool, locked: bool, index: int) -> void:
 	var rect := Rect2(Vector2.ZERO, ctrl.size)
-	var base := Color(0.04, 0.18, 0.18, 0.96) if selected else Color(0.03, 0.14 + 0.03 * index, 0.19 + 0.02 * index, 0.92)
+	ctrl.draw_texture_rect(GUI_TAB_ACTIVE if selected else GUI_TAB_INACTIVE, rect, false)
 	if locked:
-		base = Color(0.025, 0.03, 0.04, 0.94)
-	ctrl.draw_rect(rect, base)
-	ctrl.draw_rect(rect, Color(0.94, 0.73, 0.18) if selected else Color(0.02, 0.03, 0.04), false, 2.0)
-	ctrl.draw_rect(Rect2(4, 4, rect.size.x - 8, rect.size.y - 8), Color(0.06, 0.34, 0.30, 0.55) if selected else Color(0.06, 0.20, 0.28, 0.50))
-	if locked:
-		ctrl.draw_rect(Rect2(4, 4, rect.size.x - 8, rect.size.y - 8), Color(0, 0, 0, 0.34))
+		ctrl.draw_rect(rect, Color(0, 0, 0, 0.28))
 	var court := Rect2(10, 8, rect.size.x - 20, 28)
-	ctrl.draw_rect(court, Color(0.08, 0.45, 0.35) if selected else Color(0.05, 0.28, 0.34))
+	ctrl.draw_rect(court, Color(0.08, 0.45, 0.35, 0.85) if selected else Color(0.05, 0.28, 0.34, 0.72))
 	ctrl.draw_line(court.position + Vector2(court.size.x * 0.5, 0), court.position + Vector2(court.size.x * 0.5, court.size.y), Color(0.6, 0.95, 0.85, 0.45), 1.0)
 	if locked:
 		_draw_lock(ctrl, court.get_center(), 14.0)

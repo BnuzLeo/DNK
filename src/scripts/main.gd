@@ -3,8 +3,21 @@ extends Node2D
 ## 主场景控制器 - 走廊式房间制地牢 + HUD + 小地图
 
 const VS := preload("res://scripts/visual_spec.gd")
+const PopupGui := preload("res://scripts/popup_gui.gd")
 const SHOCKWAVE_EFFECT := preload("res://scripts/shockwave_effect.gd")
-const GUI_STATUS_BAR := preload("res://assets/export/gui/状态栏.png")
+const GUI_STATUS_BAR := preload("res://assets/export/gui/hud_status_panel.png")
+const GUI_HUD_BAR_FRAME := preload("res://assets/export/gui/hud_bar_frame.png")
+const GUI_HUD_BAR_FILL_HP := preload("res://assets/export/gui/hud_bar_fill_hp.png")
+const GUI_HUD_BAR_FILL_MANA := preload("res://assets/export/gui/hud_bar_fill_mana.png")
+const GUI_HUD_BAR_FILL_ARMOR := preload("res://assets/export/gui/hud_bar_fill_armor.png")
+const GUI_HUD_ICON_HP := preload("res://assets/export/gui/hud_icon_hp.png")
+const GUI_HUD_ICON_MANA := preload("res://assets/export/gui/hud_icon_mana.png")
+const GUI_HUD_ICON_ARMOR := preload("res://assets/export/gui/hud_icon_armor.png")
+const GUI_HUD_CURRENCY_PANEL := preload("res://assets/export/gui/hud_currency_panel.png")
+const GUI_HUD_ICON_PRACTICE := preload("res://assets/export/gui/hud_icon_practice.png")
+const GUI_HUD_ICON_KUN_COIN := preload("res://assets/export/gui/hud_icon_kun_coin.png")
+const GUI_PAUSE_BUTTON := preload("res://assets/export/gui/btn_pause.png")
+const GUI_BAG_ICON := preload("res://assets/export/gui/icon_bag.png")
 const GUI_ACTION_ATTACK_ICON := preload("res://assets/export/gui/btn-攻击.png")
 const GUI_ACTION_DASH_ICON := preload("res://assets/export/gui/btn-滑行.png")
 const GUI_ACTION_BERSERK_ICON := preload("res://assets/export/gui/btn-狂暴.png")
@@ -35,10 +48,17 @@ const ICE_WALL_TILES := [
 	preload("res://assets/export/map/冰封篮球场/墙壁_01.png"),
 	preload("res://assets/export/map/冰封篮球场/墙壁_02.png")
 ]
-const STATUS_SCALE := 1.73
-const STATUS_POS := Vector2(24.0, 20.0)
-const STATUS_FILL_W := 59.0 * STATUS_SCALE
-const STATUS_FILL_H := 5.5 * STATUS_SCALE
+const STATUS_POS := Vector2(18.0, 16.0)
+const STATUS_PANEL_SIZE := Vector2(190.0, 99.0)
+const STATUS_BAR_POS_X := 42.0
+const STATUS_BAR_FILL_OFFSET_X := 2.0
+const STATUS_BAR_FILL_OFFSET_Y := 0.0
+const STATUS_BAR_FRAME_SIZE := Vector2(136.0, 18.0)
+const STATUS_FILL_W := 132.0
+const STATUS_FILL_H := 18.0
+const STATUS_ICON_SIZE := Vector2(21.0, 21.0)
+const HUD_CURRENCY_PANEL_SIZE := Vector2(138.0, 50.0)
+const HUD_CURRENCY_ICON_SIZE := Vector2(34.0, 34.0)
 const ACTION_FRAME_SIZE := Vector2(50.67, 50.67)
 const ACTION_CONTROL_SIZE := Vector2(50.67, 78.0)
 const ACTION_ROW_Y := 530.0
@@ -138,14 +158,14 @@ var _system_hint_generation := 0
 var _fps_label: Label
 var _kills_label: Label
 var _weapon_label: Label
-var _hp_bar: ColorRect
-var _hp_bar_bg: ColorRect
+var _hp_bar: TextureRect
+var _hp_bar_bg: TextureRect
 var _hp_text: Label
-var _shield_bar: ColorRect
-var _shield_bar_bg: ColorRect
+var _shield_bar: TextureRect
+var _shield_bar_bg: TextureRect
 var _shield_text: Label
-var _mana_bar: ColorRect
-var _mana_bar_bg: ColorRect
+var _mana_bar: TextureRect
+var _mana_bar_bg: TextureRect
 var _mana_text: Label
 var _dash_icon: Control
 var _berserk_icon: Control
@@ -1024,64 +1044,31 @@ func _create_hud() -> void:
 
 	_hud_frame = Control.new()
 	_hud_frame.position = STATUS_POS
-	_hud_frame.size = Vector2(79, 39) * STATUS_SCALE
-	_hud_frame.z_index = 2
+	_hud_frame.size = STATUS_PANEL_SIZE
+	_hud_frame.z_index = 0
 	_hud_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud_frame.draw.connect(_draw_stats_frame)
 	canvas.add_child(_hud_frame)
 
-	_hp_bar_bg = ColorRect.new()
-	_hp_bar_bg.position = STATUS_POS + Vector2(15, 4) * STATUS_SCALE
-	_hp_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
-	_hp_bar_bg.z_index = 0
-	_hp_bar_bg.color = Color(0.08, 0.04, 0.03, 0.55)
-	canvas.add_child(_hp_bar_bg)
-
-	_hp_bar = ColorRect.new()
-	_hp_bar.position = _hp_bar_bg.position
-	_hp_bar.size = _hp_bar_bg.size
-	_hp_bar.z_index = 0
-	_hp_bar.color = Color(0.88, 0.07, 0.15)
-	canvas.add_child(_hp_bar)
-
-	_hp_text = _make_hud_value_label(STATUS_POS + Vector2(60, 3), Color.WHITE)
-	_hp_text.z_index = 1
+	_hp_bar = _add_hud_texture(canvas, GUI_HUD_BAR_FILL_HP, STATUS_POS + Vector2(STATUS_BAR_POS_X + STATUS_BAR_FILL_OFFSET_X, 18.0 + STATUS_BAR_FILL_OFFSET_Y), Vector2(STATUS_FILL_W, STATUS_FILL_H), 1)
+	_hp_bar_bg = _add_hud_texture(canvas, GUI_HUD_BAR_FRAME, STATUS_POS + Vector2(STATUS_BAR_POS_X, 18.0), STATUS_BAR_FRAME_SIZE, 2)
+	_add_hud_texture(canvas, GUI_HUD_ICON_HP, STATUS_POS + Vector2(14.0, 16.0), STATUS_ICON_SIZE, 3)
+	_hp_text = _make_hud_value_label(STATUS_POS + Vector2(76.0, 16.0), Color.WHITE)
+	_hp_text.z_index = 4
 	canvas.add_child(_hp_text)
 
-	_shield_bar_bg = ColorRect.new()
-	_shield_bar_bg.position = STATUS_POS + Vector2(15, 16) * STATUS_SCALE
-	_shield_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
-	_shield_bar_bg.z_index = 0
-	_shield_bar_bg.color = Color(0.06, 0.07, 0.08, 0.55)
-	canvas.add_child(_shield_bar_bg)
-
-	_shield_bar = ColorRect.new()
-	_shield_bar.position = _shield_bar_bg.position
-	_shield_bar.size = _shield_bar_bg.size
-	_shield_bar.z_index = 0
-	_shield_bar.color = Color(0.78, 0.85, 0.9)
-	canvas.add_child(_shield_bar)
-
-	_shield_text = _make_hud_value_label(STATUS_POS + Vector2(60, 34), Color.WHITE)
-	_shield_text.z_index = 1
+	_shield_bar = _add_hud_texture(canvas, GUI_HUD_BAR_FILL_ARMOR, STATUS_POS + Vector2(STATUS_BAR_POS_X + STATUS_BAR_FILL_OFFSET_X, 45.0 + STATUS_BAR_FILL_OFFSET_Y), Vector2(STATUS_FILL_W, STATUS_FILL_H), 1)
+	_shield_bar_bg = _add_hud_texture(canvas, GUI_HUD_BAR_FRAME, STATUS_POS + Vector2(STATUS_BAR_POS_X, 45.0), STATUS_BAR_FRAME_SIZE, 2)
+	_add_hud_texture(canvas, GUI_HUD_ICON_ARMOR, STATUS_POS + Vector2(14.0, 43.0), STATUS_ICON_SIZE, 3)
+	_shield_text = _make_hud_value_label(STATUS_POS + Vector2(76.0, 43.0), Color.WHITE)
+	_shield_text.z_index = 4
 	canvas.add_child(_shield_text)
 
-	_mana_bar_bg = ColorRect.new()
-	_mana_bar_bg.position = STATUS_POS + Vector2(15, 28) * STATUS_SCALE
-	_mana_bar_bg.size = Vector2(STATUS_FILL_W, STATUS_FILL_H)
-	_mana_bar_bg.z_index = 0
-	_mana_bar_bg.color = Color(0.04, 0.05, 0.12, 0.55)
-	canvas.add_child(_mana_bar_bg)
-
-	_mana_bar = ColorRect.new()
-	_mana_bar.position = _mana_bar_bg.position
-	_mana_bar.size = _mana_bar_bg.size
-	_mana_bar.z_index = 0
-	_mana_bar.color = Color(0.22, 0.33, 0.9)
-	canvas.add_child(_mana_bar)
-
-	_mana_text = _make_hud_value_label(STATUS_POS + Vector2(60, 65), Color.WHITE)
-	_mana_text.z_index = 1
+	_mana_bar = _add_hud_texture(canvas, GUI_HUD_BAR_FILL_MANA, STATUS_POS + Vector2(STATUS_BAR_POS_X + STATUS_BAR_FILL_OFFSET_X, 72.0 + STATUS_BAR_FILL_OFFSET_Y), Vector2(STATUS_FILL_W, STATUS_FILL_H), 1)
+	_mana_bar_bg = _add_hud_texture(canvas, GUI_HUD_BAR_FRAME, STATUS_POS + Vector2(STATUS_BAR_POS_X, 72.0), STATUS_BAR_FRAME_SIZE, 2)
+	_add_hud_texture(canvas, GUI_HUD_ICON_MANA, STATUS_POS + Vector2(14.0, 70.0), STATUS_ICON_SIZE, 3)
+	_mana_text = _make_hud_value_label(STATUS_POS + Vector2(76.0, 70.0), Color.WHITE)
+	_mana_text.z_index = 4
 	canvas.add_child(_mana_text)
 
 	_weapon_label = Label.new()
@@ -1089,46 +1076,46 @@ func _create_hud() -> void:
 	canvas.add_child(_weapon_label)
 
 	_practice_panel = Control.new()
-	_practice_panel.position = Vector2(656, 16)
-	_practice_panel.size = Vector2(144, 36)
+	_practice_panel.position = Vector2(584, 14)
+	_practice_panel.size = HUD_CURRENCY_PANEL_SIZE
 	_practice_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_practice_panel.draw.connect(_draw_practice_panel)
 	canvas.add_child(_practice_panel)
 
 	_practice_label = Label.new()
-	_practice_label.position = Vector2(694, 18)
-	_practice_label.size = Vector2(96, 22)
+	_practice_label.position = Vector2(632, 26)
+	_practice_label.size = Vector2(78, 22)
 	_practice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_practice_label.add_theme_font_size_override("font_size", 18)
 	_practice_label.add_theme_color_override("font_color", Color.WHITE)
 	canvas.add_child(_practice_label)
 
 	_coin_panel = Control.new()
-	_coin_panel.position = Vector2(814, 16)
-	_coin_panel.size = Vector2(96, 36)
+	_coin_panel.position = Vector2(730, 14)
+	_coin_panel.size = HUD_CURRENCY_PANEL_SIZE
 	_coin_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_coin_panel.draw.connect(_draw_coin_panel)
 	canvas.add_child(_coin_panel)
 
 	_coin_label = Label.new()
-	_coin_label.position = Vector2(846, 18)
-	_coin_label.size = Vector2(56, 22)
+	_coin_label.position = Vector2(778, 26)
+	_coin_label.size = Vector2(78, 22)
 	_coin_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_coin_label.add_theme_font_size_override("font_size", 18)
 	_coin_label.add_theme_color_override("font_color", Color.WHITE)
 	canvas.add_child(_coin_label)
 
 	_pause_button = Control.new()
-	_pause_button.position = Vector2(924, 14)
-	_pause_button.size = Vector2(28, 36)
+	_pause_button.position = Vector2(902, 14)
+	_pause_button.size = Vector2(44, 44)
 	_pause_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	_pause_button.draw.connect(_draw_pause_button)
 	_pause_button.gui_input.connect(_on_pause_button_input)
 	canvas.add_child(_pause_button)
 
 	_bag_button = Control.new()
-	_bag_button.position = Vector2(622, 14)
-	_bag_button.size = Vector2(28, 36)
+	_bag_button.position = Vector2(536, 14)
+	_bag_button.size = Vector2(40, 44)
 	_bag_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	_bag_button.draw.connect(_draw_bag_button)
 	_bag_button.gui_input.connect(_on_bag_button_input)
@@ -1136,7 +1123,7 @@ func _create_hud() -> void:
 
 	var kill_boss_test_button := Button.new()
 	kill_boss_test_button.text = "秒杀Boss"
-	kill_boss_test_button.position = Vector2(306, 16)
+	kill_boss_test_button.position = Vector2(306, 64)
 	kill_boss_test_button.size = Vector2(88, 30)
 	kill_boss_test_button.focus_mode = Control.FOCUS_NONE
 	kill_boss_test_button.add_theme_font_size_override("font_size", 15)
@@ -1145,7 +1132,7 @@ func _create_hud() -> void:
 
 	_invincible_test_button = Button.new()
 	_invincible_test_button.text = "无敌测试"
-	_invincible_test_button.position = Vector2(410, 16)
+	_invincible_test_button.position = Vector2(410, 64)
 	_invincible_test_button.size = Vector2(88, 30)
 	_invincible_test_button.focus_mode = Control.FOCUS_NONE
 	_invincible_test_button.add_theme_font_size_override("font_size", 15)
@@ -1154,7 +1141,7 @@ func _create_hud() -> void:
 
 	var boss_test_button := Button.new()
 	boss_test_button.text = "Boss测试"
-	boss_test_button.position = Vector2(514, 16)
+	boss_test_button.position = Vector2(514, 64)
 	boss_test_button.size = Vector2(88, 30)
 	boss_test_button.focus_mode = Control.FOCUS_NONE
 	boss_test_button.add_theme_font_size_override("font_size", 15)
@@ -1195,7 +1182,7 @@ func _create_hud() -> void:
 
 	# Buff 状态栏
 	_buff_bar = Control.new()
-	_buff_bar.position = Vector2(182, 22)
+	_buff_bar.position = Vector2(218, 22)
 	_buff_bar.size = Vector2(130, 28)
 	_buff_bar.draw.connect(_draw_buff_bar)
 	canvas.add_child(_buff_bar)
@@ -1206,7 +1193,7 @@ func _create_hud() -> void:
 func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
 	var label := Label.new()
 	label.position = pos
-	label.size = Vector2(96, 16)
+	label.size = Vector2(74, 18)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 12)
 	label.add_theme_color_override("font_color", color)
@@ -1214,6 +1201,19 @@ func _make_hud_value_label(pos: Vector2, color: Color) -> Label:
 	label.add_theme_constant_override("shadow_offset_x", 1)
 	label.add_theme_constant_override("shadow_offset_y", 1)
 	return label
+
+
+func _add_hud_texture(canvas: CanvasLayer, texture: Texture2D, pos: Vector2, size: Vector2, z_index: int) -> TextureRect:
+	var node := TextureRect.new()
+	node.texture = texture
+	node.position = pos
+	node.size = size
+	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	node.stretch_mode = TextureRect.STRETCH_SCALE
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	node.z_index = z_index
+	canvas.add_child(node)
+	return node
 
 
 func _create_message_panel(canvas: CanvasLayer) -> void:
@@ -1300,36 +1300,22 @@ func _draw_stats_frame() -> void:
 
 func _draw_practice_panel() -> void:
 	var r := Rect2(Vector2.ZERO, _practice_panel.size)
-	_practice_panel.draw_rect(r, Color(0.22, 0.22, 0.24))
-	_practice_panel.draw_rect(r.grow(-3), Color(0.34, 0.34, 0.36))
-	_practice_panel.draw_circle(Vector2(20, 18), 8.0, Color(1.0, 0.86, 0.12))
-	_practice_panel.draw_arc(Vector2(20, 18), 8.0, 0, TAU, 18, Color(0.25, 0.12, 0.02), 2.0)
+	_practice_panel.draw_texture_rect(GUI_HUD_CURRENCY_PANEL, r, false)
+	_practice_panel.draw_texture_rect(GUI_HUD_ICON_PRACTICE, Rect2(Vector2(9, 8), HUD_CURRENCY_ICON_SIZE), false)
 
 
 func _draw_coin_panel() -> void:
 	var r := Rect2(Vector2.ZERO, _coin_panel.size)
-	_coin_panel.draw_rect(r, Color(0.22, 0.22, 0.24))
-	_coin_panel.draw_rect(r.grow(-3), Color(0.34, 0.34, 0.36))
-	_coin_panel.draw_circle(Vector2(18, 18), 8.0, Color(1.0, 0.86, 0.12))
-	_coin_panel.draw_arc(Vector2(18, 18), 8.0, 0, TAU, 18, Color(0.25, 0.12, 0.02), 2.0)
+	_coin_panel.draw_texture_rect(GUI_HUD_CURRENCY_PANEL, r, false)
+	_coin_panel.draw_texture_rect(GUI_HUD_ICON_KUN_COIN, Rect2(Vector2(9, 8), HUD_CURRENCY_ICON_SIZE), false)
 
 
 func _draw_pause_button() -> void:
-	var r := Rect2(Vector2.ZERO, _pause_button.size)
-	_pause_button.draw_rect(r, Color(0.36, 0.28, 0.18))
-	_pause_button.draw_rect(r.grow(-3), Color(0.64, 0.49, 0.29))
-	_pause_button.draw_rect(r.grow(-8), Color(0.73, 0.58, 0.36))
-	_pause_button.draw_rect(Rect2(7, 8, 5, 20), Color(0.38, 0.28, 0.16))
-	_pause_button.draw_rect(Rect2(16, 8, 5, 20), Color(0.38, 0.28, 0.16))
+	_pause_button.draw_texture_rect(GUI_PAUSE_BUTTON, Rect2(Vector2.ZERO, _pause_button.size), false)
 
 
 func _draw_bag_button() -> void:
-	var r := Rect2(Vector2.ZERO, _bag_button.size)
-	_bag_button.draw_rect(r, Color(0.30, 0.24, 0.16))
-	_bag_button.draw_rect(r.grow(-3), Color(0.59, 0.46, 0.28))
-	_bag_button.draw_rect(Rect2(7, 10, 14, 14), Color(0.79, 0.66, 0.42))
-	_bag_button.draw_rect(Rect2(9, 7, 10, 5), Color(0.79, 0.66, 0.42))
-	_bag_button.draw_arc(Vector2(14, 11), 4.0, PI, TAU, 10, Color(0.35, 0.22, 0.10), 1.5)
+	_bag_button.draw_texture_rect(GUI_BAG_ICON, Rect2(Vector2(2, 0), Vector2(36, 36)), false)
 	_draw_button_key(_bag_button, "B", Color(0.98, 0.90, 0.62))
 
 
@@ -1694,12 +1680,12 @@ func _process(delta: float) -> void:
 	_mana_bar.size.x = STATUS_FILL_W * clampf(mana_ratio, 0.0, 1.0)
 	var hp_ratio: float = float($Player.hp) / float($Player.MAX_HP)
 	_hp_bar.size.x = STATUS_FILL_W * clampf(hp_ratio, 0.0, 1.0)
-	_hp_bar.color = Color(0.88, 0.07, 0.15)
+	_hp_bar.modulate = Color.WHITE
 	var armor_ratio := 0.0 if $Player.max_armor <= 0 else float($Player.armor) / float($Player.max_armor)
 	_shield_bar.size.x = STATUS_FILL_W * clampf(armor_ratio, 0.0, 1.0)
-	_shield_bar.visible = $Player.max_armor > 0
-	_shield_bar_bg.visible = $Player.max_armor > 0
-	_shield_text.visible = $Player.max_armor > 0
+	_shield_bar.visible = $Player.armor > 0
+	_shield_bar_bg.visible = true
+	_shield_text.visible = true
 
 	# 技能图标刷新
 	if _attack_icon:
@@ -1791,9 +1777,9 @@ func _on_player_hp_changed(current: int, max_hp: int) -> void:
 	var ratio := float(current) / float(max_hp)
 	_hp_bar.size.x = STATUS_FILL_W * ratio
 	if ratio > 0.3:
-		_hp_bar.color = Color(0.0, 0.8, 0.2).lerp(Color(1.0, 0.0, 0.0), 1.0 - ratio)
+		_hp_bar.modulate = Color(0.0, 0.8, 0.2).lerp(Color.WHITE, ratio)
 	else:
-		_hp_bar.color = Color(1.0, 0.0, 0.0)
+		_hp_bar.modulate = Color(1.0, 0.0, 0.0)
 
 
 func _on_player_died() -> void:
@@ -1809,42 +1795,40 @@ func _on_player_died() -> void:
 
 
 func _show_game_over() -> void:
-	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.7)
-	overlay.size = VS.VIEWPORT_SIZE
-
 	var canvas := CanvasLayer.new()
 	canvas.layer = 40
 	add_child(canvas)
-	canvas.add_child(overlay)
+	PopupGui.add_overlay(canvas)
+	var panel := PopupGui.add_panel(canvas)
+	PopupGui.add_title(canvas, "游戏结束", "res://assets/export/gui/icon_stage_hard.png")
 
 	var label := Label.new()
-	label.text = "游戏结束\n击杀: %d\n\n按 R 返回基地" % GameManager.total_kills
+	label.text = "击杀: %d\n\n按 R 返回大厅" % GameManager.total_kills
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_font_size_override("font_size", 28)
 	label.add_theme_color_override("font_color", Color.WHITE)
-	label.position = Vector2(380, 240)
+	label.position = panel.position + Vector2(0, 120)
+	label.size = Vector2(PopupGui.PANEL_SIZE.x, 220)
 	canvas.add_child(label)
 
 
 func _show_victory() -> void:
-	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.7)
-	overlay.size = VS.VIEWPORT_SIZE
-
 	var canvas := CanvasLayer.new()
 	canvas.layer = 40
 	add_child(canvas)
-	canvas.add_child(overlay)
+	PopupGui.add_overlay(canvas)
+	var panel := PopupGui.add_panel(canvas)
+	PopupGui.add_title(canvas, "通关", "res://assets/export/gui/icon_stage_normal.png")
 
 	var label := Label.new()
-	label.text = "通关！\n击杀: %d\n\n按 R 返回基地" % GameManager.total_kills
+	label.text = "击杀: %d\n\n按 R 返回大厅" % GameManager.total_kills
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_font_size_override("font_size", 28)
 	label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.0))
-	label.position = Vector2(380, 240)
+	label.position = panel.position + Vector2(0, 120)
+	label.size = Vector2(PopupGui.PANEL_SIZE.x, 220)
 	canvas.add_child(label)
 
 
@@ -1936,25 +1920,18 @@ func _show_revive_ui() -> void:
 	_revive_canvas.layer = 28
 	add_child(_revive_canvas)
 
-	# 半透明背景
-	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.6)
-	bg.size = VS.VIEWPORT_SIZE
-	_revive_canvas.add_child(bg)
-
-	# 弹框面板
-	var panel := ColorRect.new()
-	panel.color = Color(0.12, 0.12, 0.15)
-	panel.position = Vector2(330, 220)
-	panel.size = Vector2(300, 200)
-	_revive_canvas.add_child(panel)
+	PopupGui.add_overlay(_revive_canvas)
+	var panel := PopupGui.add_panel(_revive_canvas)
+	PopupGui.add_title(_revive_canvas, "复活倒计时", "res://assets/export/gui/icon_talent_point.png")
 
 	# 标题
 	var title := Label.new()
-	title.text = "是否复活？"
-	title.add_theme_font_size_override("font_size", 28)
+	title.text = "是否消耗复活币继续战斗？"
+	title.size = Vector2(690, 32)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
-	title.position = Vector2(380, 235)
+	title.position = panel.position + Vector2(30, 118)
 	_revive_canvas.add_child(title)
 
 	# 倒计时
@@ -1962,15 +1939,19 @@ func _show_revive_ui() -> void:
 	_revive_countdown_label.text = "10"
 	_revive_countdown_label.add_theme_font_size_override("font_size", 48)
 	_revive_countdown_label.add_theme_color_override("font_color", Color(1.0, 0.41, 0.71))
-	_revive_countdown_label.position = Vector2(455, 280)
+	_revive_countdown_label.size = Vector2(750, 64)
+	_revive_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_revive_countdown_label.position = panel.position + Vector2(0, 180)
 	_revive_canvas.add_child(_revive_countdown_label)
 
 	# 提示
 	var hint := Label.new()
 	hint.text = "点击复活 / ESC 放弃"
+	hint.size = Vector2(690, 24)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_font_size_override("font_size", 16)
 	hint.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-	hint.position = Vector2(385, 360)
+	hint.position = panel.position + Vector2(30, 270)
 	_revive_canvas.add_child(hint)
 
 
@@ -2071,43 +2052,21 @@ func _show_pause_menu() -> void:
 	_pause_canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_pause_canvas)
 
-	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.6)
-	overlay.size = VS.VIEWPORT_SIZE
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_pause_canvas.add_child(overlay)
+	PopupGui.add_overlay(_pause_canvas)
+	var panel := PopupGui.add_panel(_pause_canvas)
+	PopupGui.add_title(_pause_canvas, "已暂停", "res://assets/export/gui/btn_pause.png")
 
-	var label := Label.new()
-	label.text = "已暂停"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 32)
-	label.add_theme_color_override("font_color", Color.WHITE)
-	label.position = Vector2(380, 230)
-	_pause_canvas.add_child(label)
+	var hint := Label.new()
+	hint.text = "ESC / P 继续游戏"
+	hint.position = panel.position + Vector2(0, 150)
+	hint.size = Vector2(PopupGui.PANEL_SIZE.x, 28)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_font_size_override("font_size", 20)
+	hint.add_theme_color_override("font_color", Color(0.82, 0.92, 1.0))
+	_pause_canvas.add_child(hint)
 
-	# 继续按钮
-	var continue_btn := Label.new()
-	continue_btn.text = "[ ESC / P 继续 ]"
-	continue_btn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	continue_btn.add_theme_font_size_override("font_size", 20)
-	continue_btn.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
-	continue_btn.position = Vector2(400, 310)
-	continue_btn.size = Vector2(160, 30)
-	continue_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	continue_btn.gui_input.connect(_on_pause_continue_input)
-	_pause_canvas.add_child(continue_btn)
-
-	# 返回基地按钮
-	var lobby_btn := Label.new()
-	lobby_btn.text = "[ 返回基地 ]"
-	lobby_btn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lobby_btn.add_theme_font_size_override("font_size", 20)
-	lobby_btn.add_theme_color_override("font_color", Color(1.0, 0.7, 0.3))
-	lobby_btn.position = Vector2(400, 360)
-	lobby_btn.size = Vector2(160, 30)
-	lobby_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	lobby_btn.gui_input.connect(_on_pause_lobby_input)
-	_pause_canvas.add_child(lobby_btn)
+	PopupGui.add_confirm_button(_pause_canvas, panel.position + Vector2(286, 230), "继续", Callable(self, "_resume_from_pause_menu"))
+	PopupGui.add_normal_button(_pause_canvas, panel.position + Vector2(286, 296), "返回大厅", Callable(self, "_return_to_lobby_from_pause_menu"))
 
 
 func _hide_pause_menu() -> void:
@@ -2131,21 +2090,29 @@ func _open_equipment_panel() -> void:
 	_equipment_panel.show_panel($Player)
 
 
+func _resume_from_pause_menu() -> void:
+	_hide_pause_menu()
+	GameManager.change_state(GameManager.GameState.PLAYING)
+
+
+func _return_to_lobby_from_pause_menu() -> void:
+	_hide_pause_menu()
+	if _boss_defeated:
+		_grant_boss_settlement_reward()
+	_boss_clear_return_active = false
+	_hide_system_countdown_hint()
+	GameManager.restore_lobby_weapons()
+	GameManager.return_to_lobby()
+
+
 func _on_pause_continue_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_hide_pause_menu()
-		GameManager.change_state(GameManager.GameState.PLAYING)
+		_resume_from_pause_menu()
 
 
 func _on_pause_lobby_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_hide_pause_menu()
-		if _boss_defeated:
-			_grant_boss_settlement_reward()
-		_boss_clear_return_active = false
-		_hide_system_countdown_hint()
-		GameManager.restore_lobby_weapons()
-		GameManager.return_to_lobby()
+		_return_to_lobby_from_pause_menu()
 
 
 # ── 打击反馈 ──────────────────────────────────────────

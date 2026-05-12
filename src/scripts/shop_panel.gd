@@ -27,13 +27,22 @@ func _build_ui() -> void:
 	var panel_pos := PopupGui.panel_position()
 	PopupGui.add_overlay(_canvas)
 	PopupGui.add_panel(_canvas)
-	PopupGui.add_title(_canvas, "武器商店")
+	PopupGui.add_title(_canvas, "武器商店", "res://assets/export/gui/icon_shop.png")
 	PopupGui.add_close_button(_canvas, Callable(self, "_close"))
 
 	# 货币
+	var coin_icon := TextureRect.new()
+	coin_icon.texture = PopupGui.load_texture("res://assets/export/gui/hud_icon_kun_coin.png")
+	coin_icon.position = panel_pos + Vector2(548, 76)
+	coin_icon.size = Vector2(30, 30)
+	coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_canvas.add_child(coin_icon)
+
 	var currency := Label.new()
-	currency.text = "坤币: %d" % GameManager.kun_coins
-	currency.position = panel_pos + Vector2(560, 82)
+	currency.text = "%d" % GameManager.kun_coins
+	currency.position = panel_pos + Vector2(582, 82)
+	currency.size = Vector2(120, 22)
 	currency.add_theme_font_size_override("font_size", 16)
 	currency.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
 	currency.name = "CoinLabel"
@@ -55,10 +64,19 @@ func _create_weapon_row(key: String, y: float) -> void:
 	var left_x := panel_pos.x + 58.0
 	var action_x := panel_pos.x + 558.0
 
+	var slot_bg := TextureRect.new()
+	slot_bg.texture = PopupGui.load_texture("res://assets/export/gui/ui_popup_slot.png")
+	slot_bg.position = Vector2(left_x - 10.0, y - 14.0)
+	slot_bg.size = Vector2(96.0, 96.0)
+	slot_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	slot_bg.stretch_mode = TextureRect.STRETCH_SCALE
+	slot_bg.modulate = Color(1, 1, 1, 0.72)
+	_canvas.add_child(slot_bg)
+
 	# 武器名
 	var name_label := Label.new()
 	name_label.text = weapon.name
-	name_label.position = Vector2(left_x, y)
+	name_label.position = Vector2(left_x + 108.0, y)
 	name_label.add_theme_font_size_override("font_size", 20)
 	name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	_canvas.add_child(name_label)
@@ -74,7 +92,7 @@ func _create_weapon_row(key: String, y: float) -> void:
 		_: type_text = "武器"
 	var type_label := Label.new()
 	type_label.text = "[%s]" % type_text
-	type_label.position = Vector2(left_x + 150.0, y + 3.0)
+	type_label.position = Vector2(left_x + 258.0, y + 3.0)
 	type_label.add_theme_font_size_override("font_size", 14)
 	type_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 	_canvas.add_child(type_label)
@@ -83,16 +101,24 @@ func _create_weapon_row(key: String, y: float) -> void:
 	var stats_text := _get_weapon_stats_text(weapon)
 	var stats_label := Label.new()
 	stats_label.text = stats_text
-	stats_label.position = Vector2(left_x, y + 30.0)
+	stats_label.position = Vector2(left_x + 108.0, y + 30.0)
 	stats_label.add_theme_font_size_override("font_size", 13)
 	stats_label.add_theme_color_override("font_color", Color(0.6, 0.7, 0.8))
 	_canvas.add_child(stats_label)
 
 	# 价格/状态
 	if owned:
+		var owned_icon := TextureRect.new()
+		owned_icon.texture = PopupGui.load_texture("res://assets/export/gui/icon_owned.png")
+		owned_icon.position = Vector2(action_x + 16.0, y + 17.0)
+		owned_icon.size = Vector2(32, 32)
+		owned_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		owned_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_canvas.add_child(owned_icon)
+
 		var owned_label := Label.new()
-		owned_label.text = "[ 已拥有 ]"
-		owned_label.position = Vector2(action_x + 20.0, y + 19.0)
+		owned_label.text = "已拥有"
+		owned_label.position = Vector2(action_x + 54.0, y + 22.0)
 		owned_label.add_theme_font_size_override("font_size", 16)
 		owned_label.add_theme_color_override("font_color", Color(0.0, 0.9, 0.4))
 		_canvas.add_child(owned_label)
@@ -105,12 +131,12 @@ func _create_weapon_row(key: String, y: float) -> void:
 		price_label.add_theme_color_override("font_color", price_color)
 		_canvas.add_child(price_label)
 
-		PopupGui.add_normal_button(_canvas, Vector2(action_x, y + 6.0), "购买", Callable(self, "_buy_weapon").bind(key), can_buy)
+		PopupGui.add_confirm_button(_canvas, Vector2(action_x, y + 16.0), "购买", Callable(self, "_buy_weapon").bind(key), can_buy)
 
 	# 分割线
 	var sep := ColorRect.new()
 	sep.color = Color(0.2, 0.2, 0.25)
-	sep.position = Vector2(left_x, y + 78.0)
+	sep.position = Vector2(left_x + 108.0, y + 78.0)
 	sep.size = Vector2(635.0, 1.0)
 	_canvas.add_child(sep)
 

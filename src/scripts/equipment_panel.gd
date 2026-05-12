@@ -4,6 +4,10 @@ extends Node
 
 const VS := preload("res://scripts/visual_spec.gd")
 const PopupGui := preload("res://scripts/popup_gui.gd")
+const EQUIP_SLOT_TEXTURE := preload("res://assets/export/gui/ui_popup_slot.png")
+const EQUIP_SLOT_SELECTED_TEXTURE := preload("res://assets/export/gui/ui_popup_slot_selected.png")
+const EQUIP_LOCK_TEXTURE := preload("res://assets/export/gui/ui_badge_locked.png")
+const EQUIP_ICON_TEXTURE := preload("res://assets/export/gui/icon_equip.png")
 
 var _canvas: CanvasLayer
 var _player: Node
@@ -56,7 +60,7 @@ func _build_ui() -> void:
 	PopupGui.add_overlay(_canvas, Control.MOUSE_FILTER_IGNORE)
 	var panel := PopupGui.add_panel(_canvas)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	PopupGui.add_title(_canvas, "背包")
+	PopupGui.add_title(_canvas, "背包", "res://assets/export/gui/icon_bag.png")
 
 	# 装备槽标题
 	var eq_label := Label.new()
@@ -129,8 +133,9 @@ func _draw_equipped_slots() -> void:
 
 		if i >= max_slots:
 			# 锁定槽位
-			ctrl.draw_rect(rect, Color(0.08, 0.08, 0.08))
+			ctrl.draw_texture_rect(EQUIP_SLOT_TEXTURE, rect, false, Color(0.45, 0.45, 0.48, 0.9))
 			ctrl.draw_rect(rect, Color(0.3, 0.3, 0.3), false, 1.5)
+			ctrl.draw_texture_rect(EQUIP_LOCK_TEXTURE, Rect2(rect.position + Vector2(rect.size.x - 34.0, 6.0), Vector2(28.0, 28.0)), false)
 			var lock_text := "锁定"
 			var next_slot := i + 1
 			if next_slot in GameManager.SLOT_UNLOCK_COSTS:
@@ -147,8 +152,9 @@ func _draw_equipped_slots() -> void:
 			var weapon: Dictionary = _player.WEAPONS[key]
 			var is_selected := i == _selected_slot
 			var border_color := Color(0.3, 0.9, 0.5) if is_selected else Color(0.3, 0.5, 0.7)
-			ctrl.draw_rect(rect, Color(0.12, 0.15, 0.12))
+			ctrl.draw_texture_rect(EQUIP_SLOT_SELECTED_TEXTURE if is_selected else EQUIP_SLOT_TEXTURE, rect, false)
 			ctrl.draw_rect(rect, border_color, false, 2.0 if is_selected else 1.0)
+			ctrl.draw_texture_rect(EQUIP_ICON_TEXTURE, Rect2(rect.position + Vector2(8, 8), Vector2(24, 24)), false, Color(1, 1, 1, 0.85))
 			# 武器名
 			var name_size := ThemeDB.fallback_font.get_string_size(weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15)
 			ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - name_size.x) / 2, base_y + 30), weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.9, 0.9, 0.9))
@@ -171,7 +177,7 @@ func _draw_equipped_slots() -> void:
 			ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + 4, base_y + 14), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.4, 0.4, 0.4))
 		else:
 			# 空槽
-			ctrl.draw_rect(rect, Color(0.08, 0.1, 0.08))
+			ctrl.draw_texture_rect(EQUIP_SLOT_TEXTURE, rect, false, Color(0.75, 0.75, 0.78, 0.85))
 			ctrl.draw_rect(rect, Color(0.2, 0.3, 0.2), false, 1.0)
 			var empty_text := "空槽"
 			var et_size := ThemeDB.fallback_font.get_string_size(empty_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
@@ -202,7 +208,7 @@ func _draw_backpack() -> void:
 		var rect := Rect2(x, base_y, SLOT_W, SLOT_H)
 		var is_dragging_this := key == _drag_weapon_key
 
-		ctrl.draw_rect(rect, Color(0.08, 0.07, 0.1) if is_dragging_this else Color(0.12, 0.1, 0.15))
+		ctrl.draw_texture_rect(EQUIP_SLOT_SELECTED_TEXTURE if is_dragging_this else EQUIP_SLOT_TEXTURE, rect, false)
 		ctrl.draw_rect(rect, Color(0.6, 0.5, 0.85) if is_dragging_this else Color(0.4, 0.3, 0.6), false, 2.0 if is_dragging_this else 1.0)
 
 		# 武器名
@@ -234,7 +240,7 @@ func _draw_drag_preview() -> void:
 		return
 	var weapon: Dictionary = _player.WEAPONS[_drag_weapon_key]
 	var rect := Rect2(_drag_current_pos - Vector2(SLOT_W, SLOT_H) * 0.5, Vector2(SLOT_W, SLOT_H))
-	_drag_draw.draw_rect(rect, Color(0.16, 0.12, 0.22, 0.85))
+	_drag_draw.draw_texture_rect(EQUIP_SLOT_SELECTED_TEXTURE, rect, false, Color(1, 1, 1, 0.9))
 	_drag_draw.draw_rect(rect, Color(0.95, 0.8, 0.25), false, 2.0)
 	var name_size := ThemeDB.fallback_font.get_string_size(weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15)
 	_drag_draw.draw_string(ThemeDB.fallback_font, Vector2(rect.position.x + (SLOT_W - name_size.x) / 2, rect.position.y + 34), weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.95, 0.95, 0.95))

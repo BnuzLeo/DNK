@@ -3,6 +3,9 @@ extends Node
 ## 天赋树面板 — 练习生基地专属
 
 const PopupGui := preload("res://scripts/popup_gui.gd")
+const TALENT_SLOT := preload("res://assets/export/gui/ui_popup_slot.png")
+const TALENT_SLOT_SELECTED := preload("res://assets/export/gui/ui_popup_slot_selected.png")
+const TALENT_POINT_ICON := preload("res://assets/export/gui/icon_talent_point.png")
 
 var _canvas: CanvasLayer
 var _player: Node
@@ -167,7 +170,7 @@ func _build_ui() -> void:
 	PopupGui.add_overlay(_canvas, Control.MOUSE_FILTER_IGNORE)
 	var panel := PopupGui.add_panel(_canvas)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	PopupGui.add_title(_canvas, "天赋树")
+	PopupGui.add_title(_canvas, "天赋树", "res://assets/export/gui/icon_talent.png")
 	PopupGui.add_close_button(_canvas, Callable(self, "_save_apply_and_close"))
 
 	# 练习时长
@@ -179,7 +182,7 @@ func _build_ui() -> void:
 	_canvas.add_child(pt_label)
 
 	# 重置按钮
-	PopupGui.add_normal_button(_canvas, panel_pos + Vector2(44, 70), "重置", Callable(self, "_reset_talents"))
+	PopupGui.add_normal_button(_canvas, panel_pos + Vector2(44, 74), "重置", Callable(self, "_reset_talents"))
 
 	# 状态提示
 	_status_label = Label.new()
@@ -222,7 +225,7 @@ func _draw_node(node_def: Dictionary) -> void:
 	var parent_key: String = node_def.parent
 	var parent_unlocked: bool = parent_key == "" or _node_levels.get(parent_key, 0) > 0
 
-	# 节点圆圈
+	# 节点
 	var radius := 22.0
 	var draw_color: Color
 	if level > 0:
@@ -230,10 +233,13 @@ func _draw_node(node_def: Dictionary) -> void:
 	else:
 		draw_color = color.darkened(0.6) if parent_unlocked else Color(0.15, 0.15, 0.15)
 
-	# 背景
 	var node_ctrl := _canvas.get_child(-1)  # tree_draw control
-	node_ctrl.draw_circle(pos, radius, draw_color.darkened(0.4))
-	node_ctrl.draw_arc(pos, radius, 0, TAU, 24, color if level > 0 else Color(0.3, 0.3, 0.3), 2.5)
+	var slot_rect := Rect2(pos - Vector2(34, 34), Vector2(68, 68))
+	var slot_tex := TALENT_SLOT_SELECTED if level > 0 else TALENT_SLOT
+	var slot_modulate := Color.WHITE if parent_unlocked else Color(0.38, 0.38, 0.42, 0.85)
+	node_ctrl.draw_texture_rect(slot_tex, slot_rect, false, slot_modulate)
+	node_ctrl.draw_texture_rect(TALENT_POINT_ICON, Rect2(pos - Vector2(14, 14), Vector2(28, 28)), false, draw_color)
+	node_ctrl.draw_arc(pos, radius + 9.0, 0, TAU, 32, color if level > 0 else Color(0.32, 0.34, 0.38), 2.5)
 
 	# 已升级的填充
 	if level > 0:
@@ -244,7 +250,9 @@ func _draw_node(node_def: Dictionary) -> void:
 		for i in 13:
 			var a := -PI / 2 + sweep * i / 12.0
 			fill_pts.append(pos + Vector2(cos(a), sin(a)) * (radius - 3))
-		node_ctrl.draw_colored_polygon(fill_pts, color.lerp(Color.WHITE, 0.3))
+		var fill_color := color.lerp(Color.WHITE, 0.3)
+		fill_color.a = 0.38
+		node_ctrl.draw_colored_polygon(fill_pts, fill_color)
 
 	# 名字
 	var name_size := ThemeDB.fallback_font.get_string_size(node_def.name,

@@ -1,35 +1,21 @@
 [gd_scene format=3 uid="uid://dtw82tgruboln"]
 
 [ext_resource type="Script" uid="uid://ba0doxeq2o8y" path="res://scripts/lobby.gd" id="1"]
-[ext_resource type="Texture2D" uid="uid://dulf8p6177ihm" path="res://assets/export/gui/大厅/objects/Group 1.png" id="2"]
-[ext_resource type="Texture2D" uid="uid://n7c625vc6a2g" path="res://assets/export/gui/大厅/objects/Groups-1.png" id="3"]
 [ext_resource type="Texture2D" uid="uid://c6801iepbwsec" path="res://assets/export/gui/大厅/objects/Groups-2.png" id="4"]
-[ext_resource type="Texture2D" uid="uid://xw2k225mi6du" path="res://assets/export/gui/大厅/objects/Groups.png" id="5"]
-[ext_resource type="Texture2D" uid="uid://c7xcc3vokq7m8" path="res://assets/export/gui/大厅/objects/Image-1.png" id="6"]
 [ext_resource type="Texture2D" uid="uid://d08o8l21bdywt" path="res://assets/export/gui/大厅/objects/Image-10.png" id="7"]
-[ext_resource type="Texture2D" uid="uid://cdn1verctixq" path="res://assets/export/gui/大厅/objects/Image-11.png" id="8"]
 [ext_resource type="Texture2D" uid="uid://cekr8f5woml41" path="res://assets/export/gui/大厅/objects/Image-12.png" id="9"]
 [ext_resource type="Texture2D" uid="uid://bbtun2pqmcg2v" path="res://assets/export/gui/大厅/objects/Image-13.png" id="10"]
-[ext_resource type="Texture2D" uid="uid://bhfrlyj5j7fxi" path="res://assets/export/gui/大厅/objects/Image-14.png" id="11"]
-[ext_resource type="Texture2D" uid="uid://b0q72tbomt6cr" path="res://assets/export/gui/大厅/objects/Image-15.png" id="12"]
-[ext_resource type="Texture2D" uid="uid://l0hy0t1j27xw" path="res://assets/export/gui/大厅/objects/Image-16.png" id="13"]
-[ext_resource type="Texture2D" uid="uid://bptqc1hhlqnar" path="res://assets/export/gui/大厅/objects/Image-17.png" id="14"]
-[ext_resource type="Texture2D" uid="uid://gie35pcbwqoc" path="res://assets/export/gui/大厅/objects/Image-2.png" id="16"]
 [ext_resource type="Texture2D" uid="uid://7h4u08gx2kqa" path="res://assets/export/gui/大厅/objects/Image-3.png" id="17"]
 [ext_resource type="Texture2D" uid="uid://d3n2oxoeu1u6p" path="res://assets/export/gui/大厅/objects/Image-4.png" id="18"]
-[ext_resource type="Texture2D" uid="uid://4f2m46k0tclr" path="res://assets/export/gui/大厅/objects/Image-5.png" id="19"]
 [ext_resource type="Texture2D" uid="uid://b45yi5ky7ko7v" path="res://assets/export/gui/大厅/objects/Image-6.png" id="20"]
 [ext_resource type="Texture2D" uid="uid://dabr2dfyxb31h" path="res://assets/export/gui/大厅/objects/Image-7.png" id="21"]
-[ext_resource type="Texture2D" uid="uid://c8nbt0nnw1gpq" path="res://assets/export/gui/大厅/objects/Image-8.png" id="22"]
-[ext_resource type="Texture2D" uid="uid://c5wpwxekoid6j" path="res://assets/export/gui/大厅/objects/Image-9.png" id="23"]
-[ext_resource type="Texture2D" uid="uid://cmx476apcyrkp" path="res://assets/export/gui/大厅/objects/Image.png" id="24"]
 [ext_resource type="Texture2D" uid="uid://3dht5tfqeqa3" path="res://assets/export/gui/大厅/objects/Object-1.png" id="25"]
 [ext_resource type="Texture2D" uid="uid://b6jdbgdtvxphi" path="res://assets/export/gui/大厅/objects/Object-2.png" id="26"]
 [ext_resource type="Texture2D" uid="uid://bej5bwvl23xir" path="res://assets/export/gui/大厅/objects/Object-3.png" id="27"]
 [ext_resource type="Texture2D" uid="uid://dfqx6uljsjqxo" path="res://assets/export/gui/大厅/objects/Object.png" id="28"]
 [ext_resource type="Texture2D" uid="uid://mask28rc5ac3" path="res://assets/export/gui/大厅/底图.png" id="29"]
 [ext_resource type="Script" uid="uid://cl3mv7tx6f0wl" path="res://scripts/npc.gd" id="30"]
-[ext_resource type="Script" path="res://scripts/transfer_portal.gd" id="31"]
+[ext_resource type="Script" uid="uid://br1w882ryk5b7" path="res://scripts/transfer_portal.gd" id="31"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_broker"]
 radius = 40.0
@@ -42,166 +28,84 @@ script = ExtResource("1")
 
 [node name="LobbyBackground" type="Sprite2D" parent="." unique_id=1526108206]
 z_index = -100
+position = Vector2(-3, 1)
 scale = Vector2(0.625407, 0.625)
 texture = ExtResource("29")
 centered = false
+metadata/_edit_lock_ = true
 
 [node name="LobbyObjects" type="Node2D" parent="." unique_id=2079545426]
 
-[node name="LobbyObject_Group_1" type="Sprite2D" parent="LobbyObjects" unique_id=937563482]
-z_index = 1
-position = Vector2(616, 123.000015)
-scale = Vector2(0.6087662, 0.6087662)
-texture = ExtResource("2")
-
-[node name="LobbyObject_Groups-1" type="Sprite2D" parent="LobbyObjects" unique_id=2055033154]
-z_index = 1
-position = Vector2(897.00006, 404)
-scale = Vector2(0.625, 0.625)
-texture = ExtResource("3")
-
 [node name="LobbyObject_Groups-2" type="Sprite2D" parent="LobbyObjects" unique_id=2020313815]
 z_index = 1
-position = Vector2(873, 260)
+position = Vector2(863, 144)
 scale = Vector2(0.625, 0.625)
 texture = ExtResource("4")
 
-[node name="LobbyObject_Groups" type="Sprite2D" parent="LobbyObjects" unique_id=1609095076]
-z_index = 1
-position = Vector2(68, 225)
-scale = Vector2(0.52180225, 0.52180225)
-texture = ExtResource("5")
-
-[node name="LobbyObject_Image-1" type="Sprite2D" parent="LobbyObjects" unique_id=342873667]
-z_index = 1
-position = Vector2(824.00006, 427)
-scale = Vector2(0.4958331, 0.4958331)
-texture = ExtResource("6")
-
 [node name="LobbyObject_Image-10" type="Sprite2D" parent="LobbyObjects" unique_id=1295632826]
 z_index = 1
-position = Vector2(276.00003, 273.00003)
-scale = Vector2(0.5463709, 0.5463709)
+position = Vector2(387, 108.00001)
+scale = Vector2(0.60383034, 0.6038303)
 texture = ExtResource("7")
-
-[node name="LobbyObject_Image-11" type="Sprite2D" parent="LobbyObjects" unique_id=479423196]
-z_index = 1
-position = Vector2(581.00006, 167)
-scale = Vector2(0.625, 0.625)
-texture = ExtResource("8")
 
 [node name="LobbyObject_Image-12" type="Sprite2D" parent="LobbyObjects" unique_id=1802760080]
 z_index = 1
-position = Vector2(741.99994, 234)
+position = Vector2(730, 181)
 scale = Vector2(0.5536765, 0.5536765)
 texture = ExtResource("9")
 
 [node name="LobbyObject_Image-13" type="Sprite2D" parent="LobbyObjects" unique_id=1403778411]
 z_index = 1
-position = Vector2(933.99994, 558)
-scale = Vector2(0.625, 0.625)
+position = Vector2(550, 122)
+scale = Vector2(0.54755425, 0.5475543)
 texture = ExtResource("10")
-
-[node name="LobbyObject_Image-14" type="Sprite2D" parent="LobbyObjects" unique_id=576351347]
-z_index = 1
-position = Vector2(866, 129.00002)
-scale = Vector2(0.625, 0.625)
-texture = ExtResource("11")
-
-[node name="LobbyObject_Image-15" type="Sprite2D" parent="LobbyObjects" unique_id=903643399]
-z_index = 1
-position = Vector2(743, 144)
-scale = Vector2(0.5541107, 0.5541107)
-texture = ExtResource("12")
-
-[node name="LobbyObject_Image-16" type="Sprite2D" parent="LobbyObjects" unique_id=702607784]
-z_index = 1
-position = Vector2(37, 384.00003)
-scale = Vector2(0.625, 0.625)
-texture = ExtResource("13")
-
-[node name="LobbyObject_Image-17" type="Sprite2D" parent="LobbyObjects" unique_id=1114985759]
-z_index = 1
-position = Vector2(276, 527.00006)
-scale = Vector2(0.625, 0.625)
-texture = ExtResource("14")
-
-[node name="LobbyObject_Image-2" type="Sprite2D" parent="LobbyObjects" unique_id=906045233]
-z_index = 1
-position = Vector2(175.00005, 173.00005)
-scale = Vector2(0.625, 0.625)
-texture = ExtResource("16")
 
 [node name="LobbyObject_Image-3" type="Sprite2D" parent="LobbyObjects" unique_id=1228867030]
 z_index = 1
-position = Vector2(642, 584.00006)
+position = Vector2(312, 600)
 scale = Vector2(0.625, 0.625)
 texture = ExtResource("17")
 
 [node name="LobbyObject_Image-4" type="Sprite2D" parent="LobbyObjects" unique_id=2072664740]
 z_index = 2
-position = Vector2(192, 546)
+position = Vector2(60.000027, 154.00003)
 scale = Vector2(0.625, 0.625)
 texture = ExtResource("18")
 
-[node name="LobbyObject_Image-5" type="Sprite2D" parent="LobbyObjects" unique_id=1829117729]
-z_index = 1
-position = Vector2(221, 493.00003)
-scale = Vector2(0.625, 0.625)
-texture = ExtResource("19")
-
 [node name="LobbyObject_Image-6" type="Sprite2D" parent="LobbyObjects" unique_id=212092533]
 z_index = 1
-position = Vector2(613, 548.00006)
+position = Vector2(588.00006, 135.00002)
 scale = Vector2(0.625, 0.625)
 texture = ExtResource("20")
 
 [node name="LobbyObject_Image-7" type="Sprite2D" parent="LobbyObjects" unique_id=1683550706]
 z_index = 1
-position = Vector2(90.00001, 408)
+position = Vector2(627.00006, 132)
 scale = Vector2(0.5538788, 0.5538787)
 texture = ExtResource("21")
 
-[node name="LobbyObject_Image-8" type="Sprite2D" parent="LobbyObjects" unique_id=942290850]
-z_index = 1
-position = Vector2(348, 135)
-scale = Vector2(0.625, 0.625)
-texture = ExtResource("22")
-
-[node name="LobbyObject_Image-9" type="Sprite2D" parent="LobbyObjects" unique_id=1272972322]
-z_index = 1
-position = Vector2(277, 166.00002)
-scale = Vector2(0.5076214, 0.5076214)
-texture = ExtResource("23")
-
-[node name="LobbyObject_Image" type="Sprite2D" parent="LobbyObjects" unique_id=949280100]
-z_index = 1
-position = Vector2(63.000015, 121.00003)
-scale = Vector2(0.625, 0.625)
-texture = ExtResource("24")
-
 [node name="LobbyObject_Object-1" type="Sprite2D" parent="LobbyObjects" unique_id=312438849]
 z_index = 1
-position = Vector2(155, 266)
+position = Vector2(110, 239)
 scale = Vector2(0.5584892, 0.5584892)
 texture = ExtResource("25")
 
 [node name="LobbyObject_Object-2" type="Sprite2D" parent="LobbyObjects" unique_id=1580108719]
 z_index = 1
-position = Vector2(798, 533)
+position = Vector2(454, 591)
 scale = Vector2(0.625, 0.625)
 texture = ExtResource("26")
 
 [node name="LobbyObject_Object-3" type="Sprite2D" parent="LobbyObjects" unique_id=1463508242]
 z_index = 1
-position = Vector2(105, 540)
-scale = Vector2(0.625, 0.625)
+position = Vector2(107, 536)
+scale = Vector2(0.62422836, 0.625)
 texture = ExtResource("27")
 
 [node name="LobbyObject_Object" type="Sprite2D" parent="LobbyObjects" unique_id=1691946979]
 z_index = 1
-position = Vector2(449.8708, 546.25)
-scale = Vector2(0.74583304, 0.74583304)
+position = Vector2(314, 140)
+scale = Vector2(0.42291653, 0.42291653)
 texture = ExtResource("28")
 
 [node name="LobbyNPCs" type="Node2D" parent="." unique_id=1572967919]
@@ -211,7 +115,7 @@ position = Vector2(369, 343)
 script = ExtResource("30")
 
 [node name="InteractionCollision" type="CollisionShape2D" parent="LobbyNPCs/Broker" unique_id=205732163]
-position = Vector2(1, 1)
+position = Vector2(-1, 1)
 shape = SubResource("CircleShape2D_broker")
 
 [node name="Smith" type="Area2D" parent="LobbyNPCs" unique_id=883166355]
@@ -224,5 +128,5 @@ shape = SubResource("CircleShape2D_smith")
 
 [node name="LobbyPortal" type="AnimatedSprite2D" parent="." unique_id=35210348]
 z_index = 5
-position = Vector2(480, 120)
+position = Vector2(478, 95)
 script = ExtResource("31")
