@@ -79,6 +79,7 @@ const BOSS_SETTLEMENT_RETURN_TIME := 10.0
 const SYSTEM_HINT_DURATION := 1.8
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
+enum RoomKind { START, BATTLE, CHEST, EVENT, BOSS }
 
 # 网格单元格大小（一个格子 = 房间 + 走廊空间）
 const CELL_W := int(VS.CELL_SIZE.x)
@@ -96,6 +97,23 @@ const WALL_T := int(VS.WALL_THICKNESS)
 const DOOR_COLLISION_LAYER := 16
 const MAP_TILE_SIZE := 32.0
 const MAX_RANDOM_CHESTS_PER_ROOM := 2
+const TEMPLATE_PLAY_ROOM_COUNT := 8
+const ROOM_TEMPLATE_BATTLE := [
+	preload("res://scenes/rooms/BattleRoom01.tscn"),
+	preload("res://scenes/rooms/BattleRoom02.tscn"),
+	preload("res://scenes/rooms/BattleRoom03.tscn"),
+	preload("res://scenes/rooms/BattleRoom04.tscn")
+]
+const ROOM_TEMPLATE_CHEST := [
+	preload("res://scenes/rooms/ChestRoom01.tscn")
+]
+const ROOM_TEMPLATE_EVENT := [
+	preload("res://scenes/rooms/EventRoom01.tscn"),
+	preload("res://scenes/rooms/EventRoom02.tscn")
+]
+const ROOM_TEMPLATE_BOSS := [
+	preload("res://scenes/rooms/BossRoom01.tscn")
+]
 
 const GRID_SIZE := 5
 const CENTER := Vector2i(2, 2)
@@ -103,11 +121,14 @@ const CENTER := Vector2i(2, 2)
 class RoomData:
 	var grid_pos: Vector2i
 	var state: int = RoomState.INACTIVE
+	var kind: int = RoomKind.BATTLE
 	var enemies: Array[Area2D] = []
 	var is_boss: bool = false
 	var is_start: bool = false
 	var explored: bool = false
 	var spawned: bool = false
+	var template_scene: PackedScene = null
+	var template_instance: Node2D = null
 
 var _rooms: Dictionary = {}
 var _current_room: Vector2i = CENTER
@@ -130,6 +151,7 @@ var _spawn_warning_positions: Array[Vector2] = []
 var _spawn_warning_timer := 0.0
 var _spawn_warning_room: Vector2i = CENTER
 var _random_chest_spawns_by_room: Dictionary = {}
+var _room_template_instances: Array[Node] = []
 
 # 摄像机 + 打击反馈
 var _cam_mgr: CameraManager
@@ -278,6 +300,7 @@ func _ensure_boss_return_portal_visible() -> void:
 func _generate_floor() -> void:
 	_rooms.clear()
 	_doors.clear()
+	_clear_room_template_instances()
 	_random_chest_spawns_by_room.clear()
 	_boss_defeated = false
 	_portal_active = false
@@ -291,31 +314,95 @@ func _generate_floor() -> void:
 	_spawn_warning_positions.clear()
 	_spawn_warning_timer = 0.0
 
-	var boss_pos := _random_edge_room()
-	_boss_pos = boss_pos
-	var path := _generate_path(CENTER, boss_pos)
-	_boss_entry_pos = path[path.size() - 2] if path.size() > 1 else CENTER
+	var layout := _generate_template_layout(TEMPLATE_PLAY_ROOM_COUNT + 1)
+	for pos in layout:
+		var data := RoomData.new()
+		data.grid_pos = pos
+		_rooms[pos] = data
 
-	for pos in path:
-		_rooms[pos] = RoomData.new()
-		_rooms[pos].grid_pos = pos
-		if pos == boss_pos:
-			_rooms[pos].is_boss = true
-		if pos == CENTER:
-			_rooms[pos].is_start = true
-
-	for pos in path:
-		# boss 房间是终点：不从 boss 生成分支，也不在 boss 周围生成额外入口。
-		if pos == boss_pos:
-			continue
-		for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
-			var adj: Vector2i = pos + dir
-			if _can_add_branch_room(adj, boss_pos) and randf() < 0.4:
-				_rooms[adj] = RoomData.new()
-				_rooms[adj].grid_pos = adj
+	var play_rooms := layout.filter(func(pos: Vector2i) -> bool: return pos != CENTER)
+	_boss_pos = _select_boss_room(play_rooms)
+	_boss_entry_pos = _select_boss_entry_room(_boss_pos)
+	_assign_room_templates(play_rooms)
 
 	_rooms_cleared = 0
 	_total_rooms = _rooms.size()
+
+
+func _generate_template_layout(target_count: int) -> Array[Vector2i]:
+	var layout: Array[Vector2i] = [CENTER]
+	var used := {CENTER: true}
+	while layout.size() < target_count:
+		var candidates: Array[Vector2i] = []
+		for pos in layout:
+			for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				var adj: Vector2i = pos + dir
+				if _in_bounds(adj) and not used.has(adj):
+					candidates.append(adj)
+		if candidates.is_empty():
+			break
+		var picked: Vector2i = candidates[randi() % candidates.size()]
+		used[picked] = true
+		layout.append(picked)
+	return layout
+
+
+func _select_boss_room(play_rooms: Array[Vector2i]) -> Vector2i:
+	var best := play_rooms[0]
+	var best_score := -1
+	for pos in play_rooms:
+		var score := absi(pos.x - CENTER.x) + absi(pos.y - CENTER.y)
+		if score > best_score:
+			best = pos
+			best_score = score
+	return best
+
+
+func _select_boss_entry_room(boss_pos: Vector2i) -> Vector2i:
+	var best := CENTER
+	var best_score := 999
+	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		var adj: Vector2i = boss_pos + dir
+		if adj not in _rooms:
+			continue
+		var score := absi(adj.x - CENTER.x) + absi(adj.y - CENTER.y)
+		if score < best_score:
+			best = adj
+			best_score = score
+	return best
+
+
+func _assign_room_templates(play_rooms: Array[Vector2i]) -> void:
+	var start_room: RoomData = _rooms[CENTER]
+	start_room.kind = RoomKind.START
+	start_room.is_start = true
+
+	var boss_room: RoomData = _rooms[_boss_pos]
+	boss_room.kind = RoomKind.BOSS
+	boss_room.is_boss = true
+	boss_room.template_scene = ROOM_TEMPLATE_BOSS[0]
+
+	var remaining := play_rooms.filter(func(pos: Vector2i) -> bool: return pos != _boss_pos)
+	remaining.shuffle()
+
+	var battle_templates := ROOM_TEMPLATE_BATTLE.duplicate()
+	battle_templates.shuffle()
+	for i in range(mini(4, remaining.size())):
+		var room: RoomData = _rooms[remaining[i]]
+		room.kind = RoomKind.BATTLE
+		room.template_scene = battle_templates[i % battle_templates.size()]
+
+	if remaining.size() > 4:
+		var chest_room: RoomData = _rooms[remaining[4]]
+		chest_room.kind = RoomKind.CHEST
+		chest_room.template_scene = ROOM_TEMPLATE_CHEST[0]
+
+	var event_templates := ROOM_TEMPLATE_EVENT.duplicate()
+	event_templates.shuffle()
+	for i in range(5, remaining.size()):
+		var event_room: RoomData = _rooms[remaining[i]]
+		event_room.kind = RoomKind.EVENT
+		event_room.template_scene = event_templates[(i - 5) % event_templates.size()]
 
 
 func _random_edge_room() -> Vector2i:
@@ -459,6 +546,7 @@ func _create_dungeon() -> void:
 			_doors[pos].e = _create_door(pos, "e")
 		if has_west:
 			_doors[pos].w = _create_door(pos, "w")
+	_instantiate_room_templates()
 
 
 func _wall_segment(pos: Vector2, sz: Vector2) -> void:
@@ -545,12 +633,30 @@ func _on_player_entered_room(pos: Vector2i) -> void:
 			_minimap.queue_redraw()
 		return
 
+	if room.kind == RoomKind.CHEST:
+		room.state = RoomState.CLEARED
+		_rooms_cleared += 1
+		_spawn_template_chests(pos, false)
+		_show_system_hint("宝箱房已发现", Color(1.0, 0.84, 0.18))
+		queue_redraw()
+		if _minimap:
+			_minimap.queue_redraw()
+		return
+
+	if room.kind == RoomKind.EVENT:
+		room.state = RoomState.CLEARED
+		_rooms_cleared += 1
+		_spawn_template_event_reward(pos)
+		_show_system_hint("事件房已触发", Color(0.45, 0.90, 1.0))
+		queue_redraw()
+		if _minimap:
+			_minimap.queue_redraw()
+		return
+
 	room.state = RoomState.ACTIVE
 	# 1) 关门
 	_close_doors(pos)
-	# 2) 放置障碍物和陷阱
-	_spawn_room_objects(pos)
-	# 3) 预警 + 出怪
+	# 2) 预警 + 出怪。障碍物来自房间 tscn 模板。
 	_start_spawn_warning(pos)
 	queue_redraw()
 	if _minimap:
@@ -585,15 +691,20 @@ func _start_spawn_warning(pos: Vector2i) -> void:
 	_spawn_warning_positions.clear()
 	_spawn_warning_room = pos
 	if room.is_boss:
-		_spawn_warning_positions.append(center)
+		var boss_spawns := _get_template_marker_global_positions(room, "BossSpawn")
+		_spawn_warning_positions.append(boss_spawns[0] if not boss_spawns.is_empty() else center)
 	else:
-		var count := 3 + randi() % 4
-		for i in count:
-			var offset := Vector2(randf_range(-250, 250), randf_range(-150, 150))
-			var p := center + offset
-			if p.distance_to(center) < 80:
-				p = center + offset.normalized() * 120
-			_spawn_warning_positions.append(p)
+		var template_spawns := _get_template_marker_global_positions(room, "EnemySpawn")
+		if not template_spawns.is_empty():
+			_spawn_warning_positions.append_array(template_spawns)
+		else:
+			var count := 3 + randi() % 4
+			for i in count:
+				var offset := Vector2(randf_range(-250, 250), randf_range(-150, 150))
+				var p := center + offset
+				if p.distance_to(center) < 80:
+					p = center + offset.normalized() * 120
+				_spawn_warning_positions.append(p)
 		var bonus := _get_floor_enemy_bonus()
 		for i in bonus:
 			var offset := Vector2(randf_range(-200, 200), randf_range(-120, 120))
@@ -845,6 +956,78 @@ func _spawn_start_supply_chest(room_pos: Vector2i) -> void:
 	_show_message_hint("起始补给已出现", Color(1.0, 0.84, 0.0))
 
 
+func _spawn_template_chests(room_pos: Vector2i, weapon_choice: bool) -> void:
+	if room_pos not in _rooms:
+		return
+	var room: RoomData = _rooms[room_pos]
+	var markers := _get_template_marker_global_positions(room, "ChestSpawn")
+	if markers.is_empty():
+		markers.append(Vector2(room_pos.x * CELL_W + CELL_W / 2.0, room_pos.y * CELL_H + CELL_H / 2.0))
+	for pos in markers:
+		_spawn_template_chest_at(pos, weapon_choice)
+
+
+func _spawn_template_event_reward(room_pos: Vector2i) -> void:
+	if room_pos not in _rooms:
+		return
+	var room: RoomData = _rooms[room_pos]
+	var markers := _get_template_marker_global_positions(room, "EventSpawn")
+	if markers.is_empty():
+		markers = _get_template_marker_global_positions(room, "ChestSpawn")
+	if markers.is_empty():
+		markers.append(Vector2(room_pos.x * CELL_W + CELL_W / 2.0, room_pos.y * CELL_H + CELL_H / 2.0))
+	_spawn_template_chest_at(markers[0], true)
+
+
+func _spawn_template_chest_at(pos: Vector2, weapon_choice: bool) -> void:
+	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
+	var chest: Area2D = chest_scene.instantiate()
+	chest.position = pos
+	chest.is_weapon_choice = weapon_choice
+	add_child(chest)
+
+
+func _clear_room_template_instances() -> void:
+	for instance in _room_template_instances:
+		if is_instance_valid(instance):
+			instance.queue_free()
+	_room_template_instances.clear()
+	for pos in _rooms:
+		var room: RoomData = _rooms[pos]
+		room.template_instance = null
+
+
+func _instantiate_room_templates() -> void:
+	_clear_room_template_instances()
+	for pos in _rooms:
+		var room: RoomData = _rooms[pos]
+		if room.template_scene == null:
+			continue
+		var instance := room.template_scene.instantiate() as Node2D
+		if instance == null:
+			continue
+		instance.name = "RoomTemplate_%d_%d" % [pos.x, pos.y]
+		instance.position = Vector2(pos.x * CELL_W + ROOM_PAD_X, pos.y * CELL_H + ROOM_PAD_Y)
+		add_child(instance)
+		room.template_instance = instance
+		_room_template_instances.append(instance)
+
+
+func _get_template_marker_global_positions(room: RoomData, prefix: String) -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	if room.template_instance == null or not is_instance_valid(room.template_instance):
+		return positions
+	_collect_template_marker_positions(room.template_instance, prefix, positions)
+	return positions
+
+
+func _collect_template_marker_positions(node: Node, prefix: String, positions: Array[Vector2]) -> void:
+	if node is Marker2D and node.name.begins_with(prefix):
+		positions.append((node as Marker2D).global_position)
+	for child in node.get_children():
+		_collect_template_marker_positions(child, prefix, positions)
+
+
 # ── 房间物件生成 ──────────────────────────────────────────
 
 var _room_objects: Dictionary = {}  # {Vector2i: Array[Node]}
@@ -942,6 +1125,7 @@ func _next_floor() -> void:
 			if is_instance_valid(obj):
 				obj.queue_free()
 	_room_objects.clear()
+	_clear_room_template_instances()
 	# 隐藏 Boss 血条
 	if _boss_hp_bar_bg != null and is_instance_valid(_boss_hp_bar_bg):
 		_boss_hp_bar_bg.queue_free()
@@ -2438,6 +2622,10 @@ func _draw_minimap(ctrl: Control) -> void:
 			fill = Color(0.20, 0.58, 0.42)
 		elif room.is_boss:
 			fill = Color(0.78, 0.18, 0.30)
+		elif room.kind == RoomKind.CHEST:
+			fill = Color(0.92, 0.68, 0.20)
+		elif room.kind == RoomKind.EVENT:
+			fill = Color(0.20, 0.56, 0.78)
 		elif room.state == RoomState.CLEARED:
 			fill = Color(0.20, 0.70, 0.54)
 		elif room.state == RoomState.ACTIVE:

@@ -1,0 +1,105 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/export/decoration/冰原墙壁.png" id="1"]
+[ext_resource type="Texture2D" path="res://assets/export/decoration/冰原箱子.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/export/decoration/垃圾桶-骑士之家.png" id="3"]
+
+[sub_resource type="RectangleShape2D" id="1"]
+size = Vector2(46, 58)
+
+[sub_resource type="RectangleShape2D" id="2"]
+size = Vector2(40, 48)
+
+[node name="BossRoom01" type="Node2D"]
+metadata/room_kind = "boss"
+
+[node name="Obstacles" type="Node2D" parent="."]
+
+[node name="IceWallNorthWest" type="StaticBody2D" parent="Obstacles"]
+position = Vector2(180, 110)
+collision_layer = 16
+collision_mask = 0
+
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallNorthWest"]
+texture = ExtResource("1")
+scale = Vector2(2.2, 2.2)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallNorthWest"]
+shape = SubResource("1")
+
+[node name="IceWallNorthEast" type="StaticBody2D" parent="Obstacles"]
+position = Vector2(520, 110)
+collision_layer = 16
+collision_mask = 0
+
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallNorthEast"]
+texture = ExtResource("1")
+scale = Vector2(2.2, 2.2)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallNorthEast"]
+shape = SubResource("1")
+
+[node name="IceWallSouthWest" type="StaticBody2D" parent="Obstacles"]
+position = Vector2(180, 310)
+collision_layer = 16
+collision_mask = 0
+
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallSouthWest"]
+texture = ExtResource("1")
+scale = Vector2(2.2, 2.2)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallSouthWest"]
+shape = SubResource("1")
+
+[node name="IceWallSouthEast" type="StaticBody2D" parent="Obstacles"]
+position = Vector2(520, 310)
+collision_layer = 16
+collision_mask = 0
+
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallSouthEast"]
+texture = ExtResource("1")
+scale = Vector2(2.2, 2.2)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallSouthEast"]
+shape = SubResource("1")
+
+[node name="IceCrateA" type="StaticBody2D" parent="Obstacles"]
+position = Vector2(288, 202)
+collision_layer = 16
+collision_mask = 0
+
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceCrateA"]
+texture = ExtResource("2")
+scale = Vector2(2, 2)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceCrateA"]
+shape = SubResource("2")
+
+[node name="IceCrateB" type="StaticBody2D" parent="Obstacles"]
+position = Vector2(412, 202)
+collision_layer = 16
+collision_mask = 0
+
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceCrateB"]
+texture = ExtResource("2")
+scale = Vector2(2, 2)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceCrateB"]
+shape = SubResource("2")
+
+[node name="Decorations" type="Node2D" parent="."]
+
+[node name="TrashCanA" type="Sprite2D" parent="Decorations"]
+position = Vector2(90, 200)
+texture = ExtResource("3")
+scale = Vector2(0.36, 0.36)
+
+[node name="TrashCanB" type="Sprite2D" parent="Decorations"]
+position = Vector2(610, 200)
+texture = ExtResource("3")
+scale = Vector2(0.36, 0.36)
+
+[node name="BossSpawns" type="Node2D" parent="."]
+
+[node name="BossSpawn01" type="Marker2D" parent="BossSpawns"]
+position = Vector2(350, 198)
