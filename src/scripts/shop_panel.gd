@@ -2,12 +2,21 @@ extends Node
 
 ## 卡皮巴拉 — 武器商店面板
 
-const PopupGui := preload("res://scripts/popup_gui.gd")
 const SHOP_PANEL_SCENE := preload("res://scenes/ui/WeaponShopPanel.tscn")
+const WEAPON_ICON_PATHS := {
+	"jntm": "res://assets/export/weapon/weapon_03/飞熊军激光炮.png",
+	"chicken_foot": "res://assets/export/weapon/weapon_02/瓦克恩冲锋枪.png",
+}
+const SHOP_ROW_PATHS := {
+	"jntm": "WeaponRows/JntmRow",
+	"chicken_foot": "WeaponRows/ChickenFootRow",
+}
+const BUY_BUTTON_ENABLED_TEXTURE := preload("res://assets/export/gui/ui_button_primary.png")
+const BUY_BUTTON_DISABLED_TEXTURE := preload("res://assets/export/gui/ui_button_disabled.png")
 
 var _canvas: CanvasLayer
 var _player: Node
-var _panel_origin := Vector2.ZERO
+var _weapon_icon_cache: Dictionary = {}
 
 const SHOP_WEAPONS := ["jntm", "chicken_foot"]
 
@@ -17,6 +26,7 @@ func show_panel(player: Node) -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_canvas = CanvasLayer.new()
 	_canvas.layer = 29
+	_canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_canvas)
 	_build_ui()
 
@@ -27,46 +37,34 @@ func _build_ui() -> void:
 
 	var shell := SHOP_PANEL_SCENE.instantiate() as Control
 	_canvas.add_child(shell)
-	_panel_origin = (shell.get_node("Panel") as Control).global_position
 	var close_button := shell.get_node("CloseButton") as Button
 	close_button.pressed.connect(GameAudio.play_button)
 	close_button.pressed.connect(_close)
 	var currency := shell.get_node("CoinLabel") as Label
 	currency.text = "%d" % GameManager.kun_coins
 
-	# 武器列表
-	var y_offset := _panel_origin.y + 128.0
 	for key in SHOP_WEAPONS:
-		_create_weapon_row(key, y_offset)
-		y_offset += 95.0
+		_populate_weapon_row(shell, key)
 
 
-func _create_weapon_row(key: String, y: float) -> void:
+func _populate_weapon_row(shell: Control, key: String) -> void:
+	if not SHOP_ROW_PATHS.has(key):
+		return
+	var row := shell.get_node_or_null(String(SHOP_ROW_PATHS[key])) as Control
+	if row == null:
+		return
+
 	var weapon: Dictionary = _player.WEAPONS[key]
 	var price: int = GameManager.WEAPON_COSTS[key]
 	var owned: bool = key in GameManager.player_data.owned_weapons
 	var can_buy: bool = not owned and GameManager.kun_coins >= price
-	var left_x := _panel_origin.x + 58.0
-	var action_x := _panel_origin.x + 558.0
 
-	var slot_bg := TextureRect.new()
-	slot_bg.texture = PopupGui.load_texture("res://assets/export/gui/ui_popup_slot.png")
-	slot_bg.position = Vector2(left_x - 10.0, y - 14.0)
-	slot_bg.size = Vector2(96.0, 96.0)
-	slot_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	slot_bg.stretch_mode = TextureRect.STRETCH_SCALE
-	slot_bg.modulate = Color(1, 1, 1, 0.72)
-	_canvas.add_child(slot_bg)
+	var weapon_icon := row.get_node("WeaponIcon") as TextureRect
+	weapon_icon.texture = _get_weapon_icon(key)
 
-	# 武器名
-	var name_label := Label.new()
+	var name_label := row.get_node("NameLabel") as Label
 	name_label.text = weapon.name
-	name_label.position = Vector2(left_x + 108.0, y)
-	name_label.add_theme_font_size_override("font_size", 20)
-	name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-	_canvas.add_child(name_label)
 
-	# 武器类型
 	var type_text := ""
 	match weapon.type:
 		"basketball": type_text = "投射"
@@ -75,55 +73,23 @@ func _create_weapon_row(key: String, y: float) -> void:
 		"man_gun": type_text = "锁定枪械"
 		"laser_gun": type_text = "持续激光"
 		_: type_text = "武器"
-	var type_label := Label.new()
+	var type_label := row.get_node("TypeLabel") as Label
 	type_label.text = "[%s]" % type_text
-	type_label.position = Vector2(left_x + 258.0, y + 3.0)
-	type_label.add_theme_font_size_override("font_size", 14)
-	type_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
-	_canvas.add_child(type_label)
 
-	# 属性
-	var stats_text := _get_weapon_stats_text(weapon)
-	var stats_label := Label.new()
-	stats_label.text = stats_text
-	stats_label.position = Vector2(left_x + 108.0, y + 30.0)
-	stats_label.add_theme_font_size_override("font_size", 13)
-	stats_label.add_theme_color_override("font_color", Color(0.6, 0.7, 0.8))
-	_canvas.add_child(stats_label)
+	var stats_label := row.get_node("StatsLabel") as Label
+	stats_label.text = _get_weapon_stats_text(weapon)
 
-	# 价格/状态
-	if owned:
-		var owned_icon := TextureRect.new()
-		owned_icon.texture = PopupGui.load_texture("res://assets/export/gui/icon_owned.png")
-		owned_icon.position = Vector2(action_x + 16.0, y + 17.0)
-		owned_icon.size = Vector2(32, 32)
-		owned_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		owned_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		_canvas.add_child(owned_icon)
+	var price_label := row.get_node("PriceLabel") as Label
+	price_label.text = "坤币: %d" % price
+	price_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0) if can_buy else Color(0.5, 0.3, 0.3))
+	price_label.visible = not owned
 
-		var owned_label := Label.new()
-		owned_label.text = "已拥有"
-		owned_label.position = Vector2(action_x + 54.0, y + 22.0)
-		owned_label.add_theme_font_size_override("font_size", 16)
-		owned_label.add_theme_color_override("font_color", Color(0.0, 0.9, 0.4))
-		_canvas.add_child(owned_label)
-	else:
-		var price_label := Label.new()
-		price_label.text = "坤币: %d" % price
-		price_label.position = Vector2(action_x + 28.0, y - 18.0)
-		price_label.add_theme_font_size_override("font_size", 14)
-		var price_color := Color(1.0, 0.84, 0.0) if can_buy else Color(0.5, 0.3, 0.3)
-		price_label.add_theme_color_override("font_color", price_color)
-		_canvas.add_child(price_label)
+	(row.get_node("OwnedIcon") as Control).visible = owned
+	(row.get_node("OwnedLabel") as Control).visible = owned
 
-		PopupGui.add_confirm_button(_canvas, Vector2(action_x, y + 16.0), "购买", Callable(self, "_buy_weapon").bind(key), can_buy)
-
-	# 分割线
-	var sep := ColorRect.new()
-	sep.color = Color(0.2, 0.2, 0.25)
-	sep.position = Vector2(left_x + 108.0, y + 78.0)
-	sep.size = Vector2(635.0, 1.0)
-	_canvas.add_child(sep)
+	var buy_button := row.get_node("BuyButton") as Control
+	buy_button.visible = not owned
+	_configure_buy_button(buy_button, key, can_buy)
 
 
 func _buy_weapon(key: String) -> void:
@@ -131,10 +97,35 @@ func _buy_weapon(key: String) -> void:
 		_build_ui()
 
 
-func _on_buy_input(event: InputEvent, key: String) -> void:
+func _get_weapon_icon(key: String) -> Texture2D:
+	if not WEAPON_ICON_PATHS.has(key):
+		return null
+	if _weapon_icon_cache.has(key):
+		return _weapon_icon_cache[key]
+	var texture := load(String(WEAPON_ICON_PATHS[key])) as Texture2D
+	_weapon_icon_cache[key] = texture
+	return texture
+
+
+func _configure_buy_button(button: Control, key: String, enabled: bool) -> void:
+	button.mouse_filter = Control.MOUSE_FILTER_STOP if enabled else Control.MOUSE_FILTER_IGNORE
+	button.modulate = Color.WHITE if enabled else Color(0.45, 0.45, 0.45, 0.85)
+
+	var background := button.get_node("Background") as TextureRect
+	background.texture = BUY_BUTTON_ENABLED_TEXTURE if enabled else BUY_BUTTON_DISABLED_TEXTURE
+
+	var text_label := button.get_node("Text") as Label
+	text_label.text = "购买"
+	text_label.add_theme_color_override("font_color", Color(0.98, 0.92, 0.68) if enabled else Color(0.55, 0.55, 0.55))
+
+	if enabled:
+		button.gui_input.connect(_on_buy_button_input.bind(key))
+
+
+func _on_buy_button_input(event: InputEvent, key: String) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if GameManager.purchase_weapon(key):
-			_build_ui()
+		GameAudio.play_button()
+		_buy_weapon(key)
 
 
 func _get_weapon_stats_text(weapon: Dictionary) -> String:
@@ -150,11 +141,6 @@ func _get_weapon_stats_text(weapon: Dictionary) -> String:
 		"laser_gun":
 			return "伤害:%d/跳  按住持续激光  狂暴:墙体折射2次" % weapon.damage
 	return "伤害:%d" % weapon.damage
-
-
-func _on_close_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_close()
 
 
 func _input(event: InputEvent) -> void:

@@ -27,6 +27,10 @@ const BRANCH_COLORS := {
 # 连线定义 [from_key, to_key]
 var _connections: Array[Array] = []
 var _tree_draw: Control
+var _close_button: Button
+var _reset_button: Button
+var _talent_nodes_container: Control
+var _talent_node_controls: Dictionary = {}
 
 
 func _init() -> void:
@@ -145,6 +149,7 @@ func show_panel(player: Node) -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_canvas = CanvasLayer.new()
 	_canvas.layer = 29
+	_canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_canvas)
 	_load_levels()
 	_build_ui()
@@ -170,13 +175,13 @@ func _build_ui() -> void:
 	var shell := TALENT_PANEL_SCENE.instantiate() as Control
 	_canvas.add_child(shell)
 
-	var close_button := shell.get_node("CloseButton") as Button
-	close_button.pressed.connect(GameAudio.play_button)
-	close_button.pressed.connect(_save_apply_and_close)
+	_close_button = shell.get_node("CloseButton") as Button
+	_close_button.pressed.connect(GameAudio.play_button)
+	_close_button.pressed.connect(_save_apply_and_close)
 
-	var reset_button := shell.get_node("ResetButton") as Button
-	reset_button.pressed.connect(GameAudio.play_button)
-	reset_button.pressed.connect(_reset_talents)
+	_reset_button = shell.get_node("ResetButton") as Button
+	_reset_button.pressed.connect(GameAudio.play_button)
+	_reset_button.pressed.connect(_reset_talents)
 
 	var pt_label := shell.get_node("PracticeLabel") as Label
 	pt_label.text = "练习时长: %d" % GameManager.practice_time
@@ -186,6 +191,9 @@ func _build_ui() -> void:
 
 	_tree_draw = shell.get_node("TreeDraw") as Control
 	_tree_draw.draw.connect(_draw_tree)
+	_collect_talent_node_controls(shell)
+	_sync_talent_node_controls()
+	_tree_draw.queue_redraw()
 
 
 func _draw_tree() -> void:
@@ -196,11 +204,95 @@ func _draw_tree() -> void:
 		if from_node and to_node:
 			var from_level: int = _node_levels.get(from_node.key, 0)
 			var line_color: Color = from_node.color.darkened(0.3) if from_level > 0 else Color(0.2, 0.2, 0.25)
-			_tree_draw.draw_line(from_node.pos, to_node.pos, line_color, 3.0)
+			_tree_draw.draw_line(_get_talent_node_center(from_node), _get_talent_node_center(to_node), line_color, 3.0)
 
-	# 画节点
+	if _talent_node_controls.is_empty():
+		for node_def in _nodes:
+			_draw_node(node_def)
+	else:
+		for node_def in _nodes:
+			_draw_node_progress(node_def)
+
+
+func _collect_talent_node_controls(shell: Control) -> void:
+	_talent_node_controls.clear()
+	_talent_nodes_container = shell.get_node_or_null("TalentNodes") as Control
+	if _talent_nodes_container == null:
+		return
 	for node_def in _nodes:
-		_draw_node(node_def)
+		var key := String(node_def.key)
+		var node_control := _talent_nodes_container.get_node_or_null(key) as Control
+		if node_control != null:
+			_talent_node_controls[key] = node_control
+
+
+func _sync_talent_node_controls() -> void:
+	for node_def in _nodes:
+		var key := String(node_def.key)
+		var node_control := _talent_node_controls.get(key, null) as Control
+		if node_control == null:
+			continue
+
+		var level: int = _node_levels.get(key, 0)
+		var max_lv: int = node_def.max_level
+		var parent_key: String = node_def.parent
+		var parent_unlocked: bool = parent_key == "" or _node_levels.get(parent_key, 0) > 0
+		var base_color: Color = node_def.color
+		var icon_color := base_color.lerp(Color.WHITE, 0.2) if level > 0 else base_color.darkened(0.6)
+		if not parent_unlocked:
+			icon_color = Color(0.15, 0.15, 0.15)
+
+		var slot := node_control.get_node_or_null("Slot") as TextureRect
+		if slot != null:
+			slot.texture = TALENT_SLOT_SELECTED if level > 0 else TALENT_SLOT
+			slot.modulate = Color.WHITE if parent_unlocked else Color(0.38, 0.38, 0.42, 0.85)
+
+		var point_icon := node_control.get_node_or_null("PointIcon") as TextureRect
+		if point_icon != null:
+			point_icon.modulate = icon_color
+
+		var name_label := node_control.get_node_or_null("NameLabel") as Label
+		if name_label != null:
+			name_label.text = node_def.name
+			name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9) if parent_unlocked else Color(0.45, 0.45, 0.5))
+
+		var level_label := node_control.get_node_or_null("LevelLabel") as Label
+		if level_label != null:
+			level_label.text = "%d/%d" % [level, max_lv]
+
+
+func _get_talent_node_center(node_def: Dictionary) -> Vector2:
+	var key := String(node_def.key)
+	var node_control := _talent_node_controls.get(key, null) as Control
+	if node_control == null:
+		return node_def.pos
+	var slot := node_control.get_node_or_null("Slot") as Control
+	if slot == null:
+		return _talent_nodes_container.position + node_control.position + node_control.size * 0.5
+	return _talent_nodes_container.position + node_control.position + slot.position + slot.size * 0.5
+
+
+func _draw_node_progress(node_def: Dictionary) -> void:
+	var key: String = node_def.key
+	var level: int = _node_levels.get(key, 0)
+	var max_lv: int = node_def.max_level
+	var pos := _get_talent_node_center(node_def)
+	var color: Color = node_def.color
+	var radius := 22.0
+	_tree_draw.draw_arc(pos, radius + 9.0, 0, TAU, 32, color if level > 0 else Color(0.32, 0.34, 0.38), 2.5)
+
+	if level <= 0:
+		return
+	var fill_ratio := float(level) / float(max_lv)
+	var fill_pts := PackedVector2Array()
+	fill_pts.append(pos)
+	var sweep := TAU * fill_ratio
+	for i in 13:
+		var a := -PI / 2 + sweep * i / 12.0
+		fill_pts.append(pos + Vector2(cos(a), sin(a)) * (radius - 3))
+	var fill_color := color.lerp(Color.WHITE, 0.3)
+	fill_color.a = 0.38
+	_tree_draw.draw_colored_polygon(fill_pts, fill_color)
 
 
 func _draw_node(node_def: Dictionary) -> void:
@@ -270,14 +362,22 @@ func _input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		get_viewport().set_input_as_handled()
 		var click_pos: Vector2 = event.position
+		if _is_click_on_button(_close_button, click_pos) or _is_click_on_button(_reset_button, click_pos):
+			return
 		if _tree_draw != null:
 			click_pos -= _tree_draw.global_position
 		for node_def in _nodes:
-			if click_pos.distance_to(node_def.pos) < 25.0:
+			if click_pos.distance_to(_get_talent_node_center(node_def)) < 34.0:
+				get_viewport().set_input_as_handled()
 				_try_upgrade(node_def)
 				break
+
+
+func _is_click_on_button(button: Button, click_pos: Vector2) -> bool:
+	if button == null or not is_instance_valid(button):
+		return false
+	return Rect2(button.global_position, button.size).has_point(click_pos)
 
 
 func _try_upgrade(node_def: Dictionary) -> void:

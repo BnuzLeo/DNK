@@ -161,10 +161,10 @@ offset_bottom = 58.0
 
 [node name="BagIcon" type="TextureRect" parent="BagButton" unique_id=488627411]
 layout_mode = 0
-offset_left = 374.0
-offset_top = 65.0
-offset_right = 410.0
-offset_bottom = 101.0
+offset_left = 375.0
+offset_top = 117.0
+offset_right = 411.0
+offset_bottom = 153.0
 mouse_filter = 2
 texture = ExtResource("13_bag")
 expand_mode = 1
@@ -250,28 +250,28 @@ expand_mode = 1
 stretch_mode = 5
 
 [node name="KillBossTestButton" type="Button" parent="." unique_id=597966925]
-offset_left = 313.0
-offset_top = 20.0
-offset_right = 401.0
-offset_bottom = 50.0
+offset_left = 253.0
+offset_top = 22.0
+offset_right = 341.0
+offset_bottom = 52.0
 focus_mode = 0
 theme_override_font_sizes/font_size = 15
 text = "秒杀Boss"
 
 [node name="InvincibleTestButton" type="Button" parent="." unique_id=2132295324]
-offset_left = 407.0
-offset_top = 20.0
-offset_right = 495.0
-offset_bottom = 50.0
+offset_left = 351.0
+offset_top = 22.0
+offset_right = 439.0
+offset_bottom = 52.0
 focus_mode = 0
 theme_override_font_sizes/font_size = 15
 text = "无敌测试"
 
 [node name="BossTestButton" type="Button" parent="." unique_id=1732314658]
-offset_left = 502.0
-offset_top = 20.0
-offset_right = 590.0
-offset_bottom = 50.0
+offset_left = 451.0
+offset_top = 22.0
+offset_right = 539.0
+offset_bottom = 52.0
 focus_mode = 0
 theme_override_font_sizes/font_size = 15
 text = "Boss测试"
@@ -311,10 +311,10 @@ offset_bottom = 608.0
 [node name="BuffBar" type="Control" parent="." unique_id=1752861670]
 layout_mode = 3
 anchors_preset = 0
-offset_left = 218.0
-offset_top = 22.0
-offset_right = 348.0
-offset_bottom = 50.0
+offset_left = 219.0
+offset_top = 23.0
+offset_right = 349.0
+offset_bottom = 51.0
 mouse_filter = 2
 
 [node name="MessagePanel" type="Control" parent="." unique_id=1190161580]

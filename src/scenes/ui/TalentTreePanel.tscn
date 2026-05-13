@@ -1,101 +1,554 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://dwin0e2q36rno"]
 
-[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
-[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_header.png" id="2_header"]
-[ext_resource type="Texture2D" path="res://assets/export/gui/icon_talent.png" id="3_icon"]
-[ext_resource type="Texture2D" path="res://assets/export/gui/ui_close_button.png" id="4_close"]
+[ext_resource type="Texture2D" uid="uid://c3lkhnewmuaok" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
+[ext_resource type="Texture2D" uid="uid://chxcnajxylj3i" path="res://assets/export/gui/ui_popup_header.png" id="2_header"]
+[ext_resource type="Texture2D" uid="uid://buscsw27g4qfy" path="res://assets/export/gui/icon_talent.png" id="3_icon"]
+[ext_resource type="Texture2D" uid="uid://dp4w77n4prjqu" path="res://assets/export/gui/ui_close_button.png" id="4_close"]
+[ext_resource type="Texture2D" uid="uid://c3akf3jvxts8y" path="res://assets/export/gui/ui_popup_slot.png" id="5_slot"]
+[ext_resource type="Texture2D" uid="uid://dydi28s8tjk6j" path="res://assets/export/gui/normal-btn.png" id="5_x0qaf"]
+[ext_resource type="Texture2D" uid="uid://cle0eobitipra" path="res://assets/export/gui/icon_talent_point.png" id="7_point"]
 
-[node name="TalentTreePanel" type="Control"]
+[node name="TalentTreePanel" type="Control" unique_id=1256820552]
+layout_mode = 3
+anchors_preset = 0
 offset_right = 960.0
 offset_bottom = 640.0
 mouse_filter = 2
 
-[node name="Overlay" type="ColorRect" parent="."]
+[node name="Overlay" type="ColorRect" parent="." unique_id=2100731670]
+layout_mode = 0
 offset_right = 960.0
 offset_bottom = 640.0
+mouse_filter = 2
 color = Color(0, 0, 0, 0.72)
-mouse_filter = 2
 
-[node name="Panel" type="TextureRect" parent="."]
+[node name="Panel" type="TextureRect" parent="." unique_id=417526565]
+layout_mode = 0
 offset_left = 105.0
 offset_top = 70.0
 offset_right = 855.0
 offset_bottom = 570.0
+mouse_filter = 2
 texture = ExtResource("1_panel")
 expand_mode = 1
-stretch_mode = 0
-mouse_filter = 2
 
-[node name="Header" type="TextureRect" parent="."]
+[node name="Header" type="TextureRect" parent="." unique_id=1926983717]
+layout_mode = 0
 offset_left = 105.0
 offset_top = 70.0
 offset_right = 855.0
 offset_bottom = 134.0
+mouse_filter = 2
 texture = ExtResource("2_header")
 expand_mode = 1
-stretch_mode = 0
-mouse_filter = 2
 
-[node name="TitleIcon" type="TextureRect" parent="."]
+[node name="TitleIcon" type="TextureRect" parent="." unique_id=759949537]
+layout_mode = 0
 offset_left = 137.0
 offset_top = 78.0
 offset_right = 185.0
 offset_bottom = 126.0
+mouse_filter = 2
 texture = ExtResource("3_icon")
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
-[node name="TitleLabel" type="Label" parent="."]
+[node name="TitleLabel" type="Label" parent="." unique_id=1618887559]
+layout_mode = 0
 offset_left = 193.0
 offset_top = 70.0
 offset_right = 715.0
 offset_bottom = 134.0
-vertical_alignment = 1
-text = "天赋树"
 theme_override_colors/font_color = Color(0.98, 0.92, 0.78, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
 theme_override_font_sizes/font_size = 24
-mouse_filter = 2
+text = "天赋树"
+vertical_alignment = 1
 
-[node name="CloseButton" type="Button" parent="."]
+[node name="CloseButton" type="Button" parent="." unique_id=2076855882]
+layout_mode = 0
 offset_left = 789.0
 offset_top = 86.0
 offset_right = 837.0
 offset_bottom = 134.0
+focus_mode = 0
 icon = ExtResource("4_close")
 expand_icon = true
-focus_mode = 0
 
-[node name="PracticeLabel" type="Label" parent="."]
+[node name="PracticeLabel" type="Label" parent="." unique_id=1183310666]
+layout_mode = 0
 offset_left = 665.0
 offset_top = 154.0
 offset_right = 825.0
 offset_bottom = 176.0
 theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
 theme_override_font_sizes/font_size = 16
+
+[node name="ResetButton" type="Button" parent="." unique_id=1455257627]
+layout_mode = 0
+offset_left = 403.0
+offset_top = 461.0
+offset_right = 546.0
+offset_bottom = 536.0
+focus_mode = 0
+text = "重置"
+icon = ExtResource("5_x0qaf")
+icon_alignment = 1
+
+[node name="TreeDraw" type="Control" parent="." unique_id=1223937653]
+anchors_preset = 0
+offset_left = -2.0
+offset_top = -2.0
+offset_right = 958.0
+offset_bottom = 638.0
 mouse_filter = 2
 
-[node name="ResetButton" type="Button" parent="."]
-offset_left = 149.0
-offset_top = 144.0
-offset_right = 329.0
-offset_bottom = 192.0
-text = "重置"
-focus_mode = 0
-
-[node name="TreeDraw" type="Control" parent="."]
-offset_right = 960.0
+[node name="TalentNodes" type="Control" parent="." unique_id=1017394470]
+anchors_preset = 0
+offset_left = -2.0
+offset_right = 958.0
 offset_bottom = 640.0
 mouse_filter = 2
 
-[node name="StatusLabel" type="Label" parent="."]
+[node name="core" type="Control" parent="TalentNodes" unique_id=248243922]
+anchors_preset = 0
+offset_left = 430.0
+offset_top = 146.0
+offset_right = 530.0
+offset_bottom = 252.0
+mouse_filter = 2
+
+[node name="Slot" type="TextureRect" parent="TalentNodes/core" unique_id=1669955312]
+layout_mode = 0
+offset_left = 16.0
+offset_right = 84.0
+offset_bottom = 68.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="PointIcon" type="TextureRect" parent="TalentNodes/core" unique_id=1512335785]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 20.0
+offset_right = 64.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("7_point")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LevelLabel" type="Label" parent="TalentNodes/core" unique_id=1082554412]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 100.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "0/5"
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="TalentNodes/core" unique_id=125954123]
+layout_mode = 0
+offset_top = 73.0
+offset_right = 100.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "基础强化"
+horizontal_alignment = 1
+
+[node name="hp_max" type="Control" parent="TalentNodes" unique_id=770443427]
+anchors_preset = 0
+offset_left = 210.0
+offset_top = 236.0
+offset_right = 310.0
+offset_bottom = 342.0
+mouse_filter = 2
+
+[node name="Slot" type="TextureRect" parent="TalentNodes/hp_max" unique_id=1162609439]
+layout_mode = 0
+offset_left = 16.0
+offset_right = 84.0
+offset_bottom = 68.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="PointIcon" type="TextureRect" parent="TalentNodes/hp_max" unique_id=472458822]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 20.0
+offset_right = 64.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("7_point")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LevelLabel" type="Label" parent="TalentNodes/hp_max" unique_id=186076769]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 100.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "0/5"
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="TalentNodes/hp_max" unique_id=98071334]
+layout_mode = 0
+offset_top = 73.0
+offset_right = 100.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "生命强化"
+horizontal_alignment = 1
+
+[node name="hp_regen" type="Control" parent="TalentNodes" unique_id=2102213369]
+anchors_preset = 0
+offset_left = 110.0
+offset_top = 336.0
+offset_right = 210.0
+offset_bottom = 442.0
+mouse_filter = 2
+
+[node name="Slot" type="TextureRect" parent="TalentNodes/hp_regen" unique_id=488225114]
+layout_mode = 0
+offset_left = 16.0
+offset_right = 84.0
+offset_bottom = 68.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="PointIcon" type="TextureRect" parent="TalentNodes/hp_regen" unique_id=1744878533]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 20.0
+offset_right = 64.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("7_point")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LevelLabel" type="Label" parent="TalentNodes/hp_regen" unique_id=1389760544]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 100.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "0/3"
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="TalentNodes/hp_regen" unique_id=1219978811]
+layout_mode = 0
+offset_top = 73.0
+offset_right = 100.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "生命回复"
+horizontal_alignment = 1
+
+[node name="shield" type="Control" parent="TalentNodes" unique_id=1451974464]
+anchors_preset = 0
+offset_left = 310.0
+offset_top = 336.0
+offset_right = 410.0
+offset_bottom = 442.0
+mouse_filter = 2
+
+[node name="Slot" type="TextureRect" parent="TalentNodes/shield" unique_id=1300211701]
+layout_mode = 0
+offset_left = 16.0
+offset_right = 84.0
+offset_bottom = 68.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="PointIcon" type="TextureRect" parent="TalentNodes/shield" unique_id=372183024]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 20.0
+offset_right = 64.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("7_point")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LevelLabel" type="Label" parent="TalentNodes/shield" unique_id=2007143950]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 100.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "0/3"
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="TalentNodes/shield" unique_id=342240921]
+layout_mode = 0
+offset_top = 73.0
+offset_right = 100.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "护盾"
+horizontal_alignment = 1
+
+[node name="spd_up" type="Control" parent="TalentNodes" unique_id=1906090901]
+anchors_preset = 0
+offset_left = 430.0
+offset_top = 256.0
+offset_right = 530.0
+offset_bottom = 362.0
+mouse_filter = 2
+
+[node name="Slot" type="TextureRect" parent="TalentNodes/spd_up" unique_id=775857487]
+layout_mode = 0
+offset_left = 16.0
+offset_right = 84.0
+offset_bottom = 68.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="PointIcon" type="TextureRect" parent="TalentNodes/spd_up" unique_id=1192324153]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 20.0
+offset_right = 64.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("7_point")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LevelLabel" type="Label" parent="TalentNodes/spd_up" unique_id=667135674]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 100.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "0/5"
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="TalentNodes/spd_up" unique_id=488079942]
+layout_mode = 0
+offset_top = 73.0
+offset_right = 100.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "疾行"
+horizontal_alignment = 1
+
+[node name="dash_cd" type="Control" parent="TalentNodes" unique_id=63352547]
+anchors_preset = 0
+offset_left = 430.0
+offset_top = 366.0
+offset_right = 530.0
+offset_bottom = 472.0
+mouse_filter = 2
+
+[node name="Slot" type="TextureRect" parent="TalentNodes/dash_cd" unique_id=2114819596]
+layout_mode = 0
+offset_left = 16.0
+offset_right = 84.0
+offset_bottom = 68.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="PointIcon" type="TextureRect" parent="TalentNodes/dash_cd" unique_id=1834072729]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 20.0
+offset_right = 64.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("7_point")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LevelLabel" type="Label" parent="TalentNodes/dash_cd" unique_id=763491700]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 100.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "0/3"
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="TalentNodes/dash_cd" unique_id=1595581776]
+layout_mode = 0
+offset_top = 73.0
+offset_right = 100.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "闪避精通"
+horizontal_alignment = 1
+
+[node name="mana_max" type="Control" parent="TalentNodes" unique_id=663305690]
+anchors_preset = 0
+offset_left = 650.0
+offset_top = 236.0
+offset_right = 750.0
+offset_bottom = 342.0
+mouse_filter = 2
+
+[node name="Slot" type="TextureRect" parent="TalentNodes/mana_max" unique_id=417875096]
+layout_mode = 0
+offset_left = 16.0
+offset_right = 84.0
+offset_bottom = 68.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="PointIcon" type="TextureRect" parent="TalentNodes/mana_max" unique_id=498198934]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 20.0
+offset_right = 64.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("7_point")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LevelLabel" type="Label" parent="TalentNodes/mana_max" unique_id=1334708207]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 100.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "0/5"
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="TalentNodes/mana_max" unique_id=902099924]
+layout_mode = 0
+offset_top = 73.0
+offset_right = 100.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "法力扩展"
+horizontal_alignment = 1
+
+[node name="mana_regen" type="Control" parent="TalentNodes" unique_id=1117917400]
+anchors_preset = 0
+offset_left = 550.0
+offset_top = 336.0
+offset_right = 650.0
+offset_bottom = 442.0
+mouse_filter = 2
+
+[node name="Slot" type="TextureRect" parent="TalentNodes/mana_regen" unique_id=1513124501]
+layout_mode = 0
+offset_left = 16.0
+offset_right = 84.0
+offset_bottom = 68.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="PointIcon" type="TextureRect" parent="TalentNodes/mana_regen" unique_id=1164299284]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 20.0
+offset_right = 64.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("7_point")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LevelLabel" type="Label" parent="TalentNodes/mana_regen" unique_id=28480478]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 100.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "0/3"
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="TalentNodes/mana_regen" unique_id=1577106408]
+layout_mode = 0
+offset_top = 73.0
+offset_right = 100.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "法力涌动"
+horizontal_alignment = 1
+
+[node name="dmg_up" type="Control" parent="TalentNodes" unique_id=1280301894]
+anchors_preset = 0
+offset_left = 750.0
+offset_top = 336.0
+offset_right = 850.0
+offset_bottom = 442.0
+mouse_filter = 2
+
+[node name="Slot" type="TextureRect" parent="TalentNodes/dmg_up" unique_id=1204694419]
+layout_mode = 0
+offset_left = 16.0
+offset_right = 84.0
+offset_bottom = 68.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="PointIcon" type="TextureRect" parent="TalentNodes/dmg_up" unique_id=1897777458]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 20.0
+offset_right = 64.0
+offset_bottom = 48.0
+mouse_filter = 2
+texture = ExtResource("7_point")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LevelLabel" type="Label" parent="TalentNodes/dmg_up" unique_id=1398891593]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 100.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "0/3"
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="TalentNodes/dmg_up" unique_id=521861102]
+layout_mode = 0
+offset_top = 73.0
+offset_right = 100.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "火力增幅"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="." unique_id=1288331667]
+layout_mode = 0
 offset_left = 405.0
 offset_top = 522.0
 offset_right = 790.0
 offset_bottom = 546.0
 theme_override_colors/font_color = Color(1, 0.6, 0.3, 1)
 theme_override_font_sizes/font_size = 15
-mouse_filter = 2

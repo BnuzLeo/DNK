@@ -75,6 +75,8 @@ const LASER_BERSERK_DURATION := 5.0
 const LASER_BERSERK_BEAM_COUNT := 1
 const LASER_BERSERK_DAMAGE_INTERVAL := 0.5
 const LASER_BERSERK_RADIUS := 48.0
+const LASER_BERSERK_VISUAL_SCALE := 2.0
+const LASER_BERSERK_BEAM_HEIGHT := 320.0
 const LASER_BERSERK_WARNING_DURATION := 0.55
 const LASER_WALL_MASK := 16
 const LASER_MIN_HIT_DISTANCE := 6.0
@@ -408,11 +410,27 @@ func _cycle_weapon() -> void:
 		return
 	GameAudio.play_switch()
 	var previous_type: String = WEAPONS[_weapon_keys[_weapon_index]].get("type", "")
+	_cancel_berserk_for_weapon_switch()
 	_weapon_index = (_weapon_index + 1) % _weapon_keys.size()
 	GameManager.player_data.weapon_index = _weapon_index
 	var next_type: String = WEAPONS[_weapon_keys[_weapon_index]].get("type", "")
 	if previous_type == "laser_gun" and next_type != "laser_gun":
 		_clear_laser_visual()
+
+
+func _cancel_berserk_for_weapon_switch() -> void:
+	if not _berserk_active and not _laser_berserk_active:
+		return
+	_berserk_active = false
+	_berserk_timer = 0.0
+	_berserk_flash_timer = 0.0
+	_basketball_auto_j_remaining = 0
+	_basketball_auto_j_timer = 0.0
+	if GameManager.state == GameManager.GameState.PLAYING:
+		_berserk_cooldown = BERSERK_COOLDOWN
+	if _laser_berserk_active:
+		_laser_berserk_cooldown = LASER_BERSERK_DURATION
+		_clear_laser_berserk()
 
 
 func _trigger_berserk() -> void:
@@ -911,24 +929,26 @@ func _create_laser_berserk_visual(parent: Node) -> Node2D:
 		var pulse := 0.72 + sin(Time.get_ticks_msec() * 0.018 + phase) * 0.18
 		if warning > 0.0:
 			var ratio := clampf(1.0 - warning / LASER_BERSERK_WARNING_DURATION, 0.0, 1.0)
-			var radius := lerpf(18.0, LASER_BERSERK_RADIUS, ratio)
-			visual.draw_circle(Vector2.ZERO, radius, Color(1.0, 0.08, 0.02, 0.10 + ratio * 0.08))
-			visual.draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, Color(1.0, 0.12, 0.04, 0.82), 3.4)
-			visual.draw_arc(Vector2.ZERO, radius * 0.58, 0.0, TAU, 36, Color(1.0, 0.86, 0.30, 0.65), 2.2)
-			visual.draw_line(Vector2(-radius, 0.0), Vector2(radius, 0.0), Color(1.0, 0.16, 0.04, 0.42), 2.0, true)
-			visual.draw_line(Vector2(0.0, -radius), Vector2(0.0, radius), Color(1.0, 0.16, 0.04, 0.42), 2.0, true)
+			var warning_visual_radius := LASER_BERSERK_RADIUS * LASER_BERSERK_VISUAL_SCALE
+			var warning_radius := lerpf(18.0 * LASER_BERSERK_VISUAL_SCALE, warning_visual_radius, ratio)
+			visual.draw_circle(Vector2.ZERO, warning_radius, Color(1.0, 0.08, 0.02, 0.10 + ratio * 0.08))
+			visual.draw_arc(Vector2.ZERO, warning_radius, 0.0, TAU, 48, Color(1.0, 0.12, 0.04, 0.82), 3.4)
+			visual.draw_arc(Vector2.ZERO, warning_radius * 0.58, 0.0, TAU, 36, Color(1.0, 0.86, 0.30, 0.65), 2.2)
+			visual.draw_line(Vector2(-warning_radius, 0.0), Vector2(warning_radius, 0.0), Color(1.0, 0.16, 0.04, 0.42), 2.0, true)
+			visual.draw_line(Vector2(0.0, -warning_radius), Vector2(0.0, warning_radius), Color(1.0, 0.16, 0.04, 0.42), 2.0, true)
 			return
-		var beam_height := 320.0
-		var radius := LASER_BERSERK_RADIUS * pulse
-		visual.draw_circle(Vector2.ZERO, LASER_BERSERK_RADIUS, Color(1.0, 0.05, 0.02, 0.24))
-		visual.draw_circle(Vector2.ZERO, LASER_BERSERK_RADIUS * 0.55, Color(1.0, 0.34, 0.08, 0.18))
-		visual.draw_arc(Vector2.ZERO, LASER_BERSERK_RADIUS, 0.0, TAU, 52, Color(1.0, 0.18, 0.04, 0.90), 4.2)
-		visual.draw_arc(Vector2.ZERO, LASER_BERSERK_RADIUS * 0.70, 0.0, TAU, 44, Color(1.0, 0.92, 0.42, 0.70), 2.4)
-		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.03, 0.01, 0.30), radius * 1.9, true)
-		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.10, 0.02, 0.72), radius * 1.08, true)
-		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.94, 0.72, 0.96), radius * 0.34, true)
-		visual.draw_line(Vector2(-LASER_BERSERK_RADIUS, 0.0), Vector2(LASER_BERSERK_RADIUS, 0.0), Color(1.0, 0.20, 0.03, 0.48), 3.0, true)
-		visual.draw_line(Vector2(0.0, -LASER_BERSERK_RADIUS), Vector2(0.0, LASER_BERSERK_RADIUS), Color(1.0, 0.20, 0.03, 0.48), 3.0, true)
+		var beam_height := LASER_BERSERK_BEAM_HEIGHT * LASER_BERSERK_VISUAL_SCALE
+		var beam_visual_radius := LASER_BERSERK_RADIUS * LASER_BERSERK_VISUAL_SCALE
+		var beam_width := beam_visual_radius * pulse
+		visual.draw_circle(Vector2.ZERO, beam_visual_radius, Color(1.0, 0.05, 0.02, 0.24))
+		visual.draw_circle(Vector2.ZERO, beam_visual_radius * 0.55, Color(1.0, 0.34, 0.08, 0.18))
+		visual.draw_arc(Vector2.ZERO, beam_visual_radius, 0.0, TAU, 52, Color(1.0, 0.18, 0.04, 0.90), 4.2)
+		visual.draw_arc(Vector2.ZERO, beam_visual_radius * 0.70, 0.0, TAU, 44, Color(1.0, 0.92, 0.42, 0.70), 2.4)
+		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.03, 0.01, 0.30), beam_width * 1.9, true)
+		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.10, 0.02, 0.72), beam_width * 1.08, true)
+		visual.draw_line(Vector2(0.0, -beam_height), Vector2.ZERO, Color(1.0, 0.94, 0.72, 0.96), beam_width * 0.34, true)
+		visual.draw_line(Vector2(-beam_visual_radius, 0.0), Vector2(beam_visual_radius, 0.0), Color(1.0, 0.20, 0.03, 0.48), 3.0, true)
+		visual.draw_line(Vector2(0.0, -beam_visual_radius), Vector2(0.0, beam_visual_radius), Color(1.0, 0.20, 0.03, 0.48), 3.0, true)
 	)
 	if parent != null:
 		parent.add_child(visual)
@@ -1266,13 +1286,13 @@ func _update_carried_weapon_visual() -> void:
 
 func _get_carried_weapon_anim_mode(weapon_type: String) -> String:
 	if weapon_type == "laser_gun":
-		return "laser_berserk" if _berserk_active else "laser_normal"
+		return "laser_berserk" if _berserk_active or _laser_berserk_active else "laser_normal"
 	return "man_berserk" if _berserk_active else "man_normal"
 
 
 func _get_carried_weapon_frame_paths(weapon_type: String) -> Array[String]:
 	if weapon_type == "laser_gun":
-		return LASER_GUN_BERSERK_FRAME_PATHS if _berserk_active else LASER_GUN_NORMAL_FRAME_PATHS
+		return LASER_GUN_BERSERK_FRAME_PATHS if _berserk_active or _laser_berserk_active else LASER_GUN_NORMAL_FRAME_PATHS
 	return MAN_GUN_BERSERK_FRAME_PATHS if _berserk_active else MAN_GUN_NORMAL_FRAME_PATHS
 
 

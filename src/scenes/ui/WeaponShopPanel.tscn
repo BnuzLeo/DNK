@@ -5,6 +5,11 @@
 [ext_resource type="Texture2D" uid="uid://dxu56wo04wi5j" path="res://assets/export/gui/icon_shop.png" id="3_icon"]
 [ext_resource type="Texture2D" uid="uid://dp4w77n4prjqu" path="res://assets/export/gui/ui_close_button.png" id="4_close"]
 [ext_resource type="Texture2D" uid="uid://deafaf1k54ehh" path="res://assets/export/gui/hud_icon_kun_coin.png" id="5_coin"]
+[ext_resource type="Texture2D" uid="uid://c3akf3jvxts8y" path="res://assets/export/gui/ui_popup_slot.png" id="6_slot"]
+[ext_resource type="Texture2D" uid="uid://dtxybq1woafrq" path="res://assets/export/weapon/weapon_03/飞熊军激光炮.png" id="7_jntm"]
+[ext_resource type="Texture2D" uid="uid://31j7360igig8" path="res://assets/export/weapon/weapon_02/瓦克恩冲锋枪.png" id="8_man"]
+[ext_resource type="Texture2D" uid="uid://660klkwtujsu" path="res://assets/export/gui/icon_owned.png" id="9_owned"]
+[ext_resource type="Texture2D" uid="uid://3y6w7lwwkk68" path="res://assets/export/gui/ui_button_primary.png" id="10_button"]
 
 [node name="WeaponShopPanel" type="Control" unique_id=1084684360]
 layout_mode = 3
@@ -93,3 +98,267 @@ offset_right = 807.0
 offset_bottom = 174.0
 theme_override_colors/font_color = Color(1, 0.84, 0, 1)
 theme_override_font_sizes/font_size = 16
+
+[node name="WeaponRows" type="Control" parent="." unique_id=1933040952]
+anchors_preset = 0
+offset_right = 960.0
+offset_bottom = 640.0
+mouse_filter = 2
+
+[node name="JntmRow" type="Control" parent="WeaponRows" unique_id=1354749148]
+anchors_preset = 0
+offset_left = 153.0
+offset_top = 184.0
+offset_right = 835.0
+offset_bottom = 278.0
+mouse_filter = 2
+
+[node name="SlotBg" type="TextureRect" parent="WeaponRows/JntmRow" unique_id=99092968]
+modulate = Color(1, 1, 1, 0.72)
+layout_mode = 0
+offset_right = 96.0
+offset_bottom = 96.0
+mouse_filter = 2
+texture = ExtResource("6_slot")
+expand_mode = 1
+
+[node name="WeaponIcon" type="TextureRect" parent="WeaponRows/JntmRow" unique_id=421889683]
+layout_mode = 0
+offset_left = 11.0
+offset_top = 11.0
+offset_right = 83.0
+offset_bottom = 83.0
+mouse_filter = 2
+texture = ExtResource("7_jntm")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="NameLabel" type="Label" parent="WeaponRows/JntmRow" unique_id=392438193]
+layout_mode = 0
+offset_left = 118.0
+offset_top = 14.0
+offset_right = 335.0
+offset_bottom = 42.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 20
+text = "大族激光"
+
+[node name="TypeLabel" type="Label" parent="WeaponRows/JntmRow" unique_id=2114470257]
+layout_mode = 0
+offset_left = 418.0
+offset_top = 42.0
+offset_right = 493.0
+offset_bottom = 64.0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "[持续激光]"
+
+[node name="StatsLabel" type="Label" parent="WeaponRows/JntmRow" unique_id=1715681556]
+layout_mode = 0
+offset_left = 118.0
+offset_top = 44.0
+offset_right = 505.0
+offset_bottom = 66.0
+theme_override_colors/font_color = Color(0.6, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 13
+text = "伤害:1  按住持续激光  狂暴:召唤激光"
+
+[node name="PriceLabel" type="Label" parent="WeaponRows/JntmRow" unique_id=799359493]
+layout_mode = 0
+offset_left = 523.0
+offset_top = 2.0
+offset_right = 645.0
+offset_bottom = 24.0
+theme_override_colors/font_color = Color(1, 0.84, 0, 1)
+theme_override_font_sizes/font_size = 14
+text = "坤币: 0"
+
+[node name="BuyButton" type="Control" parent="WeaponRows/JntmRow" unique_id=1949154039]
+anchors_preset = 0
+offset_left = 510.0
+offset_top = 30.0
+offset_right = 646.0
+offset_bottom = 96.0
+
+[node name="Background" type="TextureRect" parent="WeaponRows/JntmRow/BuyButton" unique_id=832336287]
+layout_mode = 0
+offset_left = 12.0
+offset_top = -3.0
+offset_right = 106.78788
+offset_bottom = 43.0
+mouse_filter = 2
+texture = ExtResource("10_button")
+expand_mode = 1
+
+[node name="Text" type="Label" parent="WeaponRows/JntmRow/BuyButton" unique_id=67255125]
+layout_mode = 0
+offset_left = 12.0
+offset_top = -2.0
+offset_right = 109.840904
+offset_bottom = 39.0
+theme_override_colors/font_color = Color(0.98, 0.92, 0.68, 1)
+theme_override_font_sizes/font_size = 18
+text = "购买"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="OwnedIcon" type="TextureRect" parent="WeaponRows/JntmRow" unique_id=415062140]
+visible = false
+layout_mode = 0
+offset_left = 526.0
+offset_top = 31.0
+offset_right = 558.0
+offset_bottom = 63.0
+mouse_filter = 2
+texture = ExtResource("9_owned")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="OwnedLabel" type="Label" parent="WeaponRows/JntmRow" unique_id=805855828]
+visible = false
+layout_mode = 0
+offset_left = 564.0
+offset_top = 36.0
+offset_right = 635.0
+offset_bottom = 60.0
+theme_override_colors/font_color = Color(0, 0.9, 0.4, 1)
+theme_override_font_sizes/font_size = 16
+text = "已拥有"
+
+[node name="Separator" type="ColorRect" parent="WeaponRows/JntmRow" unique_id=618278696]
+layout_mode = 0
+offset_left = 118.0
+offset_top = 92.0
+offset_right = 753.0
+offset_bottom = 93.0
+color = Color(0.2, 0.2, 0.25, 1)
+
+[node name="ChickenFootRow" type="Control" parent="WeaponRows" unique_id=179048000]
+anchors_preset = 0
+offset_left = 153.0
+offset_top = 279.0
+offset_right = 835.0
+offset_bottom = 373.0
+mouse_filter = 2
+
+[node name="SlotBg" type="TextureRect" parent="WeaponRows/ChickenFootRow" unique_id=360006693]
+modulate = Color(1, 1, 1, 0.72)
+layout_mode = 0
+offset_right = 96.0
+offset_bottom = 96.0
+mouse_filter = 2
+texture = ExtResource("6_slot")
+expand_mode = 1
+
+[node name="WeaponIcon" type="TextureRect" parent="WeaponRows/ChickenFootRow" unique_id=1495262792]
+layout_mode = 0
+offset_left = 11.0
+offset_top = 11.0
+offset_right = 83.0
+offset_bottom = 83.0
+mouse_filter = 2
+texture = ExtResource("8_man")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="NameLabel" type="Label" parent="WeaponRows/ChickenFootRow" unique_id=1918200083]
+layout_mode = 0
+offset_left = 118.0
+offset_top = 14.0
+offset_right = 335.0
+offset_bottom = 42.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 20
+text = "真正的MAN"
+
+[node name="TypeLabel" type="Label" parent="WeaponRows/ChickenFootRow" unique_id=627201851]
+layout_mode = 0
+offset_left = 419.0
+offset_top = 35.0
+offset_right = 490.0
+offset_bottom = 57.0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "[锁定枪械]"
+
+[node name="StatsLabel" type="Label" parent="WeaponRows/ChickenFootRow" unique_id=941084763]
+layout_mode = 0
+offset_left = 118.0
+offset_top = 44.0
+offset_right = 505.0
+offset_bottom = 66.0
+theme_override_colors/font_color = Color(0.6, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 13
+text = "伤害:1  CD:0.3s  狂暴:散弹"
+
+[node name="PriceLabel" type="Label" parent="WeaponRows/ChickenFootRow" unique_id=879478592]
+layout_mode = 0
+offset_left = 529.0
+offset_top = 4.0
+offset_right = 651.0
+offset_bottom = 26.0
+theme_override_colors/font_color = Color(1, 0.84, 0, 1)
+theme_override_font_sizes/font_size = 14
+text = "坤币: 0"
+
+[node name="BuyButton" type="Control" parent="WeaponRows/ChickenFootRow" unique_id=1742250282]
+anchors_preset = 0
+offset_left = 510.0
+offset_top = 30.0
+offset_right = 646.0
+offset_bottom = 96.0
+
+[node name="Background" type="TextureRect" parent="WeaponRows/ChickenFootRow/BuyButton" unique_id=741916198]
+layout_mode = 0
+offset_left = 17.0
+offset_top = 1.0
+offset_right = 105.606064
+offset_bottom = 44.0
+mouse_filter = 2
+texture = ExtResource("10_button")
+expand_mode = 1
+metadata/_edit_group_ = true
+
+[node name="Text" type="Label" parent="WeaponRows/ChickenFootRow/BuyButton" unique_id=1921664239]
+layout_mode = 0
+offset_left = 17.0
+offset_top = 1.0
+offset_right = 95.30303
+offset_bottom = 39.0
+theme_override_colors/font_color = Color(0.98, 0.92, 0.68, 1)
+theme_override_font_sizes/font_size = 18
+text = "购买"
+horizontal_alignment = 1
+vertical_alignment = 1
+metadata/_edit_group_ = true
+
+[node name="OwnedIcon" type="TextureRect" parent="WeaponRows/ChickenFootRow" unique_id=1235169749]
+visible = false
+layout_mode = 0
+offset_left = 526.0
+offset_top = 31.0
+offset_right = 558.0
+offset_bottom = 63.0
+mouse_filter = 2
+texture = ExtResource("9_owned")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="OwnedLabel" type="Label" parent="WeaponRows/ChickenFootRow" unique_id=1021442988]
+visible = false
+layout_mode = 0
+offset_left = 564.0
+offset_top = 36.0
+offset_right = 635.0
+offset_bottom = 60.0
+theme_override_colors/font_color = Color(0, 0.9, 0.4, 1)
+theme_override_font_sizes/font_size = 16
+text = "已拥有"
+
+[node name="Separator" type="ColorRect" parent="WeaponRows/ChickenFootRow" unique_id=1599013322]
+layout_mode = 0
+offset_left = 118.0
+offset_top = 92.0
+offset_right = 753.0
+offset_bottom = 93.0
+color = Color(0.2, 0.2, 0.25, 1)

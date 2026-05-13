@@ -88,7 +88,7 @@ const BOSS_SETTLEMENT_RETURN_TIME := 10.0
 const SYSTEM_HINT_DURATION := 1.8
 
 enum RoomState { INACTIVE, ACTIVE, CLEARED }
-enum RoomKind { START, BATTLE, CHEST, EVENT, BOSS }
+enum RoomKind { START, BATTLE, EVENT, BOSS }
 
 # 网格单元格大小（一个格子 = 房间 + 走廊空间）
 const CELL_W := int(VS.CELL_SIZE.x)
@@ -105,9 +105,8 @@ const CORRIDOR_W := int(VS.CORRIDOR_WIDTH)
 const WALL_T := int(VS.WALL_THICKNESS)
 const DOOR_COLLISION_LAYER := 16
 const MAP_TILE_SIZE := 32.0
-const MAX_RANDOM_CHESTS_PER_ROOM := 4
+const MAX_RANDOM_CHESTS_PER_ROOM := 1
 const ROOM_SNOW_CHANCE := 0.65
-const ROOM_CHEST_GROUP_SPACING := 32.0
 const ROOM_PLANT_DECORATION_MIN := 2
 const ROOM_PLANT_DECORATION_MAX := 4
 const TEMPLATE_PLAY_ROOM_COUNT := 8
@@ -116,9 +115,6 @@ const ROOM_TEMPLATE_BATTLE := [
 	preload("res://scenes/rooms/BattleRoom02.tscn"),
 	preload("res://scenes/rooms/BattleRoom03.tscn"),
 	preload("res://scenes/rooms/BattleRoom04.tscn")
-]
-const ROOM_TEMPLATE_CHEST := [
-	preload("res://scenes/rooms/ChestRoom01.tscn")
 ]
 const ROOM_TEMPLATE_EVENT := [
 	preload("res://scenes/rooms/EventRoom01.tscn"),
@@ -469,22 +465,27 @@ func _assign_room_templates(play_rooms: Array[Vector2i]) -> void:
 
 	var battle_templates := ROOM_TEMPLATE_BATTLE.duplicate()
 	battle_templates.shuffle()
-	for i in range(mini(4, remaining.size())):
-		var room: RoomData = _rooms[remaining[i]]
+	var adjacent_rooms := remaining.filter(func(pos: Vector2i) -> bool: return _is_cardinal_neighbor(pos, CENTER))
+	var distant_rooms := remaining.filter(func(pos: Vector2i) -> bool: return pos not in adjacent_rooms)
+	var battle_rooms: Array[Vector2i] = []
+	battle_rooms.append_array(adjacent_rooms)
+	var target_battle_count := maxi(4, battle_rooms.size())
+	for pos in distant_rooms:
+		if battle_rooms.size() >= target_battle_count:
+			break
+		battle_rooms.append(pos)
+	for i in battle_rooms.size():
+		var room: RoomData = _rooms[battle_rooms[i]]
 		room.kind = RoomKind.BATTLE
 		room.template_scene = battle_templates[i % battle_templates.size()]
 
-	if remaining.size() > 4:
-		var chest_room: RoomData = _rooms[remaining[4]]
-		chest_room.kind = RoomKind.CHEST
-		chest_room.template_scene = ROOM_TEMPLATE_CHEST[0]
-
 	var event_templates := ROOM_TEMPLATE_EVENT.duplicate()
 	event_templates.shuffle()
-	for i in range(5, remaining.size()):
-		var event_room: RoomData = _rooms[remaining[i]]
+	var event_rooms := remaining.filter(func(pos: Vector2i) -> bool: return pos not in battle_rooms)
+	for i in event_rooms.size():
+		var event_room: RoomData = _rooms[event_rooms[i]]
 		event_room.kind = RoomKind.EVENT
-		event_room.template_scene = event_templates[(i - 5) % event_templates.size()]
+		event_room.template_scene = event_templates[i % event_templates.size()]
 
 
 func _random_edge_room() -> Vector2i:
@@ -710,16 +711,6 @@ func _on_player_entered_room(pos: Vector2i) -> void:
 		room.state = RoomState.CLEARED
 		_rooms_cleared += 1
 		_spawn_start_supply_chest(pos)
-		queue_redraw()
-		if _minimap:
-			_minimap.queue_redraw()
-		return
-
-	if room.kind == RoomKind.CHEST:
-		room.state = RoomState.CLEARED
-		_rooms_cleared += 1
-		_spawn_template_chests(pos, false)
-		_show_system_hint("宝箱房已发现", Color(1.0, 0.84, 0.18))
 		queue_redraw()
 		if _minimap:
 			_minimap.queue_redraw()
@@ -1029,25 +1020,10 @@ func _spawn_weapon_chest(room_pos: Vector2i) -> void:
 
 
 func _spawn_start_supply_chest(room_pos: Vector2i) -> void:
-	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
-	var chest: Area2D = chest_scene.instantiate()
 	var cx: float = room_pos.x * CELL_W + CELL_W / 2.0
 	var cy: float = room_pos.y * CELL_H + CELL_H / 2.0
-	chest.position = Vector2(cx, cy)
-	chest.is_start_supply = true
-	add_child(chest)
+	_spawn_supply_chest_at(Vector2(cx, cy))
 	_show_message_hint("起始补给已出现", Color(1.0, 0.84, 0.0))
-
-
-func _spawn_template_chests(room_pos: Vector2i, weapon_choice: bool) -> void:
-	if room_pos not in _rooms:
-		return
-	var room: RoomData = _rooms[room_pos]
-	var markers := _get_template_marker_global_positions(room, "ChestSpawn")
-	if markers.is_empty():
-		markers.append(Vector2(room_pos.x * CELL_W + CELL_W / 2.0, room_pos.y * CELL_H + CELL_H / 2.0))
-	for pos in markers:
-		_spawn_template_chest_at(pos, weapon_choice)
 
 
 func _spawn_template_event_reward(room_pos: Vector2i) -> void:
@@ -1059,14 +1035,14 @@ func _spawn_template_event_reward(room_pos: Vector2i) -> void:
 		markers = _get_template_marker_global_positions(room, "ChestSpawn")
 	if markers.is_empty():
 		markers.append(Vector2(room_pos.x * CELL_W + CELL_W / 2.0, room_pos.y * CELL_H + CELL_H / 2.0))
-	_spawn_template_chest_at(markers[0], true)
+	_spawn_supply_chest_at(markers[0])
 
 
-func _spawn_template_chest_at(pos: Vector2, weapon_choice: bool) -> void:
+func _spawn_supply_chest_at(pos: Vector2) -> void:
 	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
 	var chest: Area2D = chest_scene.instantiate()
 	chest.position = pos
-	chest.is_weapon_choice = weapon_choice
+	chest.is_start_supply = true
 	add_child(chest)
 
 
@@ -1217,62 +1193,18 @@ func _spawn_room_objects(grid_pos: Vector2i) -> void:
 
 	var objects: Array[Node] = []
 
-	var chest_positions := _random_room_chest_group_positions(rx, ry, rw, rh, center, occupied)
+	var chest_pos := _random_room_pos(rx, ry, rw, rh, center, 92.0, occupied, 40.0)
+	if chest_pos == Vector2.ZERO:
+		_room_objects[grid_pos] = objects
+		return
 	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
-	for pos in chest_positions:
-		var chest: Area2D = chest_scene.instantiate()
-		chest.position = pos
-		add_child(chest)
-		_random_chest_spawns_by_room[grid_pos] = int(_random_chest_spawns_by_room.get(grid_pos, 0)) + 1
-		objects.append(chest)
-		occupied.append(pos)
+	var chest: Area2D = chest_scene.instantiate()
+	chest.position = chest_pos
+	add_child(chest)
+	_random_chest_spawns_by_room[grid_pos] = int(_random_chest_spawns_by_room.get(grid_pos, 0)) + 1
+	objects.append(chest)
 
 	_room_objects[grid_pos] = objects
-
-
-func _random_room_chest_group_positions(rx: float, ry: float, rw: float, rh: float,
-		center: Vector2, occupied: Array[Vector2]) -> Array[Vector2]:
-	var shapes := [
-		[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)],
-		[Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)],
-		[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1)],
-		[Vector2i(0, 0), Vector2i(-1, 0), Vector2i(0, 1)],
-		[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, -1)],
-		[Vector2i(0, 0), Vector2i(-1, 0), Vector2i(0, -1)],
-		[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)],
-	]
-	for _attempt in 36:
-		var offsets: Array = shapes[randi() % shapes.size()]
-		var base := _random_room_pos(rx, ry, rw, rh, center, 92.0, occupied, ROOM_CHEST_GROUP_SPACING)
-		if base == Vector2.ZERO:
-			continue
-		var positions: Array[Vector2] = []
-		var valid := true
-		for offset in offsets:
-			var offset_vec := Vector2(float(offset.x), float(offset.y))
-			var pos := base + offset_vec * ROOM_CHEST_GROUP_SPACING
-			if not _is_room_chest_group_pos_valid(pos, rx, ry, rw, rh, center, occupied):
-				valid = false
-				break
-			positions.append(pos)
-		if valid:
-			return positions
-	return []
-
-
-func _is_room_chest_group_pos_valid(pos: Vector2, rx: float, ry: float, rw: float, rh: float,
-		center: Vector2, occupied: Array[Vector2]) -> bool:
-	if pos.x < rx or pos.x > rx + rw or pos.y < ry or pos.y > ry + rh:
-		return false
-	if pos.distance_to(center) < 92.0:
-		return false
-	var local := Vector2(pos.x - (rx - WALL_T - 20.0), pos.y - (ry - WALL_T - 20.0))
-	if _is_near_room_door_local(local, 74.0, 66.0):
-		return false
-	for other in occupied:
-		if pos.distance_to(other) < ROOM_CHEST_GROUP_SPACING:
-			return false
-	return true
 
 
 func _random_room_pos(rx: float, ry: float, rw: float, rh: float,
@@ -2834,8 +2766,6 @@ func _draw_minimap(ctrl: Control) -> void:
 			fill = Color(0.20, 0.58, 0.42)
 		elif room.is_boss:
 			fill = Color(0.78, 0.18, 0.30)
-		elif room.kind == RoomKind.CHEST:
-			fill = Color(0.92, 0.68, 0.20)
 		elif room.kind == RoomKind.EVENT:
 			fill = Color(0.20, 0.56, 0.78)
 		elif room.state == RoomState.CLEARED:

@@ -2,6 +2,7 @@
 
 [ext_resource type="Texture2D" uid="uid://bckbwhv0wc551" path="res://assets/export/decoration/冰原墙壁.png" id="1"]
 [ext_resource type="Texture2D" uid="uid://275uevqrilar" path="res://assets/export/decoration/冰原箱子.png" id="2"]
+
 [sub_resource type="RectangleShape2D" id="1"]
 size = Vector2(46, 58)
 
@@ -16,6 +17,7 @@ metadata/room_kind = "battle"
 [node name="IceWallLeft" type="StaticBody2D" parent="Obstacles" unique_id=628415635]
 position = Vector2(230, 132)
 rotation = 1.5707964
+scale = Vector2(0.5, 0.5)
 collision_layer = 16
 collision_mask = 0
 
@@ -31,6 +33,7 @@ shape = SubResource("1")
 [node name="IceWallRight" type="StaticBody2D" parent="Obstacles" unique_id=676131745]
 position = Vector2(470, 272)
 rotation = 1.5707964
+scale = Vector2(0.5, 0.5)
 collision_layer = 16
 collision_mask = 0
 
@@ -46,6 +49,7 @@ shape = SubResource("1")
 [node name="IceWallRight" type="StaticBody2D" parent="Obstacles/IceWallRight" unique_id=1836459821]
 position = Vector2(470, 272)
 rotation = 1.5707964
+scale = Vector2(0.5, 0.5)
 collision_layer = 16
 collision_mask = 0
 
@@ -60,6 +64,7 @@ shape = SubResource("1")
 
 [node name="IceCrateA" type="StaticBody2D" parent="Obstacles" unique_id=1983850763]
 position = Vector2(302, 250)
+scale = Vector2(0.5, 0.5)
 collision_layer = 16
 collision_mask = 0
 
@@ -72,6 +77,7 @@ shape = SubResource("2")
 
 [node name="IceCrateB" type="StaticBody2D" parent="Obstacles" unique_id=9952303]
 position = Vector2(398, 150)
+scale = Vector2(0.5, 0.5)
 collision_layer = 16
 collision_mask = 0
 

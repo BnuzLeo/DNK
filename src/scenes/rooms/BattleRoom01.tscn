@@ -1,67 +1,73 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://bcfoa6fts6rc"]
 
-[ext_resource type="Texture2D" path="res://assets/export/decoration/冰原墙壁.png" id="1"]
-[ext_resource type="Texture2D" path="res://assets/export/decoration/冰原箱子.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://bckbwhv0wc551" path="res://assets/export/decoration/冰原墙壁.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://275uevqrilar" path="res://assets/export/decoration/冰原箱子.png" id="2"]
 
 [sub_resource type="RectangleShape2D" id="1"]
-size = Vector2(46, 58)
+size = Vector2(24, 24)
 
 [sub_resource type="RectangleShape2D" id="2"]
-size = Vector2(40, 48)
+size = Vector2(24.5, 27)
 
-[node name="BattleRoom01" type="Node2D"]
+[node name="BattleRoom01" type="Node2D" unique_id=1197537293]
 metadata/room_kind = "battle"
 
-[node name="Obstacles" type="Node2D" parent="."]
+[node name="Obstacles" type="Node2D" parent="." unique_id=193052710]
 
-[node name="IceWallA" type="StaticBody2D" parent="Obstacles"]
-position = Vector2(252, 164)
+[node name="IceWallA" type="StaticBody2D" parent="Obstacles" unique_id=1474488566]
+position = Vector2(264, 164)
 collision_layer = 16
 collision_mask = 0
 
-[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallA"]
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallA" unique_id=1800948780]
+position = Vector2(-11.000001, -16.999992)
+scale = Vector2(0.88947403, 0.6312503)
 texture = ExtResource("1")
-scale = Vector2(2.2, 2.2)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallA"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallA" unique_id=398505330]
+position = Vector2(-11, -17)
 shape = SubResource("1")
 
-[node name="IceWallB" type="StaticBody2D" parent="Obstacles"]
+[node name="IceWallB" type="StaticBody2D" parent="Obstacles" unique_id=571068874]
 position = Vector2(448, 236)
 collision_layer = 16
 collision_mask = 0
 
-[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallB"]
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallB" unique_id=411398425]
+position = Vector2(1.7750034, 2.598046)
+scale = Vector2(0.9710517, 0.8439062)
 texture = ExtResource("1")
-scale = Vector2(2.2, 2.2)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallB"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallB" unique_id=1511724929]
+position = Vector2(1, 2)
 shape = SubResource("1")
 
-[node name="IceCrateA" type="StaticBody2D" parent="Obstacles"]
+[node name="IceCrateA" type="StaticBody2D" parent="Obstacles" unique_id=1156441611]
 position = Vector2(350, 198)
 collision_layer = 16
 collision_mask = 0
 
-[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceCrateA"]
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceCrateA" unique_id=1584347784]
+position = Vector2(-1.7500155, -0.6666851)
+scale = Vector2(0.92857003, 0.92857003)
 texture = ExtResource("2")
-scale = Vector2(2, 2)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceCrateA"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceCrateA" unique_id=549103008]
+position = Vector2(-1.25, -1.5)
 shape = SubResource("2")
 
-[node name="Decorations" type="Node2D" parent="."]
+[node name="Decorations" type="Node2D" parent="." unique_id=202447532]
 
-[node name="EnemySpawns" type="Node2D" parent="."]
+[node name="EnemySpawns" type="Node2D" parent="." unique_id=744608743]
 
-[node name="EnemySpawn01" type="Marker2D" parent="EnemySpawns"]
+[node name="EnemySpawn01" type="Marker2D" parent="EnemySpawns" unique_id=1395776397]
 position = Vector2(188, 116)
 
-[node name="EnemySpawn02" type="Marker2D" parent="EnemySpawns"]
+[node name="EnemySpawn02" type="Marker2D" parent="EnemySpawns" unique_id=215450850]
 position = Vector2(518, 120)
 
-[node name="EnemySpawn03" type="Marker2D" parent="EnemySpawns"]
+[node name="EnemySpawn03" type="Marker2D" parent="EnemySpawns" unique_id=238240146]
 position = Vector2(210, 302)
 
-[node name="EnemySpawn04" type="Marker2D" parent="EnemySpawns"]
+[node name="EnemySpawn04" type="Marker2D" parent="EnemySpawns" unique_id=1963366581]
 position = Vector2(516, 300)

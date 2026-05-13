@@ -8,7 +8,11 @@ const EQUIPMENT_PANEL_SCENE := preload("res://scenes/ui/EquipmentPanel.tscn")
 const EQUIP_SLOT_TEXTURE := preload("res://assets/export/gui/ui_popup_slot.png")
 const EQUIP_SLOT_SELECTED_TEXTURE := preload("res://assets/export/gui/ui_popup_slot_selected.png")
 const EQUIP_LOCK_TEXTURE := preload("res://assets/export/gui/ui_badge_locked.png")
-const EQUIP_ICON_TEXTURE := preload("res://assets/export/gui/icon_equip.png")
+const WEAPON_ICON_PATHS := {
+	"jntm": "res://assets/export/weapon/weapon_03/飞熊军激光炮.png",
+	"chicken_foot": "res://assets/export/weapon/weapon_02/瓦克恩冲锋枪.png",
+	"basketball": "res://assets/export/weapon/weapon_01/普通模式.png",
+}
 
 var _canvas: CanvasLayer
 var _player: Node
@@ -20,6 +24,7 @@ var _drag_weapon_key := ""
 var _drag_start_pos := Vector2.ZERO
 var _drag_current_pos := Vector2.ZERO
 var _drag_active := false
+var _weapon_icon_cache: Dictionary = {}
 
 # 解锁确认对话框
 var _confirm_open := false
@@ -128,25 +133,14 @@ func _draw_equipped_slots() -> void:
 			var border_color := Color(0.3, 0.9, 0.5) if is_selected else Color(0.3, 0.5, 0.7)
 			ctrl.draw_texture_rect(EQUIP_SLOT_SELECTED_TEXTURE if is_selected else EQUIP_SLOT_TEXTURE, rect, false)
 			ctrl.draw_rect(rect, border_color, false, 2.0 if is_selected else 1.0)
-			ctrl.draw_texture_rect(EQUIP_ICON_TEXTURE, Rect2(rect.position + Vector2(8, 8), Vector2(24, 24)), false, Color(1, 1, 1, 0.85))
+			_draw_weapon_icon(ctrl, key, Rect2(rect.position + Vector2((SLOT_W - 36.0) * 0.5, 5.0), Vector2(36.0, 36.0)))
 			# 武器名
 			var name_size := ThemeDB.fallback_font.get_string_size(weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15)
-			ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - name_size.x) / 2, base_y + 30), weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.9, 0.9, 0.9))
+			ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - name_size.x) / 2, base_y + 48), weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.9, 0.9, 0.9))
 			# 伤害
 			var dmg_text := "伤害:%d" % (weapon.damage + _player.damage_bonus)
 			var dmg_size := ThemeDB.fallback_font.get_string_size(dmg_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
-			ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - dmg_size.x) / 2, base_y + 50), dmg_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.6, 0.7, 0.8))
-			# 类型
-			var type_text := ""
-			match weapon.type:
-				"basketball": type_text = "投射"
-				"room_blast": type_text = "全屏"
-				"rooster": type_text = "追击"
-				"man_gun": type_text = "锁定枪械"
-				"laser_gun": type_text = "持续激光"
-				_: type_text = "武器"
-			var ts_size := ThemeDB.fallback_font.get_string_size(type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11)
-			ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - ts_size.x) / 2, base_y + 66), type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.5, 0.5, 0.5))
+			ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - dmg_size.x) / 2, base_y + 65), dmg_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.6, 0.7, 0.8))
 			# 槽位编号
 			ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + 4, base_y + 14), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.4, 0.4, 0.4))
 		else:
@@ -184,27 +178,16 @@ func _draw_backpack() -> void:
 
 		ctrl.draw_texture_rect(EQUIP_SLOT_SELECTED_TEXTURE if is_dragging_this else EQUIP_SLOT_TEXTURE, rect, false)
 		ctrl.draw_rect(rect, Color(0.6, 0.5, 0.85) if is_dragging_this else Color(0.4, 0.3, 0.6), false, 2.0 if is_dragging_this else 1.0)
+		_draw_weapon_icon(ctrl, key, Rect2(rect.position + Vector2((SLOT_W - 36.0) * 0.5, 5.0), Vector2(36.0, 36.0)))
 
 		# 武器名
 		var name_size := ThemeDB.fallback_font.get_string_size(weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15)
-		ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - name_size.x) / 2, base_y + 30), weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.9, 0.9, 0.9))
+		ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - name_size.x) / 2, base_y + 48), weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.9, 0.9, 0.9))
 
 		# 伤害
 		var dmg_text := "伤害:%d" % (weapon.damage + _player.damage_bonus)
 		var dmg_size := ThemeDB.fallback_font.get_string_size(dmg_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
-		ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - dmg_size.x) / 2, base_y + 50), dmg_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.6, 0.7, 0.8))
-
-		# 类型
-		var type_text := ""
-		match weapon.type:
-			"basketball": type_text = "投射"
-			"room_blast": type_text = "全屏"
-			"rooster": type_text = "追击"
-			"man_gun": type_text = "锁定枪械"
-			"laser_gun": type_text = "持续激光"
-			_: type_text = "武器"
-		var ts_size := ThemeDB.fallback_font.get_string_size(type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11)
-		ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - ts_size.x) / 2, base_y + 66), type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.5, 0.5, 0.5))
+		ctrl.draw_string(ThemeDB.fallback_font, Vector2(x + (SLOT_W - dmg_size.x) / 2, base_y + 65), dmg_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.6, 0.7, 0.8))
 
 
 func _draw_drag_preview() -> void:
@@ -216,8 +199,26 @@ func _draw_drag_preview() -> void:
 	var rect := Rect2(_drag_current_pos - Vector2(SLOT_W, SLOT_H) * 0.5, Vector2(SLOT_W, SLOT_H))
 	_drag_draw.draw_texture_rect(EQUIP_SLOT_SELECTED_TEXTURE, rect, false, Color(1, 1, 1, 0.9))
 	_drag_draw.draw_rect(rect, Color(0.95, 0.8, 0.25), false, 2.0)
+	_draw_weapon_icon(_drag_draw, _drag_weapon_key, Rect2(rect.position + Vector2((SLOT_W - 40.0) * 0.5, 8.0), Vector2(40.0, 40.0)))
 	var name_size := ThemeDB.fallback_font.get_string_size(weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15)
-	_drag_draw.draw_string(ThemeDB.fallback_font, Vector2(rect.position.x + (SLOT_W - name_size.x) / 2, rect.position.y + 34), weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.95, 0.95, 0.95))
+	_drag_draw.draw_string(ThemeDB.fallback_font, Vector2(rect.position.x + (SLOT_W - name_size.x) / 2, rect.position.y + 58), weapon.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.95, 0.95, 0.95))
+
+
+func _draw_weapon_icon(ctrl: Control, key: String, rect: Rect2) -> void:
+	var texture := _get_weapon_icon(key)
+	if texture == null:
+		return
+	ctrl.draw_texture_rect(texture, rect, false)
+
+
+func _get_weapon_icon(key: String) -> Texture2D:
+	if not WEAPON_ICON_PATHS.has(key):
+		return null
+	if _weapon_icon_cache.has(key):
+		return _weapon_icon_cache[key]
+	var texture := load(String(WEAPON_ICON_PATHS[key])) as Texture2D
+	_weapon_icon_cache[key] = texture
+	return texture
 
 
 func _on_panel_input(event: InputEvent) -> void:

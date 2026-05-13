@@ -1,7 +1,7 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://bwic5i5u2s3qp"]
 
-[ext_resource type="Texture2D" path="res://assets/export/decoration/冰原墙壁.png" id="1"]
-[ext_resource type="Texture2D" path="res://assets/export/decoration/冰原箱子.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://bckbwhv0wc551" path="res://assets/export/decoration/冰原墙壁.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://275uevqrilar" path="res://assets/export/decoration/冰原箱子.png" id="2"]
 
 [sub_resource type="RectangleShape2D" id="1"]
 size = Vector2(46, 58)
@@ -9,74 +9,78 @@ size = Vector2(46, 58)
 [sub_resource type="RectangleShape2D" id="2"]
 size = Vector2(40, 48)
 
-[node name="BattleRoom02" type="Node2D"]
+[node name="BattleRoom02" type="Node2D" unique_id=213281882]
 metadata/room_kind = "battle"
 
-[node name="Obstacles" type="Node2D" parent="."]
+[node name="Obstacles" type="Node2D" parent="." unique_id=535930181]
 
-[node name="IceWallNorth" type="StaticBody2D" parent="Obstacles"]
+[node name="IceWallNorth" type="StaticBody2D" parent="Obstacles" unique_id=1425149438]
 position = Vector2(350, 112)
+scale = Vector2(0.5, 0.5)
 collision_layer = 16
 collision_mask = 0
 
-[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallNorth"]
-texture = ExtResource("1")
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallNorth" unique_id=956145688]
 scale = Vector2(2.3, 2.3)
+texture = ExtResource("1")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallNorth"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallNorth" unique_id=1491744890]
 shape = SubResource("1")
 
-[node name="IceWallSouth" type="StaticBody2D" parent="Obstacles"]
+[node name="IceWallSouth" type="StaticBody2D" parent="Obstacles" unique_id=93665417]
 position = Vector2(350, 292)
+scale = Vector2(0.5, 0.5)
 collision_layer = 16
 collision_mask = 0
 
-[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallSouth"]
-texture = ExtResource("1")
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceWallSouth" unique_id=1739197967]
 scale = Vector2(2.3, 2.3)
+texture = ExtResource("1")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallSouth"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceWallSouth" unique_id=653901203]
 shape = SubResource("1")
 
-[node name="IceCrateLeft" type="StaticBody2D" parent="Obstacles"]
+[node name="IceCrateLeft" type="StaticBody2D" parent="Obstacles" unique_id=2003439520]
 position = Vector2(208, 204)
+scale = Vector2(0.5, 0.5)
 collision_layer = 16
 collision_mask = 0
 
-[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceCrateLeft"]
-texture = ExtResource("2")
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceCrateLeft" unique_id=903050326]
 scale = Vector2(2, 2)
+texture = ExtResource("2")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceCrateLeft"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceCrateLeft" unique_id=1110859599]
 shape = SubResource("2")
 
-[node name="IceCrateRight" type="StaticBody2D" parent="Obstacles"]
+[node name="IceCrateRight" type="StaticBody2D" parent="Obstacles" unique_id=233484081]
 position = Vector2(492, 204)
+scale = Vector2(0.5, 0.5)
 collision_layer = 16
 collision_mask = 0
 
-[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceCrateRight"]
-texture = ExtResource("2")
+[node name="Sprite2D" type="Sprite2D" parent="Obstacles/IceCrateRight" unique_id=2079546435]
 scale = Vector2(2, 2)
+texture = ExtResource("2")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceCrateRight"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Obstacles/IceCrateRight" unique_id=2114829992]
 shape = SubResource("2")
 
-[node name="Decorations" type="Node2D" parent="."]
+[node name="Decorations" type="Node2D" parent="." unique_id=1698003923]
 
-[node name="EnemySpawns" type="Node2D" parent="."]
+[node name="EnemySpawns" type="Node2D" parent="." unique_id=180982531]
 
-[node name="EnemySpawn01" type="Marker2D" parent="EnemySpawns"]
+[node name="EnemySpawn01" type="Marker2D" parent="EnemySpawns" unique_id=598699097]
 position = Vector2(168, 112)
 
-[node name="EnemySpawn02" type="Marker2D" parent="EnemySpawns"]
+[node name="EnemySpawn02" type="Marker2D" parent="EnemySpawns" unique_id=1444930850]
 position = Vector2(532, 112)
 
-[node name="EnemySpawn03" type="Marker2D" parent="EnemySpawns"]
+[node name="EnemySpawn03" type="Marker2D" parent="EnemySpawns" unique_id=1653772872]
 position = Vector2(168, 296)
 
-[node name="EnemySpawn04" type="Marker2D" parent="EnemySpawns"]
+[node name="EnemySpawn04" type="Marker2D" parent="EnemySpawns" unique_id=1776807305]
 position = Vector2(532, 296)
 
-[node name="EnemySpawn05" type="Marker2D" parent="EnemySpawns"]
+[node name="EnemySpawn05" type="Marker2D" parent="EnemySpawns" unique_id=450424769]
 position = Vector2(350, 204)

@@ -6,6 +6,7 @@ signal state_changed(old_state: GameState, new_state: GameState)
 signal message_added(text: String, color: Color)
 
 const LOBBY_TEST_WEAPONS := ["basketball", "jntm", "chicken_foot"]
+const INITIAL_PRACTICE_TIME := 1000
 
 var _state: GameState = GameState.MAIN_MENU
 var state: GameState:
@@ -15,7 +16,7 @@ var total_kills: int = 0
 var revive_coins: int = 1
 
 # ── 经济系统 ──
-var practice_time: int = 0
+var practice_time: int = INITIAL_PRACTICE_TIME
 var kun_coins: int = 100
 var message_log: Array[Dictionary] = []
 
@@ -83,7 +84,7 @@ func change_state(new_state: GameState) -> void:
 func restart_game() -> void:
 	total_kills = 0
 	revive_coins = 1
-	practice_time = 0
+	practice_time = INITIAL_PRACTICE_TIME
 	kun_coins = 0
 	message_log.clear()
 	player_data = {
