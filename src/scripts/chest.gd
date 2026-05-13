@@ -1,6 +1,6 @@
 extends Area2D
 
-## 宝箱 — 普通宝箱被攻击打破后掉落药水；补给/武器宝箱保留交互逻辑
+## 宝箱 — 所有宝箱都需要靠近后按 E 打开
 ## is_weapon_choice = true 时为起始房间的 3 选 1 武器宝箱
 
 const VS := preload("res://scripts/visual_spec.gd")
@@ -27,8 +27,9 @@ const GOLD_CHEST_FRAME_TIME := 0.12
 const NORMAL_CHEST_FRAME_DIRS := [
 	"res://assets/export/decoration/brown_chest_idle_frames",
 	"res://assets/export/decoration/blue_chest_idle_frames",
+	"res://assets/export/decoration/white_chest_idle_frames",
 ]
-const NORMAL_CHEST_DISPLAY_SIZE := 50.0
+const NORMAL_CHEST_DISPLAY_SIZE := 32.0
 const NORMAL_CHEST_FRAME_TIME := 0.08
 const NORMAL_CHEST_MAX_HP := 6
 
@@ -61,12 +62,11 @@ func _ready() -> void:
 	add_to_group("chest")
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
+	set_process_input(true)
 	if is_start_supply:
 		_load_gold_chest_frames()
 		_configure_start_supply_collision()
-		set_process_input(true)
 	elif not is_weapon_choice:
-		collision_layer = 34  # ENEMY + PICKUP，允许玩家子弹击中普通宝箱
 		_load_random_normal_chest_frames()
 		_pick_reward()
 	_bounce_timer = randf() * TAU
@@ -109,7 +109,7 @@ func is_solid_actor() -> bool:
 
 
 func get_separation_radius() -> float:
-	return 30.0 if is_start_supply else 18.0
+	return 30.0 if is_start_supply else 16.0
 
 
 func _physics_process(delta: float) -> void:
@@ -132,17 +132,7 @@ func _on_body_entered(body: Node2D) -> void:
 		return
 	if not body.is_in_group("player"):
 		return
-	if is_start_supply:
-		_near_player = body
-		return
-	if not is_weapon_choice:
-		return
-	_opened = true
-
-	if is_weapon_choice:
-		_show_weapon_choice(body)
-	else:
-		_give_reward(body)
+	_near_player = body
 
 
 func _on_body_exited(body: Node2D) -> void:
@@ -151,27 +141,50 @@ func _on_body_exited(body: Node2D) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not is_start_supply or _opened:
+	if _opened:
 		return
 	if _near_player == null or not is_instance_valid(_near_player):
 		return
 	if GameManager.state != GameManager.GameState.PLAYING:
 		return
 	if event.is_action_pressed("interact"):
+		if not _is_nearest_interactable_chest(_near_player):
+			return
 		_opened = true
 		get_viewport().set_input_as_handled()
-		_give_start_supply(_near_player)
+		if is_start_supply:
+			_give_start_supply(_near_player)
+		elif is_weapon_choice:
+			_show_weapon_choice(_near_player)
+		else:
+			_give_reward(_near_player)
 
 
-func take_damage(amount: int) -> void:
-	if _opened or _dying or is_start_supply or is_weapon_choice or amount <= 0:
-		return
-	hp -= amount
-	modulate = Color(3.0, 3.0, 3.0, 1.0)
-	var tween := create_tween()
-	tween.tween_property(self, "modulate", Color.WHITE, 0.08)
-	if hp <= 0:
-		_break_open()
+func _is_nearest_interactable_chest(player: Node) -> bool:
+	var player_node := player as Node2D
+	if player_node == null:
+		return false
+	var my_distance := global_position.distance_to(player_node.global_position)
+	for node in get_tree().get_nodes_in_group("chest"):
+		if node == self or not is_instance_valid(node):
+			continue
+		var chest := node as Area2D
+		if chest == null:
+			continue
+		if bool(chest.get("_opened")):
+			continue
+		if chest.get("_near_player") != player:
+			continue
+		var other_distance := chest.global_position.distance_to(player_node.global_position)
+		if other_distance + 0.5 < my_distance:
+			return false
+		if absf(other_distance - my_distance) <= 0.5 and chest.get_instance_id() < get_instance_id():
+			return false
+	return true
+
+
+func take_damage(_amount: int) -> void:
+	return
 
 
 func _break_open() -> void:
@@ -208,10 +221,7 @@ func _give_reward(player: Node) -> void:
 	GameAudio.play_box_destroy()
 	if _reward_type == "potion":
 		_spawn_potion_drop()
-		opened.emit(_reward_type, _reward_key)
-		_spawn_label()
-		return
-	if _reward_type == "weapon":
+	elif _reward_type == "weapon":
 		player.add_weapon(_reward_key)
 	else:
 		GameAudio.play_energy()
@@ -569,6 +579,8 @@ func _draw() -> void:
 		var texture := _normal_chest_frames[_normal_frame_index]
 		var size := Vector2(NORMAL_CHEST_DISPLAY_SIZE, NORMAL_CHEST_DISPLAY_SIZE)
 		draw_texture_rect(texture, Rect2(base - size * 0.5, size), false)
+		if not _opened and _near_player != null and is_instance_valid(_near_player):
+			draw_string(ThemeDB.fallback_font, Vector2(-34, -NORMAL_CHEST_DISPLAY_SIZE * 0.5 - 12), "按 E 打开", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1.0, 1.0, 0.6))
 		return
 	var col_body := Color(0.2, 0.55, 0.7) if is_weapon_choice else Color(0.55, 0.35, 0.1)
 	var col_lid := Color(0.25, 0.7, 0.9) if is_weapon_choice else Color(0.7, 0.45, 0.15)
@@ -582,3 +594,5 @@ func _draw() -> void:
 	draw_rect(Rect2(base + Vector2(-size * 0.12, -size * 0.3), Vector2(size * 0.24, size * 0.16)), col_lock)
 	# 高光
 	draw_rect(Rect2(base + Vector2(-size * 0.34, -size * 0.12), Vector2(size * 0.08, size * 0.32)), col_lid.lightened(0.3).darkened(0.2))
+	if not _opened and _near_player != null and is_instance_valid(_near_player):
+		draw_string(ThemeDB.fallback_font, Vector2(-34, -size * 0.5 - 12), "按 E 打开", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1.0, 1.0, 0.6))

@@ -51,6 +51,15 @@ const ICE_WALL_TILES := [
 	preload("res://assets/export/map/冰封篮球场/墙壁_01.png"),
 	preload("res://assets/export/map/冰封篮球场/墙壁_02.png")
 ]
+const ROOM_SNOW_PARTICLE_TEXTURE := preload("res://assets/export/enemies/boss/environment/phase1_snow_particle.png")
+const PLANT_DECORATION_TEXTURES := [
+	preload("res://assets/export/decoration/天山雪莲.png"),
+	preload("res://assets/export/decoration/宝石花.png"),
+	preload("res://assets/export/decoration/水晶兰.png"),
+	preload("res://assets/export/decoration/萝卜.png"),
+	preload("res://assets/export/decoration/蓝藻花.png"),
+	preload("res://assets/export/decoration/镜面花.png")
+]
 const STATUS_POS := Vector2(18.0, 16.0)
 const STATUS_PANEL_SIZE := Vector2(190.0, 99.0)
 const STATUS_BAR_POS_X := 42.0
@@ -96,7 +105,11 @@ const CORRIDOR_W := int(VS.CORRIDOR_WIDTH)
 const WALL_T := int(VS.WALL_THICKNESS)
 const DOOR_COLLISION_LAYER := 16
 const MAP_TILE_SIZE := 32.0
-const MAX_RANDOM_CHESTS_PER_ROOM := 2
+const MAX_RANDOM_CHESTS_PER_ROOM := 4
+const ROOM_SNOW_CHANCE := 0.65
+const ROOM_CHEST_GROUP_SPACING := 32.0
+const ROOM_PLANT_DECORATION_MIN := 2
+const ROOM_PLANT_DECORATION_MAX := 4
 const TEMPLATE_PLAY_ROOM_COUNT := 8
 const ROOM_TEMPLATE_BATTLE := [
 	preload("res://scenes/rooms/BattleRoom01.tscn"),
@@ -130,6 +143,71 @@ class RoomData:
 	var template_scene: PackedScene = null
 	var template_instance: Node2D = null
 
+
+class RoomSnowFallEffect:
+	extends Node2D
+
+	var texture: Texture2D = null
+	var bounds := Rect2()
+	var flakes: Array[Dictionary] = []
+	var lifetime := 5.0
+	var age := 0.0
+	var fade_time := 0.8
+
+	func setup(p_texture: Texture2D, p_bounds: Rect2, p_seed: int) -> void:
+		texture = p_texture
+		bounds = p_bounds
+		z_index = 85
+		var rng := RandomNumberGenerator.new()
+		rng.seed = p_seed
+		lifetime = rng.randf_range(4.2, 6.2)
+		var count := rng.randi_range(28, 44)
+		for i in count:
+			var size := rng.randf_range(8.0, 18.0)
+			flakes.append({
+				"pos": Vector2(rng.randf_range(bounds.position.x, bounds.end.x), rng.randf_range(bounds.position.y - 40.0, bounds.end.y)),
+				"speed": rng.randf_range(24.0, 58.0),
+				"size": size,
+				"alpha": rng.randf_range(0.28, 0.72),
+				"sway": rng.randf_range(6.0, 18.0),
+				"sway_speed": rng.randf_range(1.3, 2.8),
+				"phase": rng.randf_range(0.0, TAU),
+			})
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		age += delta
+		if age >= lifetime:
+			queue_free()
+			return
+		for i in flakes.size():
+			var flake := flakes[i]
+			var pos: Vector2 = flake["pos"]
+			pos.y += float(flake["speed"]) * delta
+			pos.x += sin(age * float(flake["sway_speed"]) + float(flake["phase"])) * float(flake["sway"]) * delta
+			if pos.y > bounds.end.y + 20.0:
+				pos.y = bounds.position.y - 20.0
+			if pos.x < bounds.position.x - 20.0:
+				pos.x = bounds.end.x + 20.0
+			elif pos.x > bounds.end.x + 20.0:
+				pos.x = bounds.position.x - 20.0
+			flake["pos"] = pos
+			flakes[i] = flake
+		queue_redraw()
+
+	func _draw() -> void:
+		if texture == null:
+			return
+		var fade := 1.0
+		if age > lifetime - fade_time:
+			fade = clampf((lifetime - age) / fade_time, 0.0, 1.0)
+		for flake in flakes:
+			var pos: Vector2 = flake["pos"]
+			var size := float(flake["size"])
+			var alpha := float(flake["alpha"]) * fade
+			draw_texture_rect(texture, Rect2(pos - Vector2(size, size) * 0.5, Vector2(size, size)), false, Color(1.0, 1.0, 1.0, alpha))
+
+
 var _rooms: Dictionary = {}
 var _current_room: Vector2i = CENTER
 var _game_over := false
@@ -152,6 +230,7 @@ var _spawn_warning_timer := 0.0
 var _spawn_warning_room: Vector2i = CENTER
 var _random_chest_spawns_by_room: Dictionary = {}
 var _room_template_instances: Array[Node] = []
+var _active_room_snow: Node2D = null
 
 # 摄像机 + 打击反馈
 var _cam_mgr: CameraManager
@@ -302,6 +381,9 @@ func _generate_floor() -> void:
 	_doors.clear()
 	_clear_room_template_instances()
 	_random_chest_spawns_by_room.clear()
+	if _active_room_snow != null and is_instance_valid(_active_room_snow):
+		_active_room_snow.queue_free()
+	_active_room_snow = null
 	_boss_defeated = false
 	_portal_active = false
 	_return_portal_near = false
@@ -654,6 +736,7 @@ func _on_player_entered_room(pos: Vector2i) -> void:
 		return
 
 	room.state = RoomState.ACTIVE
+	_spawn_room_objects(pos)
 	# 1) 关门
 	_close_doors(pos)
 	# 2) 预警 + 出怪。障碍物来自房间 tscn 模板。
@@ -1010,7 +1093,95 @@ func _instantiate_room_templates() -> void:
 		instance.position = Vector2(pos.x * CELL_W + ROOM_PAD_X, pos.y * CELL_H + ROOM_PAD_Y)
 		add_child(instance)
 		room.template_instance = instance
+		_add_template_plant_decorations(room, instance, pos)
 		_room_template_instances.append(instance)
+
+
+func _add_template_plant_decorations(room: RoomData, instance: Node2D, room_pos: Vector2i) -> void:
+	if PLANT_DECORATION_TEXTURES.is_empty():
+		return
+	var decoration_parent := instance.get_node_or_null("Decorations") as Node2D
+	if decoration_parent == null:
+		decoration_parent = Node2D.new()
+		decoration_parent.name = "Decorations"
+		instance.add_child(decoration_parent)
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(1000003 + room_pos.x * 9176 + room_pos.y * 1319 + _current_floor * 271)
+	var count := rng.randi_range(ROOM_PLANT_DECORATION_MIN, ROOM_PLANT_DECORATION_MAX)
+	if room.is_boss:
+		count += 1
+	var occupied: Array[Vector2] = []
+	for i in count:
+		var local_pos := _random_plant_decoration_pos(rng, occupied)
+		if local_pos == Vector2.ZERO:
+			continue
+		var texture: Texture2D = PLANT_DECORATION_TEXTURES[rng.randi_range(0, PLANT_DECORATION_TEXTURES.size() - 1)]
+		var sprite := Sprite2D.new()
+		sprite.name = "PlantDecoration%02d" % (i + 1)
+		sprite.texture = texture
+		sprite.centered = true
+		sprite.position = local_pos
+		sprite.z_index = 1
+		var display_size := rng.randf_range(24.0, 34.0)
+		var max_dim := maxf(float(texture.get_width()), float(texture.get_height()))
+		if max_dim > 0.0:
+			sprite.scale = Vector2.ONE * (display_size / max_dim)
+		sprite.rotation = rng.randf_range(-0.08, 0.08)
+		sprite.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.82, 0.96))
+		decoration_parent.add_child(sprite)
+		occupied.append(local_pos)
+
+
+func _random_plant_decoration_pos(rng: RandomNumberGenerator, occupied: Array[Vector2]) -> Vector2:
+	var local_bounds := Rect2(
+		Vector2(WALL_T + 34.0, WALL_T + 34.0),
+		Vector2(ROOM_W - WALL_T * 2.0 - 68.0, ROOM_H - WALL_T * 2.0 - 68.0)
+	)
+	var center := Vector2(ROOM_W * 0.5, ROOM_H * 0.5)
+	for _attempt in 30:
+		var pos := Vector2(
+			rng.randf_range(local_bounds.position.x, local_bounds.end.x),
+			rng.randf_range(local_bounds.position.y, local_bounds.end.y)
+		)
+		if pos.distance_to(center) < 104.0:
+			continue
+		if _is_near_room_door_local(pos, 70.0, 56.0):
+			continue
+		var too_close := false
+		for other in occupied:
+			if pos.distance_to(other) < 54.0:
+				too_close = true
+				break
+		if too_close:
+			continue
+		return pos
+	return Vector2.ZERO
+
+
+func _is_near_room_door_local(pos: Vector2, half_width: float, edge_depth: float) -> bool:
+	var center_x := ROOM_W * 0.5
+	var center_y := ROOM_H * 0.5
+	if absf(pos.x - center_x) < half_width and (pos.y < edge_depth or pos.y > ROOM_H - edge_depth):
+		return true
+	if absf(pos.y - center_y) < half_width and (pos.x < edge_depth or pos.x > ROOM_W - edge_depth):
+		return true
+	return false
+
+
+func _maybe_spawn_room_snow(room_pos: Vector2i) -> void:
+	if randf() > ROOM_SNOW_CHANCE:
+		return
+	if _active_room_snow != null and is_instance_valid(_active_room_snow):
+		_active_room_snow.queue_free()
+	var bounds := Rect2(
+		Vector2(room_pos.x * CELL_W + ROOM_PAD_X + WALL_T, room_pos.y * CELL_H + ROOM_PAD_Y + WALL_T),
+		Vector2(ROOM_W - WALL_T * 2.0, ROOM_H - WALL_T * 2.0)
+	)
+	var effect := RoomSnowFallEffect.new()
+	add_child(effect)
+	effect.setup(ROOM_SNOW_PARTICLE_TEXTURE, bounds, Time.get_ticks_msec() + room_pos.x * 97 + room_pos.y * 193)
+	_active_room_snow = effect
 
 
 func _get_template_marker_global_positions(room: RoomData, prefix: String) -> Array[Vector2]:
@@ -1033,9 +1204,8 @@ func _collect_template_marker_positions(node: Node, prefix: String, positions: A
 var _room_objects: Dictionary = {}  # {Vector2i: Array[Node]}
 
 func _spawn_room_objects(grid_pos: Vector2i) -> void:
-	# 起始房间和 Boss 房不放物件
 	var room: RoomData = _rooms[grid_pos]
-	if room.is_start or room.is_boss:
+	if room.kind != RoomKind.BATTLE or _room_objects.has(grid_pos):
 		return
 
 	var occupied: Array[Vector2] = []
@@ -1047,13 +1217,9 @@ func _spawn_room_objects(grid_pos: Vector2i) -> void:
 
 	var objects: Array[Node] = []
 
-	# 普通房间直接生成可破坏宝箱，单房间最多 2 个。
-	var chest_count := 1 + randi() % MAX_RANDOM_CHESTS_PER_ROOM
+	var chest_positions := _random_room_chest_group_positions(rx, ry, rw, rh, center, occupied)
 	var chest_scene: PackedScene = preload("res://scenes/Chest.tscn")
-	for i in chest_count:
-		var pos := _random_room_pos(rx, ry, rw, rh, center, 80.0, occupied, 40.0)
-		if pos == Vector2.ZERO:
-			continue
+	for pos in chest_positions:
 		var chest: Area2D = chest_scene.instantiate()
 		chest.position = pos
 		add_child(chest)
@@ -1062,6 +1228,51 @@ func _spawn_room_objects(grid_pos: Vector2i) -> void:
 		occupied.append(pos)
 
 	_room_objects[grid_pos] = objects
+
+
+func _random_room_chest_group_positions(rx: float, ry: float, rw: float, rh: float,
+		center: Vector2, occupied: Array[Vector2]) -> Array[Vector2]:
+	var shapes := [
+		[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)],
+		[Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)],
+		[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1)],
+		[Vector2i(0, 0), Vector2i(-1, 0), Vector2i(0, 1)],
+		[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, -1)],
+		[Vector2i(0, 0), Vector2i(-1, 0), Vector2i(0, -1)],
+		[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)],
+	]
+	for _attempt in 36:
+		var offsets: Array = shapes[randi() % shapes.size()]
+		var base := _random_room_pos(rx, ry, rw, rh, center, 92.0, occupied, ROOM_CHEST_GROUP_SPACING)
+		if base == Vector2.ZERO:
+			continue
+		var positions: Array[Vector2] = []
+		var valid := true
+		for offset in offsets:
+			var offset_vec := Vector2(float(offset.x), float(offset.y))
+			var pos := base + offset_vec * ROOM_CHEST_GROUP_SPACING
+			if not _is_room_chest_group_pos_valid(pos, rx, ry, rw, rh, center, occupied):
+				valid = false
+				break
+			positions.append(pos)
+		if valid:
+			return positions
+	return []
+
+
+func _is_room_chest_group_pos_valid(pos: Vector2, rx: float, ry: float, rw: float, rh: float,
+		center: Vector2, occupied: Array[Vector2]) -> bool:
+	if pos.x < rx or pos.x > rx + rw or pos.y < ry or pos.y > ry + rh:
+		return false
+	if pos.distance_to(center) < 92.0:
+		return false
+	var local := Vector2(pos.x - (rx - WALL_T - 20.0), pos.y - (ry - WALL_T - 20.0))
+	if _is_near_room_door_local(local, 74.0, 66.0):
+		return false
+	for other in occupied:
+		if pos.distance_to(other) < ROOM_CHEST_GROUP_SPACING:
+			return false
+	return true
 
 
 func _random_room_pos(rx: float, ry: float, rw: float, rh: float,
@@ -1252,6 +1463,7 @@ func _physics_process(_delta: float) -> void:
 	if grid_pos != _current_room and grid_pos in _rooms:
 		_current_room = grid_pos
 		var room: RoomData = _rooms[grid_pos]
+		_maybe_spawn_room_snow(grid_pos)
 		if not room.explored:
 			room.explored = true
 			queue_redraw()

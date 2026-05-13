@@ -1,8 +1,7 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Texture2D" path="res://assets/export/decoration/冰原墙壁.png" id="1"]
 [ext_resource type="Texture2D" path="res://assets/export/decoration/冰原箱子.png" id="2"]
-[ext_resource type="Texture2D" path="res://assets/export/decoration/垃圾桶-骑士之家.png" id="3"]
 
 [sub_resource type="RectangleShape2D" id="1"]
 size = Vector2(46, 58)
@@ -64,11 +63,6 @@ scale = Vector2(2, 2)
 shape = SubResource("2")
 
 [node name="Decorations" type="Node2D" parent="."]
-
-[node name="TrashCan" type="Sprite2D" parent="Decorations"]
-position = Vector2(350, 102)
-texture = ExtResource("3")
-scale = Vector2(0.40, 0.40)
 
 [node name="EnemySpawns" type="Node2D" parent="."]
 
