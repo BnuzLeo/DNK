@@ -5,7 +5,8 @@ const VS := preload("res://scripts/visual_spec.gd")
 const TITLE_STINGER_PATH := "res://assets/music/dialogue/真的是你啊.MP3"
 const MENU_VIDEO_FRAME_DIR := "res://assets/export/start/start_video_frames"
 const MENU_VIDEO_FPS := 12.0
-const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/宣发视频.ogv"
+const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/开始游戏视频.ogv"
+const ENABLE_MENU_VIDEO_AUDIO := true
 const KUN_PARALLAX_RANGE := Vector2(36.0, 24.0)
 const SKIP_HOLD_TIME := 1.0
 const ENABLE_DIALOGUE_AUDIO := false
@@ -13,6 +14,7 @@ const ENABLE_START_SEQUENCE_AUDIO := true
 const MUTED_DIALOGUE_VOLUME_DB := -80.0
 
 @onready var _menu_video_layer: CanvasLayer = $MenuVideoLayer
+@onready var _menu_stream_player: VideoStreamPlayer = $MenuVideoLayer/MenuVideoStreamPlayer
 @onready var _menu_video_player: TextureRect = $MenuVideoLayer/MenuVideoPlayer
 @onready var _bg: TextureRect = $Background
 @onready var _kun: TextureRect = $KunParallax
@@ -44,7 +46,12 @@ func _ready() -> void:
 	_start_button.pressed.connect(_on_start_pressed)
 	_lobby_test_button.pressed.connect(_go_to_lobby)
 	_dungeon_test_button.pressed.connect(_go_to_dungeon)
+	_menu_stream_player.finished.connect(_on_menu_video_finished)
 	_video_player.finished.connect(_on_video_finished)
+	_menu_stream_player.bus = "Master"
+	_video_player.bus = "Master"
+	if not ENABLE_MENU_VIDEO_AUDIO:
+		_menu_stream_player.volume_db = MUTED_DIALOGUE_VOLUME_DB
 	if not ENABLE_START_SEQUENCE_AUDIO:
 		_video_player.volume_db = MUTED_DIALOGUE_VOLUME_DB
 	_video_overlay.visible = false
@@ -102,6 +109,7 @@ func _make_label_settings(font_size: int, font_color: Color, shadow_color: Color
 
 
 func _setup_feedback_nodes() -> void:
+	_menu_stream_player.pivot_offset = VS.VIEWPORT_SIZE * 0.5
 	_menu_video_player.pivot_offset = VS.VIEWPORT_SIZE * 0.5
 	_bg.pivot_offset = VS.VIEWPORT_SIZE * 0.5
 	_kun.pivot_offset = VS.VIEWPORT_SIZE * 0.5
@@ -176,6 +184,7 @@ func _on_start_pressed() -> void:
 	_video_started = true
 	_starting = false
 	_title_root.visible = false
+	_stop_menu_video()
 	_menu_video_layer.visible = false
 	_video_overlay.visible = true
 	_skip_hold = 0.0
@@ -211,6 +220,7 @@ func _play_start_feedback() -> void:
 	tween.tween_property(_start_button, "scale", Vector2(0.92, 0.92), 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_start_button, "scale", Vector2(1.08, 1.08), 0.12).set_delay(0.06).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_start_button, "modulate:a", 0.0, 0.18).set_delay(0.14)
+	tween.tween_property(_menu_stream_player, "scale", Vector2(1.035, 1.035), 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_menu_video_player, "scale", Vector2(1.035, 1.035), 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_bg, "scale", Vector2(1.035, 1.035), 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_kun, "scale", Vector2(1.085, 1.085), 0.34).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
@@ -224,18 +234,45 @@ func _play_start_feedback() -> void:
 
 
 func _play_menu_video() -> void:
+	if _play_menu_stream_video():
+		return
 	_menu_video_frames = _load_menu_video_frames()
 	if _menu_video_frames.is_empty():
 		_menu_video_layer.visible = false
 		return
 	_menu_video_layer.visible = true
+	_menu_stream_player.visible = false
+	_menu_video_player.visible = true
 	_menu_video_frame_index = 0
 	_menu_video_timer = 0.0
 	_menu_video_player.texture = _menu_video_frames[_menu_video_frame_index]
 
 
+func _play_menu_stream_video() -> bool:
+	var stream := _load_video_stream(START_SEQUENCE_VIDEO_PATH)
+	if stream == null:
+		return false
+	_menu_video_layer.visible = true
+	_menu_video_player.visible = false
+	_menu_stream_player.visible = true
+	_menu_stream_player.stream = stream
+	if ENABLE_MENU_VIDEO_AUDIO:
+		_menu_stream_player.volume_db = 0.0
+	else:
+		_menu_stream_player.volume_db = MUTED_DIALOGUE_VOLUME_DB
+	_menu_stream_player.play()
+	return true
+
+
+func _stop_menu_video() -> void:
+	if _menu_stream_player.is_playing():
+		_menu_stream_player.stop()
+
+
 func _update_menu_video(delta: float) -> void:
 	if _menu_video_frames.is_empty() or not _menu_video_layer.visible:
+		return
+	if _menu_stream_player.visible:
 		return
 	_menu_video_timer += delta
 	var frame_time := 1.0 / MENU_VIDEO_FPS
@@ -267,6 +304,7 @@ func _load_menu_video_frames() -> Array[Texture2D]:
 
 
 func _load_and_play_video() -> void:
+	_stop_menu_video()
 	var stream := _load_video_stream(START_SEQUENCE_VIDEO_PATH)
 	if stream == null:
 		push_warning("Start sequence video could not be loaded: %s" % START_SEQUENCE_VIDEO_PATH)
@@ -278,6 +316,12 @@ func _load_and_play_video() -> void:
 	else:
 		_video_player.volume_db = 0.0
 	_video_player.play()
+
+
+func _on_menu_video_finished() -> void:
+	if _video_started or not _menu_video_layer.visible or not _menu_stream_player.visible:
+		return
+	_menu_stream_player.play()
 
 
 func _load_video_stream(path: String) -> VideoStream:
