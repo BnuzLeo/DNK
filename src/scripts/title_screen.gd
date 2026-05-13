@@ -5,7 +5,8 @@ const VS := preload("res://scripts/visual_spec.gd")
 const TITLE_STINGER_PATH := "res://assets/music/dialogue/真的是你啊.MP3"
 const MENU_VIDEO_FRAME_DIR := "res://assets/export/start/start_video_frames"
 const MENU_VIDEO_FPS := 12.0
-const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/开始游戏视频.ogv"
+const MENU_STREAM_VIDEO_PATH := "res://assets/export/start/开始游戏视频.ogv"
+const START_SEQUENCE_VIDEO_PATH := "res://assets/export/start/宣发视频.ogv"
 const ENABLE_MENU_VIDEO_AUDIO := true
 const KUN_PARALLAX_RANGE := Vector2(36.0, 24.0)
 const SKIP_HOLD_TIME := 1.0
@@ -249,7 +250,7 @@ func _play_menu_video() -> void:
 
 
 func _play_menu_stream_video() -> bool:
-	var stream := _load_video_stream(START_SEQUENCE_VIDEO_PATH)
+	var stream := _load_video_stream(MENU_STREAM_VIDEO_PATH)
 	if stream == null:
 		return false
 	_menu_video_layer.visible = true
