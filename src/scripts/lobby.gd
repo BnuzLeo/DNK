@@ -830,39 +830,8 @@ func _open_map_select() -> void:
 	close_button.pressed.connect(GameAudio.play_button)
 	close_button.pressed.connect(_close_map_select)
 
-	var tab_size := Vector2(96, 58)
-	var card_size := Vector2(156, 216)
-	var card_gap := 14.0
-	var group_gap := 18.0
-	var card_y := 82.0
-	var content_w := tab_size.x + group_gap + card_size.x * 3.0 + card_gap * 2.0
-	var content_x := (window_size.x - content_w) * 0.5
-	var card_start_x := content_x + tab_size.x + group_gap
-	var tabs_h := tab_size.y * 3.0 + 10.0 * 2.0
-	var tab_start_y := card_y + (card_size.y - tabs_h) * 0.5
-
-	var modes := [
-		{"name": "关卡模式", "selected": true, "locked": false},
-		{"name": "赛季模式", "selected": false, "locked": true},
-		{"name": "古迹战场", "selected": false, "locked": true},
-	]
-	for i in modes.size():
-		var tab := Control.new()
-		tab.position = Vector2(content_x, tab_start_y + i * (tab_size.y + 10.0))
-		tab.size = tab_size
-		tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tab.draw.connect(_draw_mode_tab.bind(tab, String(modes[i].name), bool(modes[i].selected), bool(modes[i].locked), i))
-		window.add_child(tab)
-
-	_map_cards.clear()
-	for i in _map_names.size():
-		var card := Control.new()
-		card.position = Vector2(card_start_x + i * (card_size.x + card_gap), card_y)
-		card.size = card_size
-		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.draw.connect(_draw_map_card.bind(card, i))
-		window.add_child(card)
-		_map_cards.append(card)
+	_setup_stage_mode_tabs(window)
+	_bind_stage_map_cards(window)
 
 	var start_button := window.get_node("StartButton") as Button
 	start_button.focus_mode = Control.FOCUS_NONE
@@ -874,6 +843,114 @@ func _open_map_select() -> void:
 	start_button.pressed.connect(_enter_dungeon)
 
 	_refresh_map_cards()
+
+
+func _setup_stage_mode_tabs(window: Control) -> void:
+	var modes := [
+		{"path": "StageModeTab", "name": "关卡模式", "selected": true, "locked": false},
+		{"path": "SeasonModeTab", "name": "赛季模式", "selected": false, "locked": true},
+		{"path": "AncientModeTab", "name": "古迹战场", "selected": false, "locked": true},
+	]
+	for i in modes.size():
+		var tab := window.get_node_or_null("ModeTabs/%s" % String(modes[i]["path"])) as Control
+		if tab == null:
+			continue
+		tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_configure_stage_mode_tab(tab, String(modes[i]["name"]), bool(modes[i]["selected"]), bool(modes[i]["locked"]), i)
+
+
+func _configure_stage_mode_tab(tab: Control, label: String, selected: bool, locked: bool, index: int) -> void:
+	var background := tab.get_node_or_null("Background") as TextureRect
+	if background != null:
+		background.texture = GUI_TAB_ACTIVE if selected else GUI_TAB_INACTIVE
+
+	var name_label := tab.get_node_or_null("NameLabel") as Label
+	if name_label != null:
+		name_label.text = label
+		name_label.add_theme_color_override("font_color", Color.WHITE if not locked else Color(0.66, 0.66, 0.70))
+
+	var coming_soon := tab.get_node_or_null("ComingSoonLabel") as Label
+	if coming_soon != null:
+		coming_soon.visible = locked
+
+	var preview := tab.get_node_or_null("Preview") as Control
+	if preview != null:
+		preview.draw.connect(_draw_mode_tab_preview.bind(preview, selected, locked, index))
+		preview.queue_redraw()
+
+
+func _draw_mode_tab_preview(ctrl: Control, selected: bool, locked: bool, index: int) -> void:
+	var rect := Rect2(Vector2.ZERO, ctrl.size)
+	ctrl.draw_rect(rect, Color(0.08, 0.45, 0.35, 0.85) if selected else Color(0.05, 0.28, 0.34, 0.72))
+	ctrl.draw_line(rect.position + Vector2(rect.size.x * 0.5, 0), rect.position + Vector2(rect.size.x * 0.5, rect.size.y), Color(0.6, 0.95, 0.85, 0.45), 1.0)
+	if locked:
+		_draw_lock(ctrl, rect.get_center(), 14.0)
+	elif index == 1:
+		_draw_small_demon(ctrl, rect.get_center() + Vector2(-10, 0))
+		ctrl.draw_circle(rect.get_center() + Vector2(16, -2), 8, Color(0.2, 0.9, 1.0, 0.7))
+	else:
+		_draw_chibi_player(ctrl, rect.get_center() + Vector2(-8, 4))
+		_draw_basketball(ctrl, rect.get_center() + Vector2(18, 3), 5.0)
+
+
+func _bind_stage_map_cards(window: Control) -> void:
+	_map_cards.clear()
+	var card_root := window.get_node_or_null("MapCards") as Control
+	if card_root == null:
+		return
+	for i in _map_names.size():
+		var card := card_root.get_node_or_null("MapCard%d" % i) as Control
+		if card == null:
+			continue
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_configure_stage_map_card(card, i)
+		var thumbnail := card.get_node_or_null("Thumbnail") as Control
+		if thumbnail != null:
+			thumbnail.draw.connect(_draw_stage_map_thumbnail.bind(thumbnail, i))
+			thumbnail.queue_redraw()
+		_map_cards.append(card)
+
+
+func _configure_stage_map_card(card: Control, index: int) -> void:
+	var available := index == 0
+	var background := card.get_node_or_null("Background") as TextureRect
+	if background != null:
+		background.texture = GUI_POPUP_SLOT_SELECTED if available else GUI_POPUP_SLOT
+
+	var star_label := card.get_node_or_null("StarLabel") as Label
+	if star_label != null:
+		star_label.add_theme_color_override("font_color", Color(0.92, 0.93, 0.94) if available else (Color(0.78, 0.58, 0.12) if index == 2 else Color(0.18, 0.18, 0.20)))
+
+	var name_label := card.get_node_or_null("NameLabel") as Label
+	if name_label != null:
+		name_label.text = _map_names[index]
+		name_label.add_theme_color_override("font_color", Color.WHITE if available else Color(0.28, 0.28, 0.30))
+
+	var record_label := card.get_node_or_null("RecordLabel") as Label
+	if record_label != null:
+		record_label.visible = available
+		record_label.text = "已有记录: I-I"
+
+	for path in ["LockedOverlay", "LockIcon", "LockLabel", "DescLabel"]:
+		var node := card.get_node_or_null(path) as CanvasItem
+		if node != null:
+			node.visible = not available
+
+	var lock_label := card.get_node_or_null("LockLabel") as Label
+	if lock_label != null:
+		lock_label.text = "敬请期待"
+	var desc_label := card.get_node_or_null("DescLabel") as Label
+	if desc_label != null:
+		desc_label.text = "敬请期待"
+
+
+func _draw_stage_map_thumbnail(ctrl: Control, index: int) -> void:
+	var rect := Rect2(Vector2.ZERO, ctrl.size)
+	if index == 0:
+		_draw_frozen_court_thumbnail(ctrl, rect)
+	else:
+		ctrl.draw_rect(rect, Color(0.02, 0.025, 0.035, 0.95))
+		_draw_frozen_court_thumbnail(ctrl, rect)
 
 
 func _draw_map_card(card: Control, index: int) -> void:
@@ -1035,7 +1112,11 @@ func _refresh_map_cards() -> void:
 	if _map_cards.is_empty():
 		return
 	for i in _map_cards.size():
+		_configure_stage_map_card(_map_cards[i], i)
 		_map_cards[i].queue_redraw()
+		var thumbnail := _map_cards[i].get_node_or_null("Thumbnail") as Control
+		if thumbnail != null:
+			thumbnail.queue_redraw()
 
 
 func _close_map_select() -> void:

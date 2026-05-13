@@ -1,76 +1,500 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://bbmmq0fkl5y8j"]
 
-[ext_resource type="Texture2D" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
-[ext_resource type="Texture2D" path="res://assets/export/gui/icon_stage.png" id="2_icon"]
-[ext_resource type="Texture2D" path="res://assets/export/gui/ui_close_button.png" id="3_close"]
-[ext_resource type="Texture2D" path="res://assets/export/gui/ui_button_primary.png" id="4_button"]
+[ext_resource type="Texture2D" uid="uid://c3lkhnewmuaok" path="res://assets/export/gui/ui_popup_panel.png" id="1_panel"]
+[ext_resource type="Texture2D" uid="uid://1tdo0c7jcdnl" path="res://assets/export/gui/icon_stage.png" id="2_icon"]
+[ext_resource type="Texture2D" uid="uid://dp4w77n4prjqu" path="res://assets/export/gui/ui_close_button.png" id="3_close"]
+[ext_resource type="Texture2D" uid="uid://c3akf3jvxts8y" path="res://assets/export/gui/ui_popup_slot.png" id="5_slot"]
+[ext_resource type="Texture2D" uid="uid://yr71v81gho4e" path="res://assets/export/gui/ui_popup_slot_selected.png" id="6_slot_selected"]
+[ext_resource type="Texture2D" uid="uid://c1k5p4rhnh53h" path="res://assets/export/gui/ui_tab_active.png" id="7_tab_active"]
+[ext_resource type="Texture2D" uid="uid://2x14uynno7do" path="res://assets/export/gui/ui_tab_inactive.png" id="8_tab_inactive"]
+[ext_resource type="Texture2D" uid="uid://dibfu37wi4a5v" path="res://assets/export/gui/ui_badge_locked.png" id="9_lock"]
+[ext_resource type="Texture2D" uid="uid://8lsspbvy02q2" path="res://assets/export/gui/confirm-btn.png" id="9_ra3rw"]
 
-[node name="StageSelectPanel" type="CanvasLayer"]
-layer = 24
+[node name="StageSelectPanel" type="CanvasLayer" unique_id=846568681]
 process_mode = 3
+layer = 24
 
-[node name="Backdrop" type="ColorRect" parent="."]
+[node name="Backdrop" type="ColorRect" parent="." unique_id=2123428911]
 offset_right = 960.0
 offset_bottom = 640.0
 color = Color(0, 0, 0, 0.58)
-mouse_filter = 0
 
-[node name="Window" type="Control" parent="."]
+[node name="Window" type="Control" parent="." unique_id=809983880]
+clip_contents = true
+layout_mode = 3
+anchors_preset = 0
 offset_left = 144.0
 offset_top = 96.0
 offset_right = 816.0
 offset_bottom = 544.0
-clip_contents = true
-mouse_filter = 0
 
-[node name="WindowBg" type="TextureRect" parent="Window"]
+[node name="WindowBg" type="TextureRect" parent="Window" unique_id=380317630]
+layout_mode = 0
 offset_right = 672.0
 offset_bottom = 448.0
+mouse_filter = 2
 texture = ExtResource("1_panel")
 expand_mode = 1
-stretch_mode = 0
-mouse_filter = 2
 
-[node name="TitleIcon" type="TextureRect" parent="Window"]
+[node name="TitleIcon" type="TextureRect" parent="Window" unique_id=161205073]
+layout_mode = 0
 offset_left = 26.0
 offset_top = 20.0
 offset_right = 74.0
 offset_bottom = 68.0
+mouse_filter = 2
 texture = ExtResource("2_icon")
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
-[node name="TitleLabel" type="Label" parent="Window"]
-offset_left = 84.0
-offset_top = 14.0
-offset_right = 360.0
-offset_bottom = 56.0
-horizontal_alignment = 1
+[node name="TitleLabel" type="Label" parent="Window" unique_id=991231305]
+layout_mode = 0
+offset_left = 194.0
+offset_top = 42.0
+offset_right = 470.0
+offset_bottom = 84.0
 theme_override_colors/font_color = Color(0.98, 0.92, 0.78, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
 theme_override_font_sizes/font_size = 26
 text = "关卡模式"
-mouse_filter = 2
+horizontal_alignment = 1
 
-[node name="CloseButton" type="Button" parent="Window"]
+[node name="CloseButton" type="Button" parent="Window" unique_id=1873602741]
+layout_mode = 0
 offset_left = 616.0
 offset_top = 10.0
 offset_right = 660.0
 offset_bottom = 54.0
-text = ""
+focus_mode = 0
 icon = ExtResource("3_close")
 expand_icon = true
-focus_mode = 0
-mouse_filter = 0
 
-[node name="StartButton" type="Button" parent="Window"]
-offset_left = 246.0
-offset_top = 318.0
-offset_right = 426.0
-offset_bottom = 356.0
-text = "开始游玩"
+[node name="ModeTabs" type="Control" parent="Window" unique_id=1003900782]
+anchors_preset = 0
+offset_left = 3.0
+offset_right = 675.0
+offset_bottom = 448.0
+mouse_filter = 2
+
+[node name="StageModeTab" type="Control" parent="Window/ModeTabs" unique_id=487503901]
+anchors_preset = 0
+offset_left = 31.0
+offset_top = 93.0
+offset_right = 127.0
+offset_bottom = 151.0
+mouse_filter = 2
+
+[node name="Background" type="TextureRect" parent="Window/ModeTabs/StageModeTab" unique_id=643761473]
+layout_mode = 0
+offset_right = 96.0
+offset_bottom = 58.0
+mouse_filter = 2
+texture = ExtResource("7_tab_active")
+expand_mode = 1
+
+[node name="Preview" type="Control" parent="Window/ModeTabs/StageModeTab" unique_id=1642817458]
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 86.0
+offset_bottom = 36.0
+mouse_filter = 2
+
+[node name="NameLabel" type="Label" parent="Window/ModeTabs/StageModeTab" unique_id=270951165]
+layout_mode = 0
+offset_top = 38.0
+offset_right = 96.0
+offset_bottom = 58.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "关卡模式"
+horizontal_alignment = 1
+
+[node name="ComingSoonLabel" type="Label" parent="Window/ModeTabs/StageModeTab" unique_id=2010998027]
+visible = false
+layout_mode = 0
+offset_top = 24.0
+offset_right = 96.0
+offset_bottom = 42.0
+theme_override_colors/font_color = Color(0.72, 0.72, 0.76, 1)
+theme_override_font_sizes/font_size = 12
+text = "敬请期待"
+horizontal_alignment = 1
+
+[node name="SeasonModeTab" type="Control" parent="Window/ModeTabs" unique_id=1600847097]
+anchors_preset = 0
+offset_left = 31.0
+offset_top = 161.0
+offset_right = 127.0
+offset_bottom = 219.0
+mouse_filter = 2
+
+[node name="Background" type="TextureRect" parent="Window/ModeTabs/SeasonModeTab" unique_id=1143240806]
+layout_mode = 0
+offset_right = 96.0
+offset_bottom = 58.0
+mouse_filter = 2
+texture = ExtResource("8_tab_inactive")
+expand_mode = 1
+
+[node name="Preview" type="Control" parent="Window/ModeTabs/SeasonModeTab" unique_id=816825729]
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 86.0
+offset_bottom = 36.0
+mouse_filter = 2
+
+[node name="NameLabel" type="Label" parent="Window/ModeTabs/SeasonModeTab" unique_id=953616746]
+layout_mode = 0
+offset_top = 38.0
+offset_right = 96.0
+offset_bottom = 58.0
+theme_override_colors/font_color = Color(0.66, 0.66, 0.7, 1)
+theme_override_font_sizes/font_size = 16
+text = "赛季模式"
+horizontal_alignment = 1
+
+[node name="AncientModeTab" type="Control" parent="Window/ModeTabs" unique_id=244698169]
+anchors_preset = 0
+offset_left = 31.0
+offset_top = 229.0
+offset_right = 127.0
+offset_bottom = 287.0
+mouse_filter = 2
+
+[node name="Background" type="TextureRect" parent="Window/ModeTabs/AncientModeTab" unique_id=1553226751]
+layout_mode = 0
+offset_right = 96.0
+offset_bottom = 58.0
+mouse_filter = 2
+texture = ExtResource("8_tab_inactive")
+expand_mode = 1
+
+[node name="Preview" type="Control" parent="Window/ModeTabs/AncientModeTab" unique_id=596669544]
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 86.0
+offset_bottom = 36.0
+mouse_filter = 2
+
+[node name="NameLabel" type="Label" parent="Window/ModeTabs/AncientModeTab" unique_id=2060820035]
+layout_mode = 0
+offset_top = 38.0
+offset_right = 96.0
+offset_bottom = 58.0
+theme_override_colors/font_color = Color(0.66, 0.66, 0.7, 1)
+theme_override_font_sizes/font_size = 16
+text = "古迹战场"
+horizontal_alignment = 1
+
+[node name="MapCards" type="Control" parent="Window" unique_id=1323181980]
+anchors_preset = 0
+offset_left = 1.0
+offset_top = -2.0
+offset_right = 673.0
+offset_bottom = 446.0
+mouse_filter = 2
+
+[node name="MapCard0" type="Control" parent="Window/MapCards" unique_id=191665577]
+anchors_preset = 0
+offset_left = 145.0
+offset_top = 82.0
+offset_right = 301.0
+offset_bottom = 298.0
+mouse_filter = 2
+
+[node name="Background" type="TextureRect" parent="Window/MapCards/MapCard0" unique_id=1103934714]
+layout_mode = 0
+offset_right = 156.0
+offset_bottom = 216.0
+mouse_filter = 2
+texture = ExtResource("6_slot_selected")
+expand_mode = 1
+
+[node name="StarLabel" type="Label" parent="Window/MapCards/MapCard0" unique_id=194336028]
+layout_mode = 0
+offset_left = 12.0
+offset_top = 19.0
+offset_right = 37.0
+offset_bottom = 53.0
+theme_override_colors/font_color = Color(0.92, 0.93, 0.94, 1)
+theme_override_font_sizes/font_size = 24
+text = "*"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NameLabel" type="Label" parent="Window/MapCards/MapCard0" unique_id=1137201453]
+layout_mode = 0
+offset_left = 41.0
+offset_top = 20.0
+offset_right = 149.0
+offset_bottom = 46.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "冰封篮球场"
+
+[node name="Divider" type="ColorRect" parent="Window/MapCards/MapCard0" unique_id=116556554]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 48.0
+offset_right = 142.0
+offset_bottom = 50.0
+mouse_filter = 2
+color = Color(0.15, 0.17, 0.22, 0.8)
+
+[node name="Thumbnail" type="Control" parent="Window/MapCards/MapCard0" unique_id=1748809844]
+anchors_preset = 0
+offset_left = 18.0
+offset_top = 70.0
+offset_right = 138.0
+offset_bottom = 162.0
+mouse_filter = 2
+
+[node name="LockedOverlay" type="ColorRect" parent="Window/MapCards/MapCard0" unique_id=744159864]
+visible = false
+layout_mode = 0
+offset_right = 156.0
+offset_bottom = 216.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.46)
+
+[node name="LockIcon" type="TextureRect" parent="Window/MapCards/MapCard0" unique_id=898719875]
+visible = false
+layout_mode = 0
+offset_left = 60.0
+offset_top = 80.0
+offset_right = 96.0
+offset_bottom = 116.0
+mouse_filter = 2
+texture = ExtResource("9_lock")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LockLabel" type="Label" parent="Window/MapCards/MapCard0" unique_id=1336431861]
+visible = false
+layout_mode = 0
+offset_left = 32.0
+offset_top = 170.0
+offset_right = 124.0
+offset_bottom = 194.0
+theme_override_colors/font_color = Color(0.74, 0.74, 0.74, 1)
+theme_override_font_sizes/font_size = 16
+text = "敬请期待"
+horizontal_alignment = 1
+
+[node name="DescLabel" type="Label" parent="Window/MapCards/MapCard0" unique_id=2139238928]
+visible = false
+layout_mode = 0
+offset_left = 18.0
+offset_top = 196.0
+offset_right = 138.0
+offset_bottom = 214.0
+theme_override_colors/font_color = Color(0.3, 0.3, 0.34, 1)
+theme_override_font_sizes/font_size = 11
+text = "敬请期待"
+horizontal_alignment = 1
+
+[node name="MapCard1" type="Control" parent="Window/MapCards" unique_id=1229776233]
+anchors_preset = 0
+offset_left = 315.0
+offset_top = 82.0
+offset_right = 471.0
+offset_bottom = 298.0
+mouse_filter = 2
+
+[node name="Background" type="TextureRect" parent="Window/MapCards/MapCard1" unique_id=832314690]
+layout_mode = 0
+offset_right = 156.0
+offset_bottom = 216.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="StarLabel" type="Label" parent="Window/MapCards/MapCard1" unique_id=149083336]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 35.0
+offset_bottom = 38.0
+theme_override_colors/font_color = Color(0.18, 0.18, 0.2, 1)
+theme_override_font_sizes/font_size = 24
+text = "*"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NameLabel" type="Label" parent="Window/MapCards/MapCard1" unique_id=1400628793]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 13.0
+offset_right = 150.0
+offset_bottom = 37.0
+theme_override_colors/font_color = Color(0.28, 0.28, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "练习生雨林"
+
+[node name="Divider" type="ColorRect" parent="Window/MapCards/MapCard1" unique_id=1193172589]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 48.0
+offset_right = 142.0
+offset_bottom = 50.0
+mouse_filter = 2
+color = Color(0.15, 0.17, 0.22, 0.8)
+
+[node name="RecordLabel" type="Label" parent="Window/MapCards/MapCard1" unique_id=879443970]
+visible = false
+layout_mode = 0
+offset_left = 24.0
+offset_top = 55.0
+offset_right = 142.0
+offset_bottom = 72.0
+theme_override_colors/font_color = Color(0.86, 0.88, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "已有记录: I-I"
+
+[node name="Thumbnail" type="Control" parent="Window/MapCards/MapCard1" unique_id=1435449182]
+anchors_preset = 0
+offset_left = 18.0
+offset_top = 70.0
+offset_right = 138.0
+offset_bottom = 162.0
+mouse_filter = 2
+
+[node name="LockedOverlay" type="ColorRect" parent="Window/MapCards/MapCard1" unique_id=472081067]
+layout_mode = 0
+offset_right = 156.0
+offset_bottom = 216.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.46)
+
+[node name="LockIcon" type="TextureRect" parent="Window/MapCards/MapCard1" unique_id=517967314]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 80.0
+offset_right = 96.0
+offset_bottom = 116.0
+mouse_filter = 2
+texture = ExtResource("9_lock")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LockLabel" type="Label" parent="Window/MapCards/MapCard1" unique_id=1940693987]
+layout_mode = 0
+offset_left = 34.0
+offset_top = 161.0
+offset_right = 126.0
+offset_bottom = 185.0
+theme_override_colors/font_color = Color(0.74, 0.74, 0.74, 1)
+theme_override_font_sizes/font_size = 16
+text = "敬请期待"
+horizontal_alignment = 1
+
+[node name="MapCard2" type="Control" parent="Window/MapCards" unique_id=1058582110]
+anchors_preset = 0
+offset_left = 485.0
+offset_top = 82.0
+offset_right = 641.0
+offset_bottom = 298.0
+mouse_filter = 2
+
+[node name="Background" type="TextureRect" parent="Window/MapCards/MapCard2" unique_id=1363036457]
+layout_mode = 0
+offset_right = 156.0
+offset_bottom = 216.0
+mouse_filter = 2
+texture = ExtResource("5_slot")
+expand_mode = 1
+
+[node name="StarLabel" type="Label" parent="Window/MapCards/MapCard2" unique_id=1372235821]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 35.0
+offset_bottom = 38.0
+theme_override_colors/font_color = Color(0.78, 0.58, 0.12, 1)
+theme_override_font_sizes/font_size = 24
+text = "*"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NameLabel" type="Label" parent="Window/MapCards/MapCard2" unique_id=106448080]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 13.0
+offset_right = 150.0
+offset_bottom = 37.0
+theme_override_colors/font_color = Color(0.28, 0.28, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "流量和爆炸"
+
+[node name="Divider" type="ColorRect" parent="Window/MapCards/MapCard2" unique_id=1478901715]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 48.0
+offset_right = 142.0
+offset_bottom = 50.0
+mouse_filter = 2
+color = Color(0.15, 0.17, 0.22, 0.8)
+
+[node name="RecordLabel" type="Label" parent="Window/MapCards/MapCard2" unique_id=305063082]
+visible = false
+layout_mode = 0
+offset_left = 24.0
+offset_top = 55.0
+offset_right = 142.0
+offset_bottom = 72.0
+theme_override_colors/font_color = Color(0.86, 0.88, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "已有记录: I-I"
+
+[node name="Thumbnail" type="Control" parent="Window/MapCards/MapCard2" unique_id=370808547]
+anchors_preset = 0
+offset_left = 18.0
+offset_top = 70.0
+offset_right = 138.0
+offset_bottom = 162.0
+mouse_filter = 2
+
+[node name="LockedOverlay" type="ColorRect" parent="Window/MapCards/MapCard2" unique_id=1506919265]
+layout_mode = 0
+offset_right = 156.0
+offset_bottom = 216.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.46)
+
+[node name="LockIcon" type="TextureRect" parent="Window/MapCards/MapCard2" unique_id=2087421785]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 80.0
+offset_right = 96.0
+offset_bottom = 116.0
+mouse_filter = 2
+texture = ExtResource("9_lock")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LockLabel" type="Label" parent="Window/MapCards/MapCard2" unique_id=1006494370]
+layout_mode = 0
+offset_left = 31.0
+offset_top = 161.0
+offset_right = 123.0
+offset_bottom = 185.0
+theme_override_colors/font_color = Color(0.74, 0.74, 0.74, 1)
+theme_override_font_sizes/font_size = 16
+text = "敬请期待"
+horizontal_alignment = 1
+
+[node name="StartButton" type="Button" parent="Window" unique_id=176220525]
+layout_mode = 0
+offset_left = 247.0
+offset_top = 328.0
+offset_right = 391.0
+offset_bottom = 402.0
 theme_override_font_sizes/font_size = 22
-mouse_filter = 0
+text = "开始游玩"
+icon = ExtResource("9_ra3rw")
+icon_alignment = 1

@@ -16,7 +16,7 @@ metadata/room_kind = "battle"
 
 [node name="IceWallA" type="StaticBody2D" parent="Obstacles" unique_id=4769560]
 position = Vector2(178, 174)
-scale = Vector2(0.5, 0.5)
+scale = Vector2(0.6, 0.6)
 collision_layer = 16
 collision_mask = 0
 
@@ -29,7 +29,7 @@ shape = SubResource("1")
 
 [node name="IceWallB" type="StaticBody2D" parent="Obstacles" unique_id=606121100]
 position = Vector2(522, 174)
-scale = Vector2(0.5, 0.5)
+scale = Vector2(0.6, 0.6)
 collision_layer = 16
 collision_mask = 0
 
@@ -42,7 +42,7 @@ shape = SubResource("1")
 
 [node name="IceCrateA" type="StaticBody2D" parent="Obstacles" unique_id=129803154]
 position = Vector2(270, 278)
-scale = Vector2(0.5, 0.5)
+scale = Vector2(0.6, 0.6)
 collision_layer = 16
 collision_mask = 0
 
@@ -55,7 +55,7 @@ shape = SubResource("2")
 
 [node name="IceCrateB" type="StaticBody2D" parent="Obstacles" unique_id=1759908776]
 position = Vector2(430, 278)
-scale = Vector2(0.5, 0.5)
+scale = Vector2(0.6, 0.6)
 collision_layer = 16
 collision_mask = 0
 
