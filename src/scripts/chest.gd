@@ -303,8 +303,12 @@ func _load_random_normal_chest_frames() -> void:
 	_normal_frame_timer = 0.0
 	if NORMAL_CHEST_FRAME_DIRS.is_empty():
 		return
-	var dir_path := String(NORMAL_CHEST_FRAME_DIRS[randi() % NORMAL_CHEST_FRAME_DIRS.size()])
-	_normal_chest_frames = _load_texture_frames_from_dir(dir_path)
+	var candidate_dirs := NORMAL_CHEST_FRAME_DIRS.duplicate()
+	candidate_dirs.shuffle()
+	for dir_path in candidate_dirs:
+		_normal_chest_frames = _load_texture_frames_from_dir(String(dir_path))
+		if not _normal_chest_frames.is_empty():
+			return
 
 
 func _load_texture_frames_from_dir(dir_path: String) -> Array[Texture2D]:
